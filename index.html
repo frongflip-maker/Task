@@ -364,6 +364,7 @@ try {
         red: "#B74B43", cyan: "#4F7F75", gold: "#9A742F", pink: "#A65F66",
         violet: "#7D5D4D", indigo: "#676A4B", slate: "#746D62", gray: "#777064",
     };
+    const TRANSFER_COLOR = "#4A6FA5";
     const glow = (c, a = 0.35) => `0 0 0 1px ${c}33, 0 8px 28px ${hex(c, a)}`;
     function hex(c, a) { const n = parseInt(c.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
     const KG2LB = 2.20462;
@@ -2021,6 +2022,47 @@ try {
                 setIncomeSources(list => list.map(item => item.id === incomeSourceId ? { ...item, status: "paid", updatedAt: new Date().toISOString() } : item));
             return true;
         };
+        const updateIncomeSourcePayment = (paymentId, payment) => {
+            const currentPayment = payments.find(item => item.id === paymentId);
+            if (!currentPayment)
+                return false;
+            const source = incomeSources.find(item => item.id === currentPayment.incomeSourceId);
+            if (!source)
+                return false;
+            const paymentType = ["full", "deposit", "balance", "tip"].includes(payment.paymentType) ? payment.paymentType : "full";
+            const fallbackCategory = normalizeIncomeCategory(source.category || "Work");
+            let allocations = Array.isArray(payment.allocations) ? payment.allocations.map(allocation => {
+                const role = allocation.role === "tip" ? "tip" : allocation.role === "pass_through" ? "pass_through" : "principal";
+                return {
+                    id: allocation.id || uid(), role,
+                    category: role === "pass_through" ? "เงินส่วนของผู้อื่น" : normalizeIncomeCategory(allocation.category || (role === "tip" ? "Tips" : fallbackCategory)),
+                    amount: Math.max(0, Number(allocation.amount) || 0),
+                    recipientName: role === "pass_through" ? String(allocation.recipientName || allocation.name || "").trim() : "",
+                    settled: role === "pass_through" ? !!allocation.settled : false,
+                    settledDate: role === "pass_through" && allocation.settled ? (allocation.settledDate || payment.date || TK) : "",
+                    settledAccountId: role === "pass_through" && allocation.settled ? (allocation.settledAccountId || payment.accountId || null) : null
+                };
+            }).filter(allocation => allocation.amount > 0) : [];
+            const legacyAmount = Math.max(0, Number(payment.amount) || 0);
+            if (!allocations.length && legacyAmount > 0)
+                allocations = [{ id: uid(), role: paymentType === "tip" ? "tip" : "principal", category: paymentType === "tip" ? "Tips" : fallbackCategory, amount: legacyAmount }];
+            const amount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+            const principalAmount = allocations.filter(allocation => allocation.role === "principal").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const tipAmount = allocations.filter(allocation => allocation.role === "tip").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const passThroughAmount = allocations.filter(allocation => allocation.role === "pass_through").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const otherPayments = payments.filter(item => item.id !== paymentId);
+            const remaining = incomeSourceRemainingAmount(source, otherPayments);
+            const passThroughValid = allocations.filter(allocation => allocation.role === "pass_through").every(allocation => allocation.recipientName && (!allocation.settled || (allocation.settledDate && allocation.settledAccountId)));
+            if (amount <= 0 || principalAmount > remaining || (paymentType === "tip" && principalAmount > 0) || !passThroughValid)
+                return false;
+            rememberPayer(payment.payer);
+            const nextPayment = { ...currentPayment, paymentType, amount, principalAmount, tipAmount, passThroughAmount, allocations, date: payment.date || TK, accountId: payment.accountId || null, payer: String(payment.payer || "").trim(), note: String(payment.note || "").trim(), reconcileStatus: payment.reconcileStatus || "unchecked", updatedAt: new Date().toISOString() };
+            const nextPayments = payments.map(item => item.id === paymentId ? nextPayment : item);
+            setPayments(nextPayments);
+            const receivedPrincipal = nextPayments.filter(item => item.incomeSourceId === source.id).reduce((sum, item) => sum + paymentPrincipalAmount(item, fallbackCategory), 0);
+            setIncomeSources(list => list.map(item => item.id === source.id && !["archived", "cancelled"].includes(item.status) ? { ...item, status: receivedPrincipal >= Number(item.expectedAmount || 0) && Number(item.expectedAmount || 0) > 0 ? "paid" : "open", updatedAt: new Date().toISOString() } : item));
+            return true;
+        };
         const addPaidStudioBookingIncome = data => {
             const cleanName = normalizeCustomerName(data?.bandName);
             const studioService = data?.studioService === "teaching" ? "teaching" : "room";
@@ -2158,7 +2200,7 @@ try {
                 setExpenseTargets(targets => { const copy = { ...targets }; delete copy[name]; return copy; });
         };
         const updateCapital = (v) => setCapital(Number(v) || 0);
-        const shared = { T, sel, setSel, events: allEvents, todayEvents, bookings, incomeSources, payments, addIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, budgetIncomeSourceRequest, clearBudgetIncomeSourceRequest, openIncomeSourceBudget,
+        const shared = { T, sel, setSel, events: allEvents, todayEvents, bookings, incomeSources, payments, addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, budgetIncomeSourceRequest, clearBudgetIncomeSourceRequest, openIncomeSourceBudget,
             loyaltyBase, resetLoyalty, setLoyaltyRemaining, toggleBookingDone, cancelBooking, archiveBooking, delBooking, delBand, customerProfiles, updateCustomerProfile, deleteCustomerProfile, studioBookingRequest, clearStudioBookingRequest, openStudioBooking,
             transactions, addTxn, updateTxn, delTxn, capital, updateCapital,
             exportEventICS, exportDayICS, exportWeekICS, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase,
@@ -3728,14 +3770,48 @@ try {
       incomeSources = [],
       payments = [],
       initialIncomeSourceId = "",
+      initialIncomeSourcePayment = null,
       onSaveIncomeSourcePayment = null,
+      onUpdateIncomeSourcePayment = null,
       onDeleteIncomeSourcePayment = null,
       customerProfiles = {},
       onSavePaidStudioBookingIncome = null,
     }) {
+      const paymentEditMode = !!initialIncomeSourcePayment;
+      const effectiveInitialIncomeSourceId = initialIncomeSourcePayment?.incomeSourceId || initialIncomeSourceId || "";
+      const paymentEditSource = incomeSources.find(source => source.id === effectiveInitialIncomeSourceId) || null;
+      const paymentEditCategory = normalizeIncomeCategory(paymentEditSource?.category || "Work");
       const editMode = !!initial && !duplicateMode;
       const [f, setF] = useState(
-        initial
+        paymentEditMode
+          ? {
+              title: paymentEditSource?.title || "รับเงินจากงาน",
+              paymentStage: "",
+              studioService: paymentEditSource?.subtype || "room",
+              amount: String(Number(initialIncomeSourcePayment?.amount) || ""),
+              kind: "in",
+              date: initialIncomeSourcePayment?.date || TK,
+              accountId: initialIncomeSourcePayment?.accountId || accounts[0]?.id || null,
+              category: paymentEditCategory,
+              taxable: true,
+              payer: initialIncomeSourcePayment?.payer || paymentEditSource?.customerName || "",
+              moneyType: "work_income",
+              reconcileStatus: initialIncomeSourcePayment?.reconcileStatus || "unchecked",
+              note: initialIncomeSourcePayment?.note || "",
+              fromAccountId: accounts[0]?.id || null,
+              toAccountId: accounts[1]?.id || accounts[0]?.id || null,
+              transferNote: "",
+              sharedExpense: false,
+              personalAmount: "",
+              reimbursableAmount: "",
+              owedBy: "",
+              linkedExpenseId: "",
+              splitExpense: false,
+              splits: [],
+              sharedIncome: false,
+              recipientSplits: [],
+            }
+          : initial
           ? {
               title: initial.paymentBaseTitle || initial.title || "",
               paymentStage: initial.paymentStage || "",
@@ -3815,12 +3891,12 @@ try {
               recipientSplits: [],
             },
       );
-      const sourceByInitialId = incomeSources.find(source => source.id === initialIncomeSourceId) || null;
-      const [linkedIncomeSourceId, setLinkedIncomeSourceId] = useState(initialIncomeSourceId || "");
+      const sourceByInitialId = incomeSources.find(source => source.id === effectiveInitialIncomeSourceId) || null;
+      const [linkedIncomeSourceId, setLinkedIncomeSourceId] = useState(effectiveInitialIncomeSourceId);
       const linkedIncomeSource = incomeSources.find(source => source.id === linkedIncomeSourceId) || null;
-      const linkedSourcePayments = linkedIncomeSource ? payments.filter(payment => payment.incomeSourceId === linkedIncomeSource.id) : [];
+      const linkedSourcePayments = linkedIncomeSource ? payments.filter(payment => payment.incomeSourceId === linkedIncomeSource.id && (!paymentEditMode || payment.id !== initialIncomeSourcePayment?.id)) : [];
       const linkedExpected = Number(linkedIncomeSource?.expectedAmount) || 0;
-      const linkedReceived = linkedIncomeSource ? incomeSourceReceivedAmount(linkedIncomeSource.id, payments) : 0;
+      const linkedReceived = linkedIncomeSource ? incomeSourceReceivedAmount(linkedIncomeSource.id, paymentEditMode ? payments.filter(payment => payment.id !== initialIncomeSourcePayment?.id) : payments) : 0;
       const linkedRemaining = Math.max(0, linkedExpected - linkedReceived);
       const linkedTipsReceived = linkedSourcePayments.reduce((sum, payment) => sum + paymentTipAmount(payment, linkedIncomeSource?.category || "Work"), 0);
       const linkedCategoryOptions = normalizeIncomeCategories([linkedIncomeSource?.category || "Work", ...(txnCategories.income || [])]);
@@ -3829,9 +3905,11 @@ try {
         category: role === "tip" ? "Tips" : role === "pass_through" ? "เงินส่วนของผู้อื่น" : normalizeIncomeCategory(category),
         amount: String(amount), recipientName: "", settled: false, settledDate: f.date || TK, settledAccountId: f.accountId || accounts[0]?.id || null,
       });
-      const initialRemaining = sourceByInitialId ? incomeSourceRemainingAmount(sourceByInitialId, payments) : 0;
-      const [linkedPaymentType, setLinkedPaymentType] = useState(initialIncomeSourceId ? (initialRemaining > 0 ? "full" : "tip") : "full");
-      const [linkedAllocations, setLinkedAllocations] = useState(() => initialIncomeSourceId ? (initialRemaining > 0 ? [{ id: uid(), role: "principal", category: normalizeIncomeCategory(sourceByInitialId?.category || "Work"), amount: String(initialRemaining), recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }] : [{ id: uid(), role: "tip", category: "Tips", amount: "", recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }]) : []);
+      const initialRemaining = sourceByInitialId ? incomeSourceRemainingAmount(sourceByInitialId, paymentEditMode ? payments.filter(payment => payment.id !== initialIncomeSourcePayment?.id) : payments) : 0;
+      const [linkedPaymentType, setLinkedPaymentType] = useState(paymentEditMode ? (initialIncomeSourcePayment?.paymentType || "full") : effectiveInitialIncomeSourceId ? (initialRemaining > 0 ? "full" : "tip") : "full");
+      const [linkedAllocations, setLinkedAllocations] = useState(() => paymentEditMode
+        ? paymentAllocationRows(initialIncomeSourcePayment, sourceByInitialId?.category || "Work").map(allocation => ({ ...allocation, id: allocation.id || uid(), amount: String(allocation.amount), recipientName: allocation.recipientName || "", settled: !!allocation.settled, settledDate: allocation.settledDate || initialIncomeSourcePayment?.date || TK, settledAccountId: allocation.settledAccountId || initialIncomeSourcePayment?.accountId || accounts[0]?.id || null }))
+        : effectiveInitialIncomeSourceId ? (initialRemaining > 0 ? [{ id: uid(), role: "principal", category: normalizeIncomeCategory(sourceByInitialId?.category || "Work"), amount: String(initialRemaining), recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }] : [{ id: uid(), role: "tip", category: "Tips", amount: "", recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }]) : []);
       const normalizedLinkedAllocations = linkedAllocations.map(allocation => ({
         ...allocation,
         role: allocation.role === "tip" ? "tip" : allocation.role === "pass_through" ? "pass_through" : "principal",
@@ -3882,7 +3960,7 @@ try {
         setAdvancedOpen(false);
       };
       useEffect(() => {
-        if (initialIncomeSourceId && sourceByInitialId) {
+        if (effectiveInitialIncomeSourceId && sourceByInitialId && !paymentEditMode) {
           setF(current => ({ ...current, kind: "in", title: sourceByInitialId.title || "รับเงินจากงาน", amount: initialRemaining > 0 ? String(initialRemaining) : "", category: normalizeIncomeCategory(sourceByInitialId.category || "Work"), payer: sourceByInitialId.customerName || "", paymentStage: "", moneyType: "work_income", taxable: true }));
         }
       }, []);
@@ -3900,7 +3978,7 @@ try {
       const [studioBookingForm, setStudioBookingForm] = useState(() => ({
         bandName: "", bookingDate: f.date || TK, startTime: "18:00", endTime: "20:00",
       }));
-      const studioBookingLinkActive = !studioMode && !editMode && !duplicateMode && !linkedIncomeSource && f.kind === "in" && normalizeIncomeCategory(f.category) === "Studio" && studioBookingLink;
+      const studioBookingLinkActive = !studioMode && !editMode && !duplicateMode && !paymentEditMode && !linkedIncomeSource && f.kind === "in" && normalizeIncomeCategory(f.category) === "Studio" && studioBookingLink;
       const studioBookingHours = studioBookingLinkActive ? hoursBetween(studioBookingForm.startTime, studioBookingForm.endTime) : 0;
       const studioBookingPassThroughPreview = f.sharedIncome ? (f.recipientSplits || []).reduce((sum, split) => sum + (Number(split.amount) || 0), 0) : 0;
       const studioBookingAverageRate = studioBookingHours > 0 ? Math.round((Math.max(0, (Number(f.amount) || 0) - studioBookingPassThroughPreview) / studioBookingHours) * 100) / 100 : 0;
@@ -3916,9 +3994,9 @@ try {
         }
       };
       useEffect(() => {
-        if (f.kind !== "in" || normalizeIncomeCategory(f.category) !== "Studio" || linkedIncomeSource || editMode || duplicateMode)
+        if (f.kind !== "in" || normalizeIncomeCategory(f.category) !== "Studio" || linkedIncomeSource || editMode || duplicateMode || paymentEditMode)
           setStudioBookingLink(false);
-      }, [f.kind, f.category, linkedIncomeSourceId, editMode, duplicateMode]);
+      }, [f.kind, f.category, linkedIncomeSourceId, editMode, duplicateMode, paymentEditMode]);
       const [transferOnward, setTransferOnward] = useState(false);
       const [onwardAccountId, setOnwardAccountId] = useState(
         accounts[1]?.id || null,
@@ -4112,7 +4190,7 @@ try {
           initial.taxable === false)
       );
       const [advancedOpen, setAdvancedOpen] = useState(initialAdvancedOpen);
-      const txnColor = isTransfer ? T.cyan : f.kind === "in" ? T.green : T.red;
+      const txnColor = isTransfer ? TRANSFER_COLOR : f.kind === "in" ? T.green : T.red;
       const accountName = (id) =>
         accounts.find((account) => account.id === id)?.name || "ยังไม่เลือกบัญชี";
       const amountNumber = Number(f.amount) || 0;
@@ -4411,7 +4489,9 @@ try {
         Sheet,
         {
           onClose: onClose,
-          title: editMode
+          title: paymentEditMode
+            ? "แก้ไขรายการรับเงิน"
+            : editMode
             ? "แก้ไขธุรกรรม"
             : duplicateMode
               ? "ทำซ้ำธุรกรรม"
@@ -4438,7 +4518,7 @@ try {
               [
                 ["out", "รายจ่าย", T.red],
                 ["in", "รายรับ", T.green],
-                ["transfer", "โอนย้าย", T.cyan],
+                ["transfer", "โอนย้าย", TRANSFER_COLOR],
               ].map(([k, l, c]) => {
                 const on = f.kind === k;
                 return React.createElement(
@@ -4471,7 +4551,7 @@ try {
                 );
               }),
             ),
-          !studioMode && f.kind === "in" && !editMode && !duplicateMode && React.createElement("div", { className: "mb-3" },
+          !studioMode && f.kind === "in" && !editMode && !duplicateMode && !paymentEditMode && React.createElement("div", { className: "mb-3" },
             React.createElement(Label, null, "รายได้จากงานค้าง"),
             React.createElement("select", { value: linkedIncomeSourceId, onChange: event => selectLinkedIncomeSource(event.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: linkedIncomeSource ? hex(T.green, .08) : T.surf2, color: T.text, border: `1px solid ${linkedIncomeSource ? hex(T.green, .5) : T.border}` } },
               React.createElement("option", { value: "" }, "ไม่เชื่อมงานค้าง · รายรับทั่วไป"),
@@ -4481,10 +4561,10 @@ try {
           linkedIncomeSource ? React.createElement("div", { className: "grid gap-2 mb-1", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))", alignItems: "end" } },
             React.createElement("div", { className: "min-w-0" },
               React.createElement(Label, null, "วันที่รับ"),
-              React.createElement(DateInput, { value: f.date, onChange: (v) => setF((current) => ({ ...current, date: v })), style: { height: 52, minHeight: 52, fontSize: 14 } })),
+              React.createElement(DateInput, { value: f.date, onChange: (v) => setF((current) => ({ ...current, date: v })), className: "text-center", style: { height: 44, minHeight: 44, padding: "0 8px", fontSize: 13, textAlign: "center", lineHeight: "44px" } })),
             React.createElement("div", { className: "min-w-0" },
               React.createElement(Label, null, "เงินเข้าบัญชี"),
-              React.createElement("select", { value: f.accountId || "", onChange: (event) => setF((current) => ({ ...current, accountId: event.target.value })), className: "w-full px-3 rounded-xl text-sm outline-none", style: { height: 52, minHeight: 52, background: T.surf2, color: T.text, border: `1px solid ${T.border}` } },
+              React.createElement("select", { value: f.accountId || "", onChange: (event) => setF((current) => ({ ...current, accountId: event.target.value })), className: "w-full rounded-xl text-sm outline-none text-center", style: { height: 44, minHeight: 44, padding: "0 8px", background: T.surf2, color: T.text, border: `1px solid ${T.border}`, textAlign: "center", textAlignLast: "center" } },
                 React.createElement("option", { value: "" }, "เลือกบัญชี"),
                 accounts.map(account => React.createElement("option", { key: account.id, value: account.id }, account.name)))))
             : React.createElement("div", { className: "mb-1" },
@@ -4508,7 +4588,7 @@ try {
                   title: "เส้นทางเงิน",
                   subtitle:
                     "เงินย้ายระหว่างบัญชีของคุณ ไม่ถูกนับเป็นรายรับหรือรายจ่าย",
-                  color: T.cyan,
+                  color: TRANSFER_COLOR,
                 },
                 React.createElement(AccPicker, {
                   label: "บัญชีออก",
@@ -4562,8 +4642,8 @@ try {
                             className:
                               "w-11 h-6 rounded-full relative shrink-0 transition-colors",
                             style: {
-                              background: transferOnward ? T.cyan : T.muted,
-                              border: `1px solid ${transferOnward ? T.cyan : T.sub}`,
+                              background: transferOnward ? TRANSFER_COLOR : T.muted,
+                              border: `1px solid ${transferOnward ? TRANSFER_COLOR : T.sub}`,
                             },
                           },
                           React.createElement("span", {
@@ -5756,8 +5836,8 @@ try {
                             className:
                               "w-11 h-6 rounded-full relative shrink-0 transition-colors",
                             style: {
-                              background: transferOnward ? T.cyan : T.muted,
-                              border: `1px solid ${transferOnward ? T.cyan : T.sub}`,
+                              background: transferOnward ? TRANSFER_COLOR : T.muted,
+                              border: `1px solid ${transferOnward ? TRANSFER_COLOR : T.sub}`,
                             },
                           },
                           React.createElement("span", {
@@ -5896,7 +5976,9 @@ try {
                     })),
                     date: f.date, accountId: f.accountId, payer: f.payer.trim(), note: f.note.trim(), reconcileStatus: f.reconcileStatus,
                   };
-                  const saved = onSaveIncomeSourcePayment?.(linkedIncomeSource.id, paymentPayload);
+                  const saved = paymentEditMode
+                    ? onUpdateIncomeSourcePayment?.(initialIncomeSourcePayment.id, paymentPayload)
+                    : onSaveIncomeSourcePayment?.(linkedIncomeSource.id, paymentPayload);
                   if (saved !== false)
                     onClose();
                   return;
@@ -6056,7 +6138,7 @@ try {
                 onSave(list);
               },
             },
-            linkedIncomeSource ? "บันทึกรับเงิน" : editMode ? "บันทึกการแก้ไข" : duplicateMode ? "บันทึกเป็นรายการใหม่" : "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01",
+            linkedIncomeSource ? (paymentEditMode ? "บันทึกการแก้ไข" : "บันทึกรับเงิน") : editMode ? "บันทึกการแก้ไข" : duplicateMode ? "บันทึกเป็นรายการใหม่" : "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01",
           ),
         ),
       );
@@ -6235,7 +6317,7 @@ try {
         return React.createElement(Sheet, { onClose, title }, ...children);
     }
     function Budget(props) {
-        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets } = props;
+        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets } = props;
         const [mode, setMode] = useState("total");
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
@@ -6271,6 +6353,9 @@ try {
         const [duplicateTxn, setDuplicateTxn] = useState(null);
         const [refundExpense, setRefundExpense] = useState(null);
         const [delTxnConfirm, setDelTxnConfirm] = useState(null);
+        const [txnActionItem, setTxnActionItem] = useState(null);
+        const [txnActionDeleteArmed, setTxnActionDeleteArmed] = useState(false);
+        const [editIncomePayment, setEditIncomePayment] = useState(null);
         const [fcModal, setFcModal] = useState(null);
         const [payFc, setPayFc] = useState(null);
         const [delFc, setDelFc] = useState(null);
@@ -6808,8 +6893,8 @@ try {
                             });
                             transactions.forEach(t => {
                                 if (t.kind === "transfer") {
-                                    ledger.push({ id: "tf-out" + t.id, date: t.date, title: "โอนไป " + accName(t.toAccountId), amount: Number(t.amount) || 0, dir: "out", accountId: t.fromAccountId, tag: "โอนย้าย", tagC: T.cyan, kind: "txn", raw: t });
-                                    ledger.push({ id: "tf-in" + t.id, date: t.date, title: "รับโอนจาก " + accName(t.fromAccountId), amount: Number(t.amount) || 0, dir: "in", accountId: t.toAccountId, tag: "โอนย้าย", tagC: T.cyan, kind: "txn", raw: t });
+                                    ledger.push({ id: "tf-out" + t.id, date: t.date, title: "โอนไป " + accName(t.toAccountId), amount: Number(t.amount) || 0, dir: "out", accountId: t.fromAccountId, tag: "โอนย้าย", tagC: TRANSFER_COLOR, kind: "txn", raw: t });
+                                    ledger.push({ id: "tf-in" + t.id, date: t.date, title: "รับโอนจาก " + accName(t.fromAccountId), amount: Number(t.amount) || 0, dir: "in", accountId: t.toAccountId, tag: "โอนย้าย", tagC: TRANSFER_COLOR, kind: "txn", raw: t });
                                 }
                                 else {
                                     ledger.push({ id: "t" + t.id, date: t.date, title: t.title, amount: Number(t.amount) || 0, personalIncome: t.kind === "in" ? personalIncomeAmount(t) : undefined, dir: t.kind, accountId: t.accountId, tag: t.kind === "in" ? normalizeIncomeCategory(t.category || "Work") : (t.category || "อื่นๆ"), tagC: isStudioIncome(t) ? T.blue : t.kind === "in" ? T.green : T.red, kind: "txn", raw: t });
@@ -6846,7 +6931,7 @@ try {
                                     React.createElement("input", { value: txSearch, onChange: e => { setTxSearch(e.target.value); setLedgerPage(0); }, placeholder: "ค้นหาชื่อรายการ เช่น ค่าไฟ", className: "w-full pl-9 pr-3 py-2.5 rounded-xl text-xs outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } })),
                                 React.createElement("div", { className: "flex gap-1.5 overflow-x-auto pb-2", style: { scrollbarWidth: "none" } }, [["all", "ทั้งหมด"], ["in", "รายรับ"], ["out", "รายจ่าย"], ["transfer", "โอนย้าย"]].map(([k, label]) => {
                                     const on = txKind === k;
-                                    return React.createElement("button", { key: k, onClick: () => { setTxKind(k); setLedgerPage(0); }, className: "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0", style: { background: on ? (k === "in" ? T.green : k === "out" ? T.red : k === "transfer" ? T.cyan : T.purple) : T.surf2, color: on ? (k === "in" || k === "transfer" ? "#000" : "#fff") : T.sub, border: `1px solid ${on ? "transparent" : T.border}` } }, label);
+                                    return React.createElement("button", { key: k, onClick: () => { setTxKind(k); setLedgerPage(0); }, className: "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0", style: { background: on ? (k === "in" ? T.green : k === "out" ? T.red : k === "transfer" ? TRANSFER_COLOR : T.purple) : T.surf2, color: on ? (k === "in" || k === "transfer" ? "#000" : "#fff") : T.sub, border: `1px solid ${on ? "transparent" : T.border}` } }, label);
                                 })),
                                 React.createElement("div", { className: "flex gap-2 mb-2" },
                                     React.createElement("select", { value: txCategory, onChange: e => { setTxCategory(e.target.value); setLedgerPage(0); }, className: "flex-1 px-3 py-2 rounded-xl text-xs outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}`, colorScheme: "dark" } },
@@ -6857,11 +6942,11 @@ try {
                                     React.createElement("button", { onClick: () => { setTxFilter("all"); setLedgerPage(0); }, className: "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0", style: { background: txFilter === "all" ? T.purple : T.surf2, color: txFilter === "all" ? "#fff" : T.sub, border: `1px solid ${txFilter === "all" ? T.purple : T.border}` } }, "\u0E17\u0E38\u0E01\u0E1A\u0E31\u0E0D\u0E0A\u0E35"),
                                     accounts.map(a => (React.createElement("button", { key: a.id, onClick: () => { setTxFilter(a.id); setLedgerPage(0); }, className: "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0", style: { background: txFilter === a.id ? T.purple : T.surf2, color: txFilter === a.id ? "#fff" : T.sub, border: `1px solid ${txFilter === a.id ? T.purple : T.border}` } }, a.name)))),
                                 React.createElement("div", { className: "grid grid-cols-3 gap-1.5 mb-3" },
-                                    [["รับเข้า", filteredIncome, T.green], ["จ่ายออก", filteredExpense, T.red], ["โอนย้าย", filteredTransfers, T.cyan]].map(([label, value, color], index) => React.createElement("div", { key: label, className: "p-2 rounded-xl min-w-0", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                                    [["รับเข้า", filteredIncome, T.green], ["จ่ายออก", filteredExpense, T.red], ["โอนย้าย", filteredTransfers, TRANSFER_COLOR]].map(([label, value, color], index) => React.createElement("div", { key: label, className: "p-2 rounded-xl min-w-0", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                                         React.createElement("div", { className: "text-[9px] mb-0.5", style: { color: T.muted } }, label),
                                         React.createElement("div", { className: "text-xs font-extrabold truncate", style: { color } }, index === 2 ? `${value.toLocaleString()} ครั้ง` : fmtBaht(value))))),
                                 slice.length === 0 ? React.createElement(Empty, { text: "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E18\u0E38\u0E23\u0E01\u0E23\u0E23\u0E21" }) : React.createElement("div", { className: "rounded-xl mt-1 overflow-hidden", style: { background: T.surf2, border: `1px solid ${T.border}` } },
-                                    (() => { let prevDate = null; return slice.map((l, idx) => { const showDate = l.date !== prevDate; prevDate = l.date; const tColor = l.raw?.kind === "transfer" ? "#4a6fa5" : l.dir === "in" ? T.green : T.red; return React.createElement("div", { key: l.id, className: "flex items-stretch" },
+                                    (() => { let prevDate = null; return slice.map((l, idx) => { const showDate = l.date !== prevDate; prevDate = l.date; const tColor = l.raw?.kind === "transfer" ? TRANSFER_COLOR : l.dir === "in" ? T.green : T.red; return React.createElement("div", { key: l.id, className: "flex items-stretch" },
                                         React.createElement("div", { className: "shrink-0 flex items-start justify-center px-1", style: { width: 62, paddingTop: 8 } }, showDate ? React.createElement("span", { className: "text-[13px] font-extrabold whitespace-nowrap", style: { color: T.sub, lineHeight: "20px" } }, shortDate(l.date)) : null),
                                         React.createElement("div", { className: "flex-1 min-w-0 flex items-start gap-2 pl-2.5 pr-3 py-2", style: { height: l.detailSummary ? 80 : 68, borderBottom: idx < slice.length - 1 ? `1px solid ${T.border}` : "none" } },
                                         React.createElement("div", { className: "flex-1 min-w-0" },
@@ -6874,11 +6959,8 @@ try {
                                         React.createElement("div", { className: "shrink-0 text-right" },
                                             React.createElement("div", { className: "text-base font-extrabold whitespace-nowrap", style: { color: tColor } }, `${l.dir === "in" ? "+" : "−"}${fmtBaht(l.amount)}`),
                                             React.createElement("div", { className: "text-[9px] font-bold", style: { color: tColor } }, l.raw?.kind === "transfer" ? "โอนย้าย" : l.dir === "in" ? "รายรับ" : "รายจ่าย")),
-                                        React.createElement("div", { className: l.kind === "txn" ? "shrink-0 grid grid-cols-2 gap-0.5 content-center" : "shrink-0 flex flex-col items-center justify-center gap-0.5", style: { width: l.kind === "txn" ? 58 : 30, alignSelf: "center" } },
-                                            l.kind === "incomeSource" && React.createElement("button", { onClick: () => { setTxnIncomeSourceId(l.raw.id); setTxnOpen(true); }, "aria-label": "รับเงินจากงานนี้", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.blue } }, React.createElement(Pencil, { size: 12 })),
-                                            l.kind === "txn" && React.createElement("button", { onClick: () => setEditTxn(l.raw), "aria-label": "แก้ไขธุรกรรม", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.blue } }, React.createElement(Pencil, { size: 12 })),
-                                            l.kind === "txn" && React.createElement("button", { onClick: () => setDuplicateTxn({ ...l.raw, date: TK, reconcileStatus: "unchecked", moneyType: l.raw.moneyType === "reimbursement" ? "personal" : l.raw.moneyType, taxable: l.raw.moneyType === "reimbursement" ? false : l.raw.taxable, linkedExpenseId: "", fixedCostId: undefined, splits: (l.raw.splits || []).map(split => ({ ...split, id: uid() })), recipientSplits: (l.raw.recipientSplits || []).map(split => ({ ...split, id: uid(), settled: false, settledDate: "", settledAccountId: null })) }), "aria-label": "ทำซ้ำธุรกรรม", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.orange } }, React.createElement(Repeat, { size: 12 })),
-                                            l.kind === "txn" && (delTxnConfirm === l.raw.id ? React.createElement("button", { onClick: () => { delTxn(l.raw.id); setDelTxnConfirm(null); }, className: "text-[9px] font-bold px-1 py-1 rounded-lg", style: { background: T.red, color: "#fff", gridColumn: "1 / -1" } }, "ลบ") : React.createElement("button", { onClick: () => setDelTxnConfirm(l.raw.id), "aria-label": "ลบธุรกรรม", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.muted, gridColumn: "1 / -1", justifySelf: "center" } }, React.createElement(Trash2, { size: 12 })))))); }); })()),
+                                        React.createElement("div", { className: "shrink-0 flex items-center justify-center", style: { width: 34, alignSelf: "center" } },
+                                            React.createElement("button", { onClick: () => { setTxnActionItem(l); setTxnActionDeleteArmed(false); }, "aria-label": "จัดการรายการ", className: "w-8 h-8 rounded-lg flex items-center justify-center active:scale-90", style: { color: T.blue, background: hex(T.blue, .08) } }, React.createElement(Pencil, { size: 13 }))))); }); })()),
                                 sorted.length > 0 && React.createElement(Pager, { page: ledgerPage, setPage: setLedgerPage, total: sorted.length })));
                         })()));
                 })(),
@@ -7013,7 +7095,43 @@ try {
                 editAcc.id && (() => { const usage = accountUsageCount(editAcc.id); return React.createElement(React.Fragment, null,
                     usage > 0 && React.createElement("div", { className: "mt-3 p-3 rounded-xl text-[10px] leading-relaxed", style: { background: hex(T.orange, .12), color: T.orange, border: `1px solid ${hex(T.orange, .4)}` } }, `บัญชีนี้ถูกอ้างอิงอยู่ ${usage} จุด จึงลบไม่ได้ เพื่อป้องกันรายการเก่าและ Statement กลายเป็นบัญชีว่าง`),
                     React.createElement("button", { disabled: usage > 0, onClick: () => { if (usage > 0) return; setAccounts(as => as.filter(a => a.id !== editAcc.id)); setEditAcc(null); }, className: "w-full py-2.5 rounded-xl font-bold mt-2 disabled:opacity-40", style: { background: hex(T.red, .14), color: T.red, border: `1px solid ${hex(T.red, .5)}` } }, usage > 0 ? "ลบไม่ได้ · บัญชีถูกใช้งานแล้ว" : "ลบบัญชีนี้")); })())),
-            txnOpen && React.createElement(TxnModal, { accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
+            txnActionItem && React.createElement(Sheet, { onClose: () => { setTxnActionItem(null); setTxnActionDeleteArmed(false); }, title: "จัดการรายการ" },
+                React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                    React.createElement("div", { className: "text-sm font-extrabold" }, txnActionItem.title),
+                    React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, `${shortDate(txnActionItem.date)} · ${txnActionItem.tag || "รายการ"} · ${fmtBaht(txnActionItem.amount)}`)),
+                React.createElement("div", { className: "space-y-2" },
+                    React.createElement("button", { onClick: () => {
+                        if (txnActionItem.paymentRaw)
+                            setEditIncomePayment(txnActionItem.paymentRaw);
+                        else
+                            setEditTxn(txnActionItem.raw);
+                        setTxnActionItem(null);
+                        setTxnActionDeleteArmed(false);
+                    }, className: "w-full p-3 rounded-xl flex items-center gap-3 text-left", style: { background: hex(T.blue, .1), color: T.blue, border: `1px solid ${hex(T.blue, .35)}` } },
+                        React.createElement(Pencil, { size: 16 }), React.createElement("span", { className: "text-sm font-bold" }, "แก้ไข")),
+                    !txnActionItem.paymentRaw && React.createElement("button", { onClick: () => {
+                        const raw = txnActionItem.raw;
+                        setDuplicateTxn({ ...raw, date: TK, reconcileStatus: "unchecked", moneyType: raw.moneyType === "reimbursement" ? "personal" : raw.moneyType, taxable: raw.moneyType === "reimbursement" ? false : raw.taxable, linkedExpenseId: "", fixedCostId: undefined, splits: (raw.splits || []).map(split => ({ ...split, id: uid() })), recipientSplits: (raw.recipientSplits || []).map(split => ({ ...split, id: uid(), settled: false, settledDate: "", settledAccountId: null })) });
+                        setTxnActionItem(null);
+                        setTxnActionDeleteArmed(false);
+                    }, className: "w-full p-3 rounded-xl flex items-center gap-3 text-left", style: { background: hex(T.orange, .1), color: T.orange, border: `1px solid ${hex(T.orange, .35)}` } },
+                        React.createElement(Repeat, { size: 16 }), React.createElement("span", { className: "text-sm font-bold" }, "ทำซ้ำ")),
+                    !txnActionDeleteArmed ? React.createElement("button", { onClick: () => setTxnActionDeleteArmed(true), className: "w-full p-3 rounded-xl flex items-center gap-3 text-left", style: { background: hex(T.red, .08), color: T.red, border: `1px solid ${hex(T.red, .3)}` } },
+                        React.createElement(Trash2, { size: 16 }), React.createElement("span", { className: "text-sm font-bold" }, "ลบ"))
+                    : React.createElement("div", { className: "p-3 rounded-xl", style: { background: hex(T.red, .1), border: `1px solid ${hex(T.red, .4)}` } },
+                        React.createElement("div", { className: "text-xs font-bold mb-2", style: { color: T.red } }, txnActionItem.paymentRaw ? "ยืนยันลบรายการรับเงินนี้?" : "ยืนยันลบธุรกรรมนี้?"),
+                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                            React.createElement("button", { onClick: () => setTxnActionDeleteArmed(false), className: "py-2.5 rounded-lg text-xs font-bold", style: { background: T.surf2, color: T.sub } }, "ยกเลิก"),
+                            React.createElement("button", { onClick: () => {
+                                if (txnActionItem.paymentRaw)
+                                    deleteIncomeSourcePayment?.(txnActionItem.paymentId);
+                                else
+                                    delTxn(txnActionItem.raw.id);
+                                setTxnActionItem(null);
+                                setTxnActionDeleteArmed(false);
+                            }, className: "py-2.5 rounded-lg text-xs font-bold", style: { background: T.red, color: "#fff" } }, "ยืนยันลบ"))))),
+            editIncomePayment && React.createElement(TxnModal, { accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourcePayment: editIncomePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, onClose: () => setEditIncomePayment(null), onSave: () => {} }),
+            txnOpen && React.createElement(TxnModal, { accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
             refundExpense && React.createElement(TxnModal, { initial: { title: refundExpense.title, amount: refundExpense.amount, kind: "in", date: TK, accountId: accounts[0]?.id || null, category: txnCategories.income?.[0] || "อื่นๆ", taxable: false, payer: refundExpense.payer || "", moneyType: "reimbursement", linkedExpenseId: refundExpense.id, note: `รับคืนจากรายการ ${refundExpense.raw?.title || "สำรองจ่าย"}` }, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setRefundExpense(null), onSave: (list) => { list.forEach(addTxn); setRefundExpense(null); } }),
             duplicateTxn && React.createElement(TxnModal, { initial: duplicateTxn, duplicateMode: true, studioMode: !!duplicateTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setDuplicateTxn(null), onSave: (list) => { list.forEach(addTxn); setDuplicateTxn(null); } }),
             editTxn && React.createElement(TxnModal, { initial: editTxn, studioMode: !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setEditTxn(null), onSave: (list) => { if (list[0])
