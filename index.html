@@ -2588,7 +2588,7 @@ try {
                 })),
                 React.createElement("div", { className: "text-[10px] text-center mt-3", style: { color: T.muted } }, "\u0E41\u0E15\u0E30\u0E27\u0E31\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E14\u0E39\u0E23\u0E32\u0E22\u0E25\u0E30\u0E40\u0E2D\u0E35\u0E22\u0E14 \u00B7 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02 = \u0E08\u0E33\u0E19\u0E27\u0E19 event \u0E27\u0E31\u0E19\u0E19\u0E31\u0E49\u0E19"))),
             view === "day" && (React.createElement("div", { className: "space-y-2" }, dayEvents.length === 0 ? React.createElement(Empty, { text: "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E27\u0E48\u0E32\u0E07 \u2014 \u0E40\u0E1E\u0E34\u0E48\u0E21 Event \u0E2B\u0E23\u0E37\u0E2D\u0E1E\u0E31\u0E01\u0E01\u0E47\u0E44\u0E14\u0E49" }) : dayEvents.map(EventRow))),
-            view === "week" && (React.createElement("div", { className: "space-y-3" }, week.map(wd => {
+            view === "week" && (React.createElement("div", { className: "space-y-4" }, week.map(wd => {
                 const k = dkey(wd);
                 const evs = events.filter(e => e.date === k).sort((a, b) => toMin(a.startTime) - toMin(b.startTime));
                 const on = k === sel;
@@ -4661,7 +4661,7 @@ try {
             React.createElement("select", { value: linkedIncomeSourceId, onChange: event => selectLinkedIncomeSource(event.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: linkedIncomeSource ? hex(T.green, .08) : T.surf2, color: T.text, border: `1px solid ${linkedIncomeSource ? hex(T.green, .5) : T.border}` } },
               React.createElement("option", { value: "" }, "ไม่เชื่อมงานค้าง · รายรับทั่วไป"),
               activeIncomeSources.map(source => React.createElement("option", { key: source.id, value: source.id }, `${shortDate(source.dueDate)} · ${source.title} · เหลือ ${fmtBaht(incomeSourceRemainingAmount(source, payments))}`))),
-            React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, linkedIncomeSource ? "รายการนี้จะบันทึกเป็น Payment และไม่สร้าง Transaction ซ้ำ" : "เลือกงานเมื่อต้องการตัดยอดค้างรับ")),
+            React.createElement("div", { className: "text-[10px] mt-1 leading-relaxed", style: { color: T.muted } }, linkedIncomeSource ? "รายการนี้จะบันทึกเป็น Payment และไม่สร้าง Transaction ซ้ำ" : "เลือกงานเมื่อต้องการตัดยอดค้างรับ")),
           AmountField(),
           linkedIncomeSource ? React.createElement("div", { className: "grid gap-2 mb-1", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))", alignItems: "end" } },
             React.createElement("div", { className: "min-w-0" },
@@ -6796,7 +6796,7 @@ try {
             setTxFilterOpen(false);
         };
         const srcTag = (k, category) => k === "reimbursement" ? { t: "เงินสำรองจ่าย", c: T.orange } : k === "incomeSource" ? { t: normalizeIncomeCategory(category || "Work"), c: T.green } : { t: k === "booking" ? "Studio" : normalizeIncomeCategory(category || (k === "event" ? "Work" : "Work")), c: k === "booking" ? T.blue : k === "event" ? T.purple : T.cyan };
-        return (React.createElement("div", { className: "px-4 pt-5 flex flex-col gap-3" },
+        return (React.createElement("div", { className: "px-4 pt-5 flex flex-col gap-4" },
             React.createElement("h1", { className: "text-2xl font-extrabold" }, "Budget"),
             React.createElement("div", { className: "flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4", style: { scrollbarWidth: "none" } }, [["summary", BarChart3, "ภาพรวม"], ["transactions", History, "ธุรกรรม"], ["due", AlertCircle, "ค้างรับ"], ["monthclose", Check, "ปิดเดือน"]].map(([k, Ic, l]) => {
                 const on = sub === k;
@@ -6805,7 +6805,7 @@ try {
                     l,
                     k === "due" && due.length > 0 && React.createElement("span", { className: "px-1 rounded-full inline-flex items-center justify-center text-[9px] font-extrabold", style: { minWidth: 18, height: 18, background: "#e2703a", color: "#fff" }, "aria-label": `${due.length} รายการค้างรับ` }, due.length > 99 ? "99+" : due.length));
             })),
-            sub === "transactions" && React.createElement("div", { className: "flex gap-1 p-1 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } }, [["all", "รายการทั้งหมด"], ["fixed", "ค่าใช้จ่ายประจำ"]].map(([key, label]) => React.createElement("button", { key, onClick: () => setTransactionSection(key), className: "flex-1 h-10 rounded-xl text-xs font-bold transition active:scale-[.98]", style: { background: transactionSection === key ? T.purple : "transparent", color: transactionSection === key ? "#fff" : T.sub, boxShadow: transactionSection === key ? `0 5px 14px ${hex(T.purple, .2)}` : "none" } }, label))),
+            sub === "transactions" && React.createElement("div", { className: "flex gap-1 p-1 rounded-xl", style: { background: T.surf2 } }, [["all", "รายการทั้งหมด"], ["fixed", "ค่าใช้จ่ายประจำ"]].map(([key, label]) => React.createElement("button", { key, onClick: () => setTransactionSection(key), className: "flex-1 py-2 rounded-lg text-xs font-bold", style: { background: transactionSection === key ? T.purple : "transparent", color: transactionSection === key ? "#fff" : T.sub } }, label))),
             sub === "monthclose" && React.createElement("div", { className: "flex gap-1 p-1 rounded-xl", style: { background: T.surf2 } }, [["statement", "1 · Statement"], ["close", "2 · สรุปและปิดเดือน"]].map(([key, label]) => React.createElement("button", { key, onClick: () => setCloseStep(key), className: "flex-1 py-2 rounded-lg text-xs font-bold", style: { background: closeStep === key ? T.green : "transparent", color: closeStep === key ? "#000" : T.sub } }, label))),
             sub === "monthclose" && closeStep === "statement" && React.createElement(Glass, { className: "p-3 sticky top-2 z-20", glowColor: T.blue },
                 React.createElement("div", { className: "text-[10px] font-bold mb-2", style: { color: T.blue } }, "เลือกข้อมูลที่ต้องการเทียบ"),
@@ -6973,9 +6973,9 @@ try {
                                 React.createElement("div", { className: "flex-1 min-w-0 flex items-start gap-2 pl-2.5 pr-3 py-2", style: { height: item.allocationSummary ? 88 : 76, borderBottom: idx < rows.length - 1 ? `1px solid ${T.border}` : "none" } },
                                     React.createElement("div", { className: "flex-1 min-w-0" },
                                         React.createElement("div", { className: "text-sm font-bold truncate", title: item.title }, item.title),
-                                        React.createElement("div", { className: "text-[10px] mt-0.5 truncate", style: { color: T.muted } }, item.payer || "—"),
-                                        item.allocationSummary && React.createElement("div", { className: "text-[9px] mt-0.5 truncate", style: { color: T.blue } }, item.allocationSummary)),
-                                    React.createElement("div", { className: "shrink-0 text-right" },
+                                        React.createElement("div", { className: "text-[10px] mt-0.5 truncate", style: { lineHeight: "14px" }, style: { color: T.muted } }, item.payer || "—"),
+                                        item.allocationSummary && React.createElement("div", { className: "text-[9px] mt-0.5 truncate", style: { color: T.blue, lineHeight: "14px" } }, item.allocationSummary)),
+                                    React.createElement("div", { className: "shrink-0 text-right self-start", style: { minWidth: 84 } },
                                         React.createElement("div", { className: "text-base font-extrabold whitespace-nowrap", style: { color: T.green } }, fmtBaht(item.amount)),
                                         React.createElement("select", { value: item.reconcileStatus || "unchecked", disabled: importedRows.length > 0, title: importedRows.length > 0 ? "สถานะนี้ควบคุมจากการจับคู่ Statement ด้านบน" : "", onChange: event => updateReconcileStatus(item.kind, item.id, item.paymentId, event.target.value), className: "mt-1 px-2 py-1.5 rounded-lg text-[10px] font-bold outline-none disabled:opacity-60", style: { background: hex(stColor, .12), color: stColor, border: `1px solid ${hex(stColor, .4)}`, maxWidth: 128 } },
                                             React.createElement("option", { value: "unchecked" }, "ยังไม่ตรวจ"),
@@ -7020,7 +7020,7 @@ try {
                         }))));
             })(),
             (sub === "summary" || (sub === "transactions" && transactionSection === "all")) && (React.createElement(React.Fragment, null,
-                sub === "transactions" && React.createElement("button", { onClick: () => { setTxnIncomeSourceId(""); setTxnOpen(true); }, className: "w-full h-12 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { background: T.green, color: "#000", boxShadow: `0 8px 20px ${hex(T.green, .22)}` } },
+                sub === "transactions" && React.createElement("button", { onClick: () => { setTxnIncomeSourceId(""); setTxnOpen(true); }, className: "w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { background: T.green, color: "#000", boxShadow: glow(T.green) } },
                     React.createElement(Plus, { size: 17 }),
                     " \u0E40\u0E1E\u0E34\u0E48\u0E21\u0E23\u0E32\u0E22\u0E23\u0E31\u0E1A-\u0E23\u0E32\u0E22\u0E08\u0E48\u0E32\u0E22"),
                 sub === "summary" && (() => {
@@ -7248,11 +7248,11 @@ try {
                                     React.createElement("input", { value: txSearch, onChange: e => { setTxSearch(e.target.value); setLedgerPage(0); }, placeholder: "ค้นหารายการ", className: "w-full pl-9 pr-10 py-2.5 rounded-xl text-xs outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } }),
                                     txSearch && React.createElement("button", { onClick: () => { setTxSearch(""); setLedgerPage(0); }, "aria-label": "ล้างคำค้นหา", className: "absolute w-7 h-7 rounded-lg flex items-center justify-center active:scale-90", style: { right: 6, top: 6, color: T.muted, background: hex(T.surf, .7) } }, React.createElement(X, { size: 13 }))),
                                 React.createElement("div", { className: "flex items-center gap-2 mb-2" },
-                                    React.createElement("div", { className: "flex gap-1 p-1 rounded-2xl flex-1 min-w-0 overflow-x-auto", style: { background: T.surf2, border: `1px solid ${T.border}`, scrollbarWidth: "none" } }, [["all", "ทั้งหมด"], ["in", "รายรับ"], ["out", "รายจ่าย"], ["transfer", "โอนย้าย"]].map(([k, label]) => {
+                                    React.createElement("div", { className: "flex gap-1 p-1 rounded-xl flex-1 min-w-0 overflow-x-auto", style: { background: T.surf2, border: `1px solid ${T.border}`, scrollbarWidth: "none" } }, [["all", "ทั้งหมด"], ["in", "รายรับ"], ["out", "รายจ่าย"], ["transfer", "โอนย้าย"]].map(([k, label]) => {
                                         const on = txKind === k;
-                                        return React.createElement("button", { key: k, onClick: () => { setTxKind(k); setLedgerPage(0); }, className: "h-10 px-3 rounded-xl text-[11px] font-bold whitespace-nowrap transition flex-1 min-w-[68px] shrink-0 active:scale-[.98]", style: { background: on ? (k === "in" ? T.green : k === "out" ? T.red : k === "transfer" ? TRANSFER_COLOR : T.purple) : "transparent", color: on ? ((k === "all" || k === "out") ? "#fff" : "#000") : T.sub, boxShadow: on ? `0 4px 12px ${hex(k === "in" ? T.green : k === "out" ? T.red : k === "transfer" ? TRANSFER_COLOR : T.purple, .18)}` : "none" } }, label);
+                                        return React.createElement("button", { key: k, onClick: () => { setTxKind(k); setLedgerPage(0); }, className: "h-10 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap transition flex-1 min-w-[68px] shrink-0", style: { background: on ? (k === "in" ? T.green : k === "out" ? T.red : k === "transfer" ? TRANSFER_COLOR : T.purple) : "transparent", color: on ? ((k === "all" || k === "out") ? "#fff" : "#000") : T.sub } }, label);
                                     })),
-                                    React.createElement("button", { onClick: openTransactionFilters, className: "h-10 px-3 rounded-xl flex items-center gap-1.5 shrink-0 active:scale-95", style: { background: (txCategory !== "all" || txFilter !== "all") ? hex(T.purple, .14) : T.surf, color: (txCategory !== "all" || txFilter !== "all") ? T.purple : T.sub, border: `1px solid ${(txCategory !== "all" || txFilter !== "all") ? hex(T.purple, .45) : T.border}`, boxShadow: (txCategory !== "all" || txFilter !== "all") ? `0 4px 12px ${hex(T.purple, .12)}` : "none" } },
+                                    React.createElement("button", { onClick: openTransactionFilters, className: "h-10 px-3 rounded-xl flex items-center gap-1.5 shrink-0 active:scale-95", style: { background: (txCategory !== "all" || txFilter !== "all") ? hex(T.purple, .14) : T.surf, color: (txCategory !== "all" || txFilter !== "all") ? T.purple : T.sub, border: `1px solid ${(txCategory !== "all" || txFilter !== "all") ? hex(T.purple, .45) : T.border}` } },
                                         React.createElement(SlidersHorizontal, { size: 14 }),
                                         React.createElement("span", { className: "text-[10px] font-bold" }, "ตัวกรอง"),
                                         (txCategory !== "all" || txFilter !== "all") && React.createElement("span", { className: "rounded-full flex items-center justify-center text-[9px] font-extrabold", style: { width: 18, height: 18, background: T.purple, color: "#fff" } }, (txCategory !== "all" ? 1 : 0) + (txFilter !== "all" ? 1 : 0)))),
