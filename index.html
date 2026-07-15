@@ -6328,7 +6328,7 @@ try {
         const [manualMatches, setManualMatches] = useState({});
         const [importMoneyTypes, setImportMoneyTypes] = useState({});
         const [importLinkedExpenses, setImportLinkedExpenses] = useState({});
-        const [showDue, setShowDue] = useState(true);
+        const [dueSectionsOpen, setDueSectionsOpen] = useState({ overdue: true, upcoming: true });
         const [txnIncomeSourceId, setTxnIncomeSourceId] = useState("");
         useEffect(() => {
             const request = props.budgetIncomeSourceRequest;
@@ -6946,9 +6946,9 @@ try {
                                         React.createElement("div", { className: "text-[9px] mb-0.5", style: { color: T.muted } }, label),
                                         React.createElement("div", { className: "text-xs font-extrabold truncate", style: { color } }, index === 2 ? `${value.toLocaleString()} ครั้ง` : fmtBaht(value))))),
                                 slice.length === 0 ? React.createElement(Empty, { text: "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E18\u0E38\u0E23\u0E01\u0E23\u0E23\u0E21" }) : React.createElement("div", { className: "rounded-xl mt-1 overflow-hidden", style: { background: T.surf2, border: `1px solid ${T.border}` } },
-                                    (() => { let prevDate = null; return slice.map((l, idx) => { const showDate = l.date !== prevDate; prevDate = l.date; const tColor = l.raw?.kind === "transfer" ? TRANSFER_COLOR : l.dir === "in" ? T.green : T.red; return React.createElement("div", { key: l.id, className: "flex items-stretch" },
-                                        React.createElement("div", { className: "shrink-0 flex items-start justify-center px-1", style: { width: 62, paddingTop: 8 } }, showDate ? React.createElement("span", { className: "text-[13px] font-extrabold whitespace-nowrap", style: { color: T.sub, lineHeight: "20px" } }, shortDate(l.date)) : null),
-                                        React.createElement("div", { className: "flex-1 min-w-0 flex items-start gap-2 pl-2.5 pr-3 py-2", style: { height: l.detailSummary ? 80 : 68, borderBottom: idx < slice.length - 1 ? `1px solid ${T.border}` : "none" } },
+                                    (() => { let prevDate = null; return slice.map((l, idx) => { const showDate = l.date !== prevDate; prevDate = l.date; const tColor = l.raw?.kind === "transfer" ? TRANSFER_COLOR : l.dir === "in" ? T.green : T.red; const hasThirdLine = (l.kind === "incomeSource" && !!l.detailSummary) || (l.kind === "txn" && passThroughTotal(l.raw) > 0); const rowHeight = hasThirdLine ? 80 : 60; return React.createElement("div", { key: l.id, className: "flex items-stretch" },
+                                        React.createElement("div", { className: "shrink-0 flex items-center justify-center px-1", style: { width: 62, height: rowHeight } }, showDate ? React.createElement("span", { className: "text-[13px] font-extrabold whitespace-nowrap", style: { color: T.sub, lineHeight: "20px" } }, shortDate(l.date)) : null),
+                                        React.createElement("div", { className: "flex-1 min-w-0 flex items-center gap-2 pl-2.5 pr-3", style: { height: rowHeight, borderBottom: idx < slice.length - 1 ? `1px solid ${T.border}` : "none" } },
                                         React.createElement("div", { className: "flex-1 min-w-0" },
                                             React.createElement("div", { className: "text-sm font-bold truncate", title: l.title }, l.title),
                                             l.kind === "txn" && passThroughTotal(l.raw) > 0 && React.createElement("div", { className: "text-[9px] truncate mt-0.5", style: { color: "#4a6fa5" } }, `ของฉัน ${fmtBaht(personalIncomeAmount(l.raw))} · เงินผู้อื่น ${fmtBaht(passThroughTotal(l.raw))}`),
@@ -6969,16 +6969,24 @@ try {
                     React.createElement("div", { className: "flex items-center justify-between" },
                         React.createElement("div", null, React.createElement("div", { className: "text-sm font-extrabold" }, "Accounts Receivable"), React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: T.muted } }, "รับมัดจำ รับเพิ่ม หรือรับเต็มจากงานเดียวกัน")),
                         React.createElement("div", { className: "text-right" }, React.createElement("div", { className: "text-xl font-extrabold", style: { color: T.gold } }, fmtBaht(dueSum)), React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, `${due.length} รายการ`)))),
-                [["งานที่ผ่านมาแล้ว", overdueDue, T.orange], ["งานที่กำลังจะมา", upcomingDue, T.green]].map(([label, list, color]) => React.createElement("div", { key: label, className: "space-y-2" },
-                    React.createElement("div", { className: "flex items-center gap-2 pt-1" }, React.createElement("span", { className: "w-2 h-2 rounded-full", style: { background: color } }), React.createElement("span", { className: "text-xs font-extrabold" }, label), React.createElement("span", { className: "text-[10px] font-bold px-2 py-0.5 rounded-full", style: { background: hex(color, .14), color } }, list.length)),
-                    list.length === 0 ? React.createElement(Empty, { text: label === "งานที่ผ่านมาแล้ว" ? "ไม่มีงานที่ผ่านมาแล้วที่ยังค้างรับ" : "ไม่มีงานล่วงหน้าที่รอรับเงิน" }) : list.map(it => {
-                        const dt = parseK(it.workDate || it.date);
-                        const tag = srcTag(it.kind, it.category);
-                        return React.createElement(Glass, { key: it.key, className: "p-3 flex items-center gap-3", glowColor: label === "งานที่ผ่านมาแล้ว" ? T.orange : undefined },
-                            React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[dt.getDay()]), React.createElement("div", { className: "text-base font-bold leading-none", style: { color } }, dt.getDate()), React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_M[dt.getMonth()])),
-                            React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-semibold text-sm truncate" }, it.title), React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5" }, React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(tag.c, .16), color: tag.c } }, tag.t)), Number(it.receivedAmount) > 0 && React.createElement("div", { className: "text-[9px] mt-1", style: { color: T.green } }, `รับแล้ว ${fmtBaht(it.receivedAmount)} · เหลือ ${fmtBaht(it.amount)}`)),
-                            React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("button", { onClick: () => tickDue(it), className: "mt-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน")));
-                    }))))),
+                [["overdue", "งานที่ผ่านมาแล้ว", overdueDue, T.orange], ["upcoming", "งานที่กำลังจะมา", upcomingDue, T.green]].map(([sectionKey, label, list, color]) => {
+                    const open = dueSectionsOpen[sectionKey] !== false;
+                    const sectionTotal = list.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                    return React.createElement("div", { key: sectionKey },
+                        React.createElement("button", { onClick: () => setDueSectionsOpen(current => ({ ...current, [sectionKey]: !open })), className: "w-full flex items-center gap-2.5 p-3 rounded-xl active:scale-[.99]", style: { background: T.surf, border: `1px solid ${hex(color, .38)}` }, "aria-expanded": open },
+                            React.createElement("span", { className: "w-2.5 h-2.5 rounded-full shrink-0", style: { background: color } }),
+                            React.createElement("div", { className: "flex-1 min-w-0 text-left" }, React.createElement("div", { className: "text-xs font-extrabold" }, label), React.createElement("div", { className: "text-[9px] mt-0.5", style: { color: T.muted } }, `${list.length} รายการ · ${fmtBaht(sectionTotal)}`)),
+                            React.createElement(ChevronDown, { size: 16, style: { color, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" } })),
+                        open && React.createElement("div", { className: "space-y-2 mt-2" },
+                            list.length === 0 ? React.createElement(Empty, { text: sectionKey === "overdue" ? "ไม่มีงานที่ผ่านมาแล้วที่ยังค้างรับ" : "ไม่มีงานล่วงหน้าที่รอรับเงิน" }) : list.map(it => {
+                                const dt = parseK(it.workDate || it.date);
+                                const tag = srcTag(it.kind, it.category);
+                                return React.createElement(Glass, { key: it.key, className: "p-3 flex items-center gap-3", glowColor: sectionKey === "overdue" ? T.orange : undefined },
+                                    React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[dt.getDay()]), React.createElement("div", { className: "text-base font-bold leading-none", style: { color } }, dt.getDate()), React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_M[dt.getMonth()])),
+                                    React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-semibold text-sm truncate" }, it.title), React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5" }, React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(tag.c, .16), color: tag.c } }, tag.t)), Number(it.receivedAmount) > 0 && React.createElement("div", { className: "text-[9px] mt-1", style: { color: T.green } }, `รับแล้ว ${fmtBaht(it.receivedAmount)} · เหลือ ${fmtBaht(it.amount)}`)),
+                                    React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("button", { onClick: () => tickDue(it), className: "mt-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน")));
+                            })));
+                }))),
             sub === "transactions" && transactionSection === "fixed" && (React.createElement(React.Fragment, null, (() => {
                 const mk = monthKey(TK);
                 const paymentsForFixedCost = fixedCostId => transactions.filter(transaction => transaction.kind === "out" && transaction.fixedCostId === fixedCostId);
