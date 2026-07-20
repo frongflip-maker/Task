@@ -276,7 +276,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-20-split-account-47";
+window.__TASKROUTINE_BUILD__="2026-07-20-split-fix-48";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -4793,7 +4793,7 @@ try {
                 splitAccounts && React.createElement("div", { className: "flex items-center gap-2 mt-1 mb-1 pl-1" },
                   React.createElement("span", { className: "text-[9px] font-bold shrink-0", style: { color: T.muted } }, "เข้าบัญชี"),
                   React.createElement("select", { value: allocation.settledAccountId || "", onChange: event => updateLinkedAllocation(allocation.id, { settledAccountId: event.target.value || null }), className: "flex-1 px-2 py-1.5 rounded-lg text-xs outline-none min-w-0", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } },
-                    React.createElement("option", { value: "" }, "— ใช้บัญชีหลัก —"),
+                    React.createElement("option", { value: "" }, `— ใช้บัญชีหลัก (${accounts.find(account => account.id === f.accountId)?.name || "ยังไม่เลือก"}) —`),
                     accounts.map(account => React.createElement("option", { key: account.id, value: account.id }, account.name))))))),
           React.createElement("button", { type: "button", onClick: () => setSplitAccounts(v => !v), className: "flex items-center gap-2 mt-2 mb-1" },
             React.createElement("span", { className: "w-5 h-5 rounded-md flex items-center justify-center shrink-0", style: { background: splitAccounts ? T.green : T.surf2, border: `1px solid ${splitAccounts ? T.green : T.border}` } }, splitAccounts && React.createElement(Check, { size: 12, style: { color: "#fff" } })),
@@ -4855,7 +4855,7 @@ try {
                 splitAccounts && React.createElement("div", { className: "flex items-center gap-2 mt-1 mb-1 pl-1" },
                   React.createElement("span", { className: "text-[9px] font-bold shrink-0", style: { color: T.muted } }, "เข้าบัญชี"),
                   React.createElement("select", { value: allocation.settledAccountId || "", onChange: event => updateLinkedAllocation(allocation.id, { settledAccountId: event.target.value || null }), className: "flex-1 px-2 py-1.5 rounded-lg text-xs outline-none min-w-0", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } },
-                    React.createElement("option", { value: "" }, "— ใช้บัญชีหลัก —"),
+                    React.createElement("option", { value: "" }, `— ใช้บัญชีหลัก (${accounts.find(account => account.id === f.accountId)?.name || "ยังไม่เลือก"}) —`),
                     accounts.map(account => React.createElement("option", { key: account.id, value: account.id }, account.name))))))),
           React.createElement("button", { type: "button", onClick: () => setSplitAccounts(v => !v), className: "flex items-center gap-2 mt-2 mb-1" },
             React.createElement("span", { className: "w-5 h-5 rounded-md flex items-center justify-center shrink-0", style: { background: splitAccounts ? T.green : T.surf2, border: `1px solid ${splitAccounts ? T.green : T.border}` } }, splitAccounts && React.createElement(Check, { size: 12, style: { color: "#fff" } })),
@@ -5279,7 +5279,7 @@ try {
                   subtitle: "กำหนดบัญชีและหมวดให้ตรงกับเงินจริง",
                   color: txnColor,
                 },
-                React.createElement(AccPicker, {
+                !(splitAccounts && f.kind === "in" && !studioMode) && React.createElement(AccPicker, {
                   label: studioMode
                     ? "จ่ายจากบัญชี"
                     : f.kind === "in"
@@ -6151,7 +6151,8 @@ try {
                   });
                   const paidRows = normalizedLinkedAllocations.filter(allocation => allocation.amount > 0);
                   const mainAccount = f.accountId;
-                  const accountOf = allocation => allocation.role === "pass_through" ? mainAccount : (allocation.settledAccountId || mainAccount);
+                  const rawAllocationById = Object.fromEntries(linkedAllocations.map(allocation => [allocation.id, allocation]));
+                  const accountOf = allocation => allocation.role === "pass_through" ? mainAccount : ((rawAllocationById[allocation.id]?.settledAccountId) || mainAccount);
                   const distinctAccounts = [...new Set(paidRows.map(accountOf))];
                   const willSplit = splitAccounts && !paymentEditMode && distinctAccounts.length > 1;
                   if (willSplit) {
@@ -6194,7 +6195,8 @@ try {
                 if (!studioMode && !isTransfer && f.kind === "in" && !linkedIncomeSource && !studioBookingLinkActive && onSaveManualIncome && (linkedAllocations.length > 1 || linkedAllocations.some(allocation => allocation.role === "pass_through"))) {
                   const manualRows = normalizedLinkedAllocations.filter(allocation => allocation.amount > 0);
                   const manualMainAccount = f.accountId;
-                  const manualAccountOf = allocation => allocation.role === "pass_through" ? manualMainAccount : (allocation.settledAccountId || manualMainAccount);
+                  const manualRawById = Object.fromEntries(linkedAllocations.map(allocation => [allocation.id, allocation]));
+                  const manualAccountOf = allocation => allocation.role === "pass_through" ? manualMainAccount : ((manualRawById[allocation.id]?.settledAccountId) || manualMainAccount);
                   const manualDistinct = [...new Set(manualRows.map(manualAccountOf))];
                   const manualBuildAlloc = allocation => ({ id: allocation.id || uid(), role: allocation.role, category: allocation.role === "pass_through" ? "เงินส่วนของผู้อื่น" : allocation.category, stage: allocation.role === "principal" ? (allocation.stage || "full") : undefined, amount: allocation.amount, recipientName: allocation.role === "pass_through" ? allocation.recipientName : "", settled: allocation.role === "pass_through" ? allocation.settled : false, settledDate: allocation.role === "pass_through" && allocation.settled ? allocation.settledDate : "", settledAccountId: allocation.role === "pass_through" && allocation.settled ? allocation.settledAccountId : null });
                   if (splitAccounts && manualDistinct.length > 1) {
