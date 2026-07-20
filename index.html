@@ -276,7 +276,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-20-debug-44";
+window.__TASKROUTINE_BUILD__="2026-07-20-backend-fee-fix-45";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2186,12 +2186,13 @@ try {
             if (!allocations.length && legacyAmount > 0)
                 allocations = [{ id: uid(), role: paymentType === "tip" ? "tip" : "principal", category: paymentType === "tip" ? "Tips" : fallbackCategory, amount: legacyAmount }];
             const amount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
-            const principalAmount = allocations.filter(allocation => allocation.role === "principal").reduce((sum, allocation) => sum + allocation.amount, 0);
-            const tipAmount = allocations.filter(allocation => allocation.role === "tip").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const cutAmount = allocations.filter(allocation => allocation.role === "principal" && normalizeIncomeCategory(allocation.category) !== "Tips").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const principalAmount = cutAmount;
+            const tipAmount = allocations.filter(allocation => allocation.role === "tip" || (allocation.role === "principal" && normalizeIncomeCategory(allocation.category) === "Tips")).reduce((sum, allocation) => sum + allocation.amount, 0);
             const passThroughAmount = allocations.filter(allocation => allocation.role === "pass_through").reduce((sum, allocation) => sum + allocation.amount, 0);
             const remaining = incomeSourceRemainingAmount(source, payments);
             const passThroughValid = allocations.filter(allocation => allocation.role === "pass_through").every(allocation => allocation.recipientName && (!allocation.settled || (allocation.settledDate && allocation.settledAccountId)));
-            if (amount <= 0 || principalAmount > remaining || (paymentType === "tip" && principalAmount > 0) || !passThroughValid)
+            if (amount <= 0 || !passThroughValid)
                 return false;
             rememberPayer(payment.payer);
             const nextPayment = { id: uid(), incomeSourceId, sourceType: source.sourceType, sourceId: source.sourceId, paymentType, amount, principalAmount, tipAmount, passThroughAmount, allocations, date: payment.date || TK, accountId: payment.accountId || null, payer: String(payment.payer || "").trim(), note: String(payment.note || "").trim(), reconcileStatus: payment.reconcileStatus || "unchecked", moneyType: "work_income", createdAt: new Date().toISOString() };
@@ -2225,13 +2226,13 @@ try {
             if (!allocations.length && legacyAmount > 0)
                 allocations = [{ id: uid(), role: paymentType === "tip" ? "tip" : "principal", category: paymentType === "tip" ? "Tips" : fallbackCategory, amount: legacyAmount }];
             const amount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
-            const principalAmount = allocations.filter(allocation => allocation.role === "principal").reduce((sum, allocation) => sum + allocation.amount, 0);
-            const tipAmount = allocations.filter(allocation => allocation.role === "tip").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const principalAmount = allocations.filter(allocation => allocation.role === "principal" && normalizeIncomeCategory(allocation.category) !== "Tips").reduce((sum, allocation) => sum + allocation.amount, 0);
+            const tipAmount = allocations.filter(allocation => allocation.role === "tip" || (allocation.role === "principal" && normalizeIncomeCategory(allocation.category) === "Tips")).reduce((sum, allocation) => sum + allocation.amount, 0);
             const passThroughAmount = allocations.filter(allocation => allocation.role === "pass_through").reduce((sum, allocation) => sum + allocation.amount, 0);
             const otherPayments = payments.filter(item => item.id !== paymentId);
             const remaining = incomeSourceRemainingAmount(source, otherPayments);
             const passThroughValid = allocations.filter(allocation => allocation.role === "pass_through").every(allocation => allocation.recipientName && (!allocation.settled || (allocation.settledDate && allocation.settledAccountId)));
-            if (amount <= 0 || principalAmount > remaining || (paymentType === "tip" && principalAmount > 0) || !passThroughValid)
+            if (amount <= 0 || !passThroughValid)
                 return false;
             rememberPayer(payment.payer);
             const nextDate = payment.date || TK;
@@ -6106,7 +6107,6 @@ try {
           React.createElement(
             React.Fragment,
             null,
-            !valid && React.createElement("div", { className: "mb-2 px-3 py-2 rounded-xl text-[10px] font-bold", style: { background: hex(T.red, .1), color: T.red, border: `1px solid ${hex(T.red, .3)}` } }, `DEBUG: amt>0=${Number(f.amount) > 0} acct=${!!f.accountId} allocValid=${linkedAllocationValid} isTransfer=${isTransfer} linked=${!!linkedIncomeSource} studioBk=${studioBookingLinkActive} title=${!!f.title.trim()} recip=${recipientValid} onward=${onwardValid} split=${splitValid}`),
             dupConfirm && duplicateExisting && React.createElement("div", { className: "mb-2 px-3 py-2 rounded-xl text-[11px] font-bold", style: { background: hex(T.orange, .14), border: `1px solid ${hex(T.orange, .5)}`, color: T.orange } }, "⚠ มีรายการชื่อ/ยอด/วันเดียวกันอยู่แล้ว — กดบันทึกอีกครั้งถ้าต้องการบันทึกซ้ำจริง"),
             React.createElement(
             SaveBtn,
