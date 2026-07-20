@@ -276,7 +276,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-20-split-fix-48";
+window.__TASKROUTINE_BUILD__="2026-07-20-del-receivable-49";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2365,6 +2365,18 @@ try {
             setPayments(list => [...list, payment]);
             return true;
         };
+        const deleteIncomeSourceOnly = sourceId => {
+            const source = incomeSources.find(item => item.id === sourceId);
+            if (!source)
+                return false;
+            if (payments.some(payment => payment.incomeSourceId === sourceId)) {
+                fireToast("งานนี้มีรายการรับเงินอยู่ · ลบรายการรับเงินในธุรกรรมก่อน");
+                return false;
+            }
+            setIncomeSources(list => list.filter(item => item.id !== sourceId));
+            offerUndo("ลบงานค้างรับแล้ว", () => setIncomeSources(list => [...list, source]));
+            return true;
+        };
         const deleteIncomeSourcePayment = paymentId => {
             const target = payments.find(payment => payment.id === paymentId);
             if (!target)
@@ -2471,7 +2483,7 @@ try {
                 setExpenseTargets(targets => { const copy = { ...targets }; delete copy[name]; return copy; });
         };
         const updateCapital = (v) => setCapital(Number(v) || 0);
-        const shared = { T, sel, setSel, events: allEvents, todayEvents, bookings, incomeSources, payments, addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, budgetIncomeSourceRequest, clearBudgetIncomeSourceRequest, openIncomeSourceBudget,
+        const shared = { T, sel, setSel, events: allEvents, todayEvents, bookings, incomeSources, payments, addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, budgetIncomeSourceRequest, clearBudgetIncomeSourceRequest, openIncomeSourceBudget,
             loyaltyBase, resetLoyalty, setLoyaltyRemaining, toggleBookingDone, cancelBooking, archiveBooking, delBooking, delBand, customerProfiles, updateCustomerProfile, deleteCustomerProfile, studioBookingRequest, clearStudioBookingRequest, openStudioBooking,
             transactions, addTxn, updateTxn, delTxn, capital, updateCapital,
             exportEventICS, exportDayICS, exportWeekICS, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase,
@@ -6586,7 +6598,7 @@ try {
             React.createElement(SaveBtn, { disabled: !valid, onClick: () => onSave({ ...f, recipientName: String(f.recipientName || "").trim(), amount: Number(f.amount) || 0 }) }, "บันทึกการส่งต่อ"));
     }
     function Budget(props) {
-        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, offerUndo, fireToast } = props;
+        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, offerUndo, fireToast } = props;
         const [mode, setMode] = useState("total");
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
@@ -7474,7 +7486,7 @@ try {
                                 return React.createElement(Glass, { key: it.key, className: "p-3 flex items-center gap-3", glowColor: sectionKey === "overdue" ? T.orange : undefined },
                                     React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[dt.getDay()]), React.createElement("div", { className: "text-base font-bold leading-none", style: { color } }, dt.getDate()), React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_M[dt.getMonth()])),
                                     React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-semibold text-sm truncate" }, it.title), React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5" }, React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(tag.c, .16), color: tag.c } }, tag.t)), Number(it.receivedAmount) > 0 && React.createElement("div", { className: "text-[9px] mt-1", style: { color: T.green } }, `รับแล้ว ${fmtBaht(it.receivedAmount)} · เหลือ ${fmtBaht(it.amount)}`)),
-                                    React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("button", { onClick: () => tickDue(it), className: "mt-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน")));
+                                    React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("div", { className: "flex items-center gap-1.5 mt-1 justify-end" }, it.kind === "incomeSource" && React.createElement("button", { onClick: () => deleteIncomeSourceOnly?.(it.id), className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { background: hex(T.red, .1), color: T.red, border: `1px solid ${hex(T.red, .3)}` } }, React.createElement(Trash2, { size: 13 })), React.createElement("button", { onClick: () => tickDue(it), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน"))));
                             })));
                 }))),
             sub === "transactions" && transactionSection === "fixed" && (React.createElement(React.Fragment, null, (() => {
