@@ -401,7 +401,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-24-pwa-precache-55";
+window.__TASKROUTINE_BUILD__="2026-07-24-fitness-ui-59";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -471,7 +471,7 @@ try {
     const BarChart3 = makeIcon("BarChart3");
     const Plus = makeIcon("Plus");
     const X = makeIcon("X");
-    const Check = makeIcon("Check"), Copy = makeIcon("Copy"), RefreshCw = makeIcon("RefreshCw");
+    const Check = makeIcon("Check"), Copy = makeIcon("Copy"), RefreshCw = makeIcon("RefreshCw"), Layers = makeIcon("Layers");
     const Flame = makeIcon("Flame");
     const Zap = makeIcon("Zap");
     const Briefcase = makeIcon("Briefcase");
@@ -540,7 +540,10 @@ try {
     const KG2LB = 2.20462;
     const wDisplay = (kgVal, unit) => unit === "lbs" ? Math.round((Number(kgVal) || 0) * KG2LB * 10) / 10 : (Number(kgVal) || 0);
     const wToKg = (val, unit) => unit === "lbs" ? (Number(val) || 0) / KG2LB : (Number(val) || 0);
-    const MUSCLE_PARTS = ["อก", "หลัง", "ขา", "ไหล่", "ไบเซ็บ", "ไตรเซ็บ", "แกนกลาง", "ก้น"];
+    const MUSCLE_PARTS = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Abs", "Glutes"];
+    const FIT_PART_ALIASES = { "อก": "Chest", "หลัง": "Back", "ขา": "Legs", "ไหล่": "Shoulders", "ไบเซ็บ": "Biceps", "ไตรเซ็บ": "Triceps", "แกนกลาง": "Abs", "ก้น": "Glutes", "เซอร์กิต": "Circuit", "โมบิลิตี้": "Mobility", "คาร์ดิโอ": "Cardio", "ฟังก์ชันนัล": "Functional" };
+    const normalizeFitPart = value => FIT_PART_ALIASES[String(value || "").trim()] || value;
+    const normalizeFitParts = list => Array.isArray(list) ? [...new Set(list.map(normalizeFitPart).filter(Boolean))] : [];
     const PRESET_MUSCLE_GROUPS = ["Chest", "Back", "Shoulders", "Legs", "Glutes", "Biceps", "Triceps", "Abs", "Calves", "Cardio/Full Body", "Mobility"];
     const EXERCISE_LIBRARY = {
         strength: {
@@ -577,7 +580,7 @@ try {
         }
     };
     const exerciseLibraryGroupFor = (name) => Object.keys(EXERCISE_LIBRARY).find(key => EXERCISE_LIBRARY[key].exercises.some(ex => ex[0] === name)) || "strength";
-    const GYM_STYLES = ["เซอร์กิต", "โมบิลิตี้", "คาร์ดิโอ", "ฟังก์ชันนัล"];
+    const GYM_STYLES = ["Circuit", "Mobility", "Cardio", "Functional"];
     const SPORT_LIST = ["วิ่ง", "ว่ายน้ำ", "ปั่นจักรยาน", "ฟุตบอล", "บาสเกตบอล", "แบดมินตัน", "เทนนิส", "มวย", "ปีนผา", "โยคะ", "อื่นๆ"];
     const FIT_KINDS = [["weight", "GYM"], ["sport", "SPORTS"]];
     const EVENT_TYPES = {
@@ -834,6 +837,13 @@ try {
         s.exPresets ?? (s.exPresets = []);
         s.workoutPresets ?? (s.workoutPresets = []);
         s.fitnessSplit ?? (s.fitnessSplit = null);
+        if (s.fitnessSplit && typeof s.fitnessSplit === "object")
+            s.fitnessSplit = Object.fromEntries(Object.entries(s.fitnessSplit).map(([day, plan]) => [day,
+                plan && typeof plan === "object" ? { ...plan, parts: normalizeFitParts(plan.parts) } : plan]));
+        if (Array.isArray(s.events))
+            s.events = s.events.map(event => Array.isArray(event?.fitParts)
+                ? { ...event, fitParts: normalizeFitParts(event.fitParts) }
+                : event);
         s.fitnessStartDay ?? (s.fitnessStartDay = 1);
         s.fitnessConfirmed ?? (s.fitnessConfirmed = {});
         delete s.driveConnected;
@@ -8044,9 +8054,15 @@ try {
         const restart = (s) => { ensureAudio(); requestNotifyPermission(); const dur = typeof s === "number" ? s : total; setTotal(dur); setLeft(dur); endRef.current = Date.now() + dur * 1000; firedRef.current = false; setRunning(true); };
         return { total, left, running, setRunning, pick, start, pause, adj, restart };
     }
-    const NumBox = ({ value, onChange, suffix, w = 54 }) => (React.createElement("input", { type: "number", inputMode: "decimal", step: "any", value: value, onChange: e => onChange(e.target.value), className: "px-2 py-1.5 rounded-lg text-sm font-bold text-center outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}`, width: w } }));
+    const NumBox = ({ value, onChange, suffix, w = 54, max }) => (React.createElement("input", { type: "number", inputMode: "decimal", step: "any", max: max, value: value, onChange: e => { const raw = e.target.value; if (typeof max === "number" && raw !== "" && Number(raw) > max) { onChange(String(max)); return; } onChange(raw); }, className: "px-2 py-1.5 rounded-lg text-sm font-bold text-center outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}`, width: w } }));
+    const WORKOUT_REPS_MAX = 999;
+    const WORKOUT_WEIGHT_MAX = 999;
     const workoutExerciseKey = value => String(value || "").trim().toLocaleLowerCase("th").replace(/\s+/g, " ");
-    const workoutSetValue = set => ({ reps: Math.max(0, Number(set?.reps) || 0), weight: Math.max(0, Number(set?.weight) || 0) });
+    const workoutSetValue = set => {
+        const reps = Math.max(0, Number(set?.reps) || 0);
+        const weight = Math.max(0, Number(set?.weight) || 0);
+        return { reps: reps > WORKOUT_REPS_MAX ? 0 : reps, weight: weight > WORKOUT_WEIGHT_MAX ? 0 : weight };
+    };
     const workoutE1RM = set => { const value = workoutSetValue(set); return value.weight > 0 && value.reps > 0 ? value.weight * (1 + value.reps / 30) : 0; };
     const workoutSetVolume = set => { const value = workoutSetValue(set); return value.reps * value.weight; };
     const workoutCompletedSets = exercise => (exercise?.sets || []).filter(set => set.st === "done");
@@ -8116,6 +8132,8 @@ try {
         const [activeId, setActiveId] = useState(null);
         useEffect(() => { setActiveId(null); }, [view]);
         const [exName, setExName] = useState("");
+        const [historyShown, setHistoryShown] = useState(10);
+        const [presetPickOpen, setPresetPickOpen] = useState(false);
         const [showExSuggest, setShowExSuggest] = useState(false);
         const knownExerciseNames = useMemo(() => {
             const seen = new globalThis.Map();
@@ -8147,6 +8165,9 @@ try {
         };
         const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date))
             .filter(w => view === "history" ? w.date !== TK : w.date === TK);
+        const HISTORY_PAGE = 10;
+        const visibleSorted = view === "history" ? sorted.slice(0, historyShown) : sorted;
+        const hiddenCount = view === "history" ? Math.max(0, sorted.length - visibleSorted.length) : 0;
         const active = workouts.find(w => w.id === activeId);
         const histMax = useMemo(() => {
             const map = {};
@@ -8323,7 +8344,7 @@ try {
                 view !== "history" && React.createElement("button", { onClick: newSession, className: "w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { background: T.green, color: "#000" } },
                     React.createElement(Plus, { size: 17 }),
                     " \u0E40\u0E23\u0E34\u0E48\u0E21\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E01\u0E32\u0E23\u0E40\u0E25\u0E48\u0E19\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49"),
-                sorted.length === 0 ? React.createElement(Empty, { text: view === "history" ? "ยังไม่มีประวัติการเล่นก่อนหน้า" : "ยังไม่มีบันทึกวันนี้ — กดเริ่มบันทึกด้านบน" }) : sorted.map(w => (React.createElement(Glass, { key: w.id, className: "p-3 flex items-center gap-3 active:scale-[.99]", onClick: () => setActiveId(w.id), style: { cursor: "pointer" } },
+                sorted.length === 0 ? React.createElement(Empty, { text: view === "history" ? "ยังไม่มีประวัติการเล่นก่อนหน้า" : "ยังไม่มีบันทึกวันนี้ — กดเริ่มบันทึกด้านบน" }) : visibleSorted.map(w => (React.createElement(Glass, { key: w.id, className: "p-3 flex items-center gap-3 active:scale-[.99]", onClick: () => setActiveId(w.id), style: { cursor: "pointer" } },
                     React.createElement("div", { className: "w-11 text-center shrink-0" },
                         React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[parseK(w.date).getDay()]),
                         React.createElement("div", { className: "text-base font-bold leading-none" }, parseK(w.date).getDate()),
@@ -8338,7 +8359,8 @@ try {
                             w.durationMin ? ` · ⏱ ${w.durationMin} นาที` : "",
                             w.targetExceededCount ? ` · เกินเป้า ${w.targetExceededCount}` : "",
                             w.prCount ? ` · PR ${w.prCount}` : "")),
-                    React.createElement(ChevronRight, { size: 16, style: { color: T.muted } }))))));
+                    React.createElement(ChevronRight, { size: 16, style: { color: T.muted } })))),
+                hiddenCount > 0 && React.createElement("button", { onClick: () => setHistoryShown(value => value + HISTORY_PAGE), className: "w-full py-2.5 rounded-xl text-xs font-bold", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, `\u0e14\u0e39\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e2d\u0e35\u0e01 ${Math.min(HISTORY_PAGE, hiddenCount)} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23 (\u0e40\u0e2b\u0e25\u0e37\u0e2d ${hiddenCount})`)));
         }
         const linkedEv = active.linkedEventId ? (events || []).find(e => e.id === active.linkedEventId) : null;
         const renderExCard = (ex, idx, inSS) => {
@@ -8386,9 +8408,9 @@ try {
                                     "\u0E40\u0E0B\u0E47\u0E15 ",
                                     i + 1),
                                 (() => { const wNow = Number(st.weight) || 0; const hist = histMax[workoutExerciseKey(ex.name)] || 0; return hist > 0 && wNow > hist ? React.createElement("span", { className: "text-[8px] font-extrabold px-1 rounded mt-0.5", style: { color: T.gold, background: hex(T.gold, .16), border: `1px solid ${hex(T.gold, .45)}` } }, "PR!") : null; })()),
-                            React.createElement(NumBox, { value: st.reps, onChange: v => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, reps: v === "" ? "" : Number(v) } : s) })) }),
+                            React.createElement(NumBox, { max: WORKOUT_REPS_MAX, value: st.reps, onChange: v => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, reps: v === "" ? "" : Number(v) } : s) })) }),
                             React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, "\u00D7"),
-                            React.createElement(NumBox, { value: st.weight === "" ? "" : wDisplay(st.weight, ex.unit || "kg"), onChange: v => { const kgVal = v === "" ? "" : wToKg(v, ex.unit || "kg"); patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, weight: kgVal } : s) })); } }),
+                            React.createElement(NumBox, { max: WORKOUT_WEIGHT_MAX, value: st.weight === "" ? "" : wDisplay(st.weight, ex.unit || "kg"), onChange: v => { const kgVal = v === "" ? "" : wToKg(v, ex.unit || "kg"); patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, weight: kgVal } : s) })); } }),
                             React.createElement("button", { onClick: () => patchEx(ex.id, e => ({ ...e, unit: (e.unit || "kg") === "kg" ? "lbs" : "kg" })), "aria-label": "\u0E2A\u0E25\u0E31\u0E1A\u0E2B\u0E19\u0E48\u0E27\u0E22\u0E19\u0E49\u0E33\u0E2B\u0E19\u0E31\u0E01", className: "text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0", style: { color: T.blue, background: hex(T.blue, .14) } }, ex.unit || "kg"),
                             prev?.sets?.[i] && (() => {
                                 const previousSet = prev.sets[i];
@@ -8409,9 +8431,9 @@ try {
                                     React.createElement(Minus, { size: 14 })))),
                             st.drop && React.createElement("div", { className: "flex items-center gap-2 px-1.5 py-1 rounded-lg", style: { marginLeft: 40, background: hex("#4a6fa5", .07), border: `1px dashed ${hex("#4a6fa5", .35)}`, opacity: D ? 0.55 : 1 } },
                                 React.createElement("span", { className: "text-[10px] font-bold shrink-0", style: { color: "#4a6fa5" } }, "↳ drop"),
-                                React.createElement(NumBox, { value: st.drop.reps, onChange: v => setDrop({ reps: v === "" ? "" : Number(v) }), w: 50 }),
+                                React.createElement(NumBox, { max: WORKOUT_REPS_MAX, value: st.drop.reps, onChange: v => setDrop({ reps: v === "" ? "" : Number(v) }), w: 50 }),
                                 React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, "\u00D7"),
-                                React.createElement(NumBox, { value: st.drop.weight === "" ? "" : wDisplay(st.drop.weight, ex.unit || "kg"), onChange: v => setDrop({ weight: v === "" ? "" : wToKg(v, ex.unit || "kg") }), w: 58 }),
+                                React.createElement(NumBox, { max: WORKOUT_WEIGHT_MAX, value: st.drop.weight === "" ? "" : wDisplay(st.drop.weight, ex.unit || "kg"), onChange: v => setDrop({ weight: v === "" ? "" : wToKg(v, ex.unit || "kg") }), w: 58 }),
                                 React.createElement("span", { className: "text-[10px] shrink-0", style: { color: T.muted } }, ex.unit || "kg"),
                                 React.createElement("button", { onClick: () => setDrop(null), "aria-label": "ลบน้ำหนักรอง", className: "ml-auto w-7 h-7 rounded-lg flex items-center justify-center shrink-0", style: { color: T.muted } },
                                     React.createElement(Minus, { size: 14 })))));
@@ -8450,6 +8472,7 @@ try {
             return sec;
         }, 0) / 60);
         return (React.createElement("div", { className: "space-y-3" },
+            React.createElement(Glass, { className: "p-3 space-y-2.5" },
             React.createElement("div", { className: "flex items-center gap-2" },
                 React.createElement("button", { onClick: () => setActiveId(null), className: "w-8 h-8 rounded-lg flex items-center justify-center", style: { background: T.surf2 } },
                     React.createElement(ChevronLeft, { size: 16 })),
@@ -8462,13 +8485,10 @@ try {
                     React.createElement(Dumbbell, { size: 10 }),
                     " \u0E25\u0E34\u0E07\u0E01\u0E4C: ",
                     linkedEv.title)),
-            (workoutPresets || []).length > 0 && (React.createElement("div", { className: "flex gap-1.5 flex-wrap items-center" },
-                React.createElement("span", { className: "text-[10px]", style: { color: T.muted } }, "\u0E42\u0E2B\u0E25\u0E14\u0E0A\u0E38\u0E14:"),
-                workoutPresets.map(p => (React.createElement("button", { key: p.id, onClick: () => applyWorkoutPreset(p), className: "px-2.5 py-1.5 rounded-lg text-[11px] font-bold", style: { background: hex(T.violet, .14), color: T.violet, border: `1px solid ${hex(T.violet, .5)}` } },
-                    p.name,
-                    " \u00B7 ",
-                    p.items.length,
-                    "\u0E17\u0E48\u0E32"))))),
+            React.createElement("button", { onClick: () => setPresetPickOpen(true), className: "w-full px-3 py-2.5 rounded-xl flex items-center gap-2", style: { background: hex(T.violet, .1), border: `1px dashed ${hex(T.violet, .45)}` } },
+                React.createElement(Layers, { size: 15, style: { color: T.violet } }),
+                React.createElement("span", { className: "text-xs font-extrabold", style: { color: T.violet } }, "\u0e42\u0e2b\u0e25\u0e14\u0e0a\u0e38\u0e14\u0e17\u0e48\u0e32"),
+                React.createElement("span", { className: "text-[10px] ml-auto", style: { color: T.muted } }, `${(workoutPresets || []).length} \u0e0a\u0e38\u0e14`)),
             !active.startedAt ? (React.createElement("button", { onClick: () => {
                     softTick();
                     const firstIdx = active.exercises.findIndex(e => e.sets.some(s => s.st !== "done"));
@@ -8486,7 +8506,7 @@ try {
                 React.createElement("span", { className: "text-xs font-bold", style: { color: active.endedAt ? T.muted : active.pausedAt ? T.gold : T.green } }, active.endedAt ? "จบแล้ว" : active.pausedAt ? "พัก Session" : "กำลังเล่น"),
                 React.createElement("span", { className: "text-xl font-extrabold tabular-nums ml-auto", style: { color: active.endedAt ? T.sub : active.pausedAt ? T.gold : T.green } }, fmtElapsed(Math.max(0, ((active.pausedAt || active.endedAt || nowMs) - active.startedAt) - (Number(active.accumulatedPauseMs) || 0)))),
                 !active.endedAt && React.createElement("button", { onClick: () => { const now = Date.now(); if (active.pausedAt) upsert({ ...active, pausedAt: null, accumulatedPauseMs: (Number(active.accumulatedPauseMs) || 0) + (now - active.pausedAt) }); else { t.pause(); setRestOv(false); upsert({ ...active, pausedAt: now }); } }, className: "px-2.5 py-2 rounded-lg text-[11px] font-bold shrink-0", style: { background: hex(active.pausedAt ? T.green : T.gold, .16), color: active.pausedAt ? T.green : T.gold, border: `1px solid ${hex(active.pausedAt ? T.green : T.gold, .5)}` } }, active.pausedAt ? "เล่นต่อ" : "พัก"),
-                !active.endedAt && React.createElement("button", { onClick: () => { t.pause(); setRestOv(false); openFinish(); }, className: "px-2.5 py-2 rounded-lg text-[11px] font-bold shrink-0", style: { background: hex(T.red, .16), color: T.red, border: `1px solid ${hex(T.red, .5)}` } }, "จบ"))),
+                !active.endedAt && React.createElement("button", { onClick: () => { t.pause(); setRestOv(false); openFinish(); }, className: "px-2.5 py-2 rounded-lg text-[11px] font-bold shrink-0", style: { background: hex(T.red, .16), color: T.red, border: `1px solid ${hex(T.red, .5)}` } }, "จบ")))),
             active.exercises.length > 0 && (React.createElement("div", { className: "flex items-center gap-2 flex-wrap p-2.5 rounded-xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                 React.createElement(Timer, { size: 13, style: { color: T.cyan } }),
                 React.createElement("span", { className: "text-[11px]", style: { color: T.sub } }, "\u0E40\u0E27\u0E25\u0E32\u0E40\u0E25\u0E48\u0E19/\u0E40\u0E0B\u0E47\u0E15"),
@@ -8566,6 +8586,16 @@ try {
                         React.createElement("span", { className: "font-bold text-sm flex-1" }, "\u0E04\u0E23\u0E1A\u0E40\u0E27\u0E25\u0E32\u0E1E\u0E31\u0E01 \u2014 \u0E25\u0E38\u0E22\u0E40\u0E0B\u0E47\u0E15\u0E15\u0E48\u0E2D\u0E44\u0E1B!"),
                         React.createElement("button", { onClick: () => setRestOv(false), className: "px-3 py-1.5 rounded-lg text-xs font-bold", style: { background: T.green, color: "#000" } }, "\u0E44\u0E1B\u0E15\u0E48\u0E2D"))))));
             })(),
+            presetPickOpen && React.createElement(Sheet, { title: "\u0e42\u0e2b\u0e25\u0e14\u0e0a\u0e38\u0e14\u0e17\u0e48\u0e32", onClose: () => setPresetPickOpen(false) },
+                (workoutPresets || []).length === 0
+                    ? React.createElement("div", { className: "py-6 text-center text-xs", style: { color: T.muted } }, "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e0a\u0e38\u0e14\u0e17\u0e48\u0e32 \u00b7 \u0e2a\u0e23\u0e49\u0e32\u0e07\u0e44\u0e14\u0e49\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e1f\u0e34\u0e15\u0e40\u0e19\u0e2a")
+                    : React.createElement("div", { className: "space-y-2" }, workoutPresets.map(preset =>
+                        React.createElement("button", { key: preset.id, onClick: () => { applyWorkoutPreset(preset); setPresetPickOpen(false); }, className: "w-full p-3 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                            React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.violet, .14), color: T.violet } }, React.createElement(Layers, { size: 16 })),
+                            React.createElement("div", { className: "flex-1 min-w-0" },
+                                React.createElement("div", { className: "font-bold text-sm truncate" }, preset.name),
+                                React.createElement("div", { className: "text-[10px] truncate", style: { color: T.muted } }, `${(preset.items || []).length} \u0e17\u0e48\u0e32 \u00b7 ${(preset.items || []).map(item => item.name).join(", ")}`)),
+                            React.createElement(ChevronRight, { size: 16, style: { color: T.muted } }))))),
             finOpen && (() => {
                 const pauseMs = (Number(active.accumulatedPauseMs) || 0) + (active.pausedAt ? ((active.endedAt || Date.now()) - active.pausedAt) : 0);
                 const durMin = active.startedAt ? Math.max(1, Math.round(Math.max(0, ((active.endedAt || Date.now()) - active.startedAt) - pauseMs) / 60000)) : null;
@@ -9360,8 +9390,8 @@ try {
                         React.createElement("span", { className: "shrink-0", style: { width: 28 } })),
                     x.sets.map((st, si) => (React.createElement("div", { key: si, className: "flex items-center gap-2 px-1" },
                         React.createElement("span", { className: "text-sm font-extrabold text-center shrink-0", style: { color: T.text, width: 34 } }, si + 1),
-                        React.createElement(NumBox, { value: st.reps, onChange: v => patchSet(i, si, { reps: v }), w: COLW }),
-                        React.createElement(NumBox, { value: st.weight === "" ? "" : wDisplay(st.weight, x.unit || "kg"), onChange: v => patchSet(i, si, { weight: v === "" ? "" : wToKg(v, x.unit || "kg") }), w: COLW }),
+                        React.createElement(NumBox, { max: WORKOUT_REPS_MAX, value: st.reps, onChange: v => patchSet(i, si, { reps: v }), w: COLW }),
+                        React.createElement(NumBox, { max: WORKOUT_WEIGHT_MAX, value: st.weight === "" ? "" : wDisplay(st.weight, x.unit || "kg"), onChange: v => patchSet(i, si, { weight: v === "" ? "" : wToKg(v, x.unit || "kg") }), w: COLW }),
                         React.createElement(NumBox, { value: st.rest, onChange: v => patchSet(i, si, { rest: v }), w: COLW }),
                         x.sets.length > 1 ? React.createElement("button", { onClick: () => delSet(i, si), "aria-label": "\u0E25\u0E1A\u0E40\u0E0B\u0E47\u0E15", className: "w-7 h-7 rounded-md flex items-center justify-center shrink-0", style: { color: T.muted } },
                             React.createElement(Minus, { size: 13 })) : React.createElement("span", { className: "shrink-0", style: { width: 28 } })))),
@@ -9372,9 +9402,45 @@ try {
     }
     const TH_DAY_FULL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"];
     const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+    const W = (...parts) => ({ kind: "weight", parts });
+    const REST = { kind: "rest", parts: [] };
+    const SPLIT_TEMPLATES = [
+        { id: "ppl", name: "Push / Pull / Legs", desc: "6 \u0e27\u0e31\u0e19 \u00b7 \u0e14\u0e31\u0e19-\u0e14\u0e36\u0e07-\u0e02\u0e32",
+            days: { 1: W("Chest", "Shoulders", "Triceps"), 2: W("Back", "Biceps"), 3: W("Legs", "Glutes"), 4: W("Chest", "Shoulders", "Triceps"), 5: W("Back", "Biceps"), 6: W("Legs", "Glutes"), 0: REST } },
+        { id: "upper-lower", name: "Upper / Lower", desc: "4 \u0e27\u0e31\u0e19 \u00b7 \u0e1a\u0e19-\u0e25\u0e48\u0e32\u0e07",
+            days: { 1: W("Chest", "Back", "Shoulders", "Biceps", "Triceps"), 2: W("Legs", "Glutes"), 3: REST, 4: W("Chest", "Back", "Shoulders", "Biceps", "Triceps"), 5: W("Legs", "Glutes", "Abs"), 6: REST, 0: REST } },
+        { id: "bro", name: "Bro Split", desc: "5 \u0e27\u0e31\u0e19 \u00b7 \u0e41\u0e22\u0e01\u0e21\u0e31\u0e14\u0e01\u0e25\u0e49\u0e32\u0e21",
+            days: { 1: W("Chest"), 2: W("Back"), 3: W("Shoulders"), 4: W("Legs", "Glutes"), 5: W("Biceps", "Triceps", "Abs"), 6: REST, 0: REST } },
+        { id: "full-3", name: "Full Body 3 \u0e27\u0e31\u0e19", desc: "\u0e08-\u0e1e-\u0e28 \u00b7 \u0e40\u0e25\u0e48\u0e19\u0e17\u0e31\u0e49\u0e07\u0e15\u0e31\u0e27",
+            days: { 1: W("Chest", "Back", "Legs"), 2: REST, 3: W("Shoulders", "Legs", "Abs"), 4: REST, 5: W("Chest", "Back", "Glutes"), 6: REST, 0: REST } },
+        { id: "gym-cardio", name: "\u0e40\u0e27\u0e17 + \u0e04\u0e32\u0e23\u0e4c\u0e14\u0e34\u0e42\u0e2d", desc: "4 \u0e27\u0e31\u0e19 \u00b7 \u0e2a\u0e25\u0e31\u0e1a\u0e04\u0e32\u0e23\u0e4c\u0e14\u0e34\u0e42\u0e2d",
+            days: { 1: W("Chest", "Shoulders", "Triceps"), 2: W("Cardio"), 3: W("Back", "Biceps"), 4: REST, 5: W("Legs", "Glutes"), 6: W("Cardio"), 0: REST } }
+    ];
     function Fitness(props) {
         const { fitnessSplit, saveFitnessSplit, fitnessStartDay, setFitnessStartDay, fitnessConfirmed, confirmFitnessWeek, events, workouts, updateWorkouts, nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, offerUndo } = props;
         const [wpOpen, setWpOpen] = useState(false);
+        const [reportOpen, setReportOpen] = useState(false);
+        const startFromPreset = preset => {
+            const exercises = (preset.items || []).map(item => {
+                const rests = (item.sets || []).map(set => set.rest ?? item.rest ?? null);
+                const uniform = rests.every(rest => rest === rests[0]) ? rests[0] : null;
+                return {
+                    id: uid(), name: item.name, note: item.note || "", unit: item.unit || "kg",
+                    libraryGroup: item.libraryGroup, muscle: item.muscle, ss: item.ss || null, rest: uniform,
+                    target: (item.sets || []).map(set => ({ reps: set.reps, weight: set.weight })),
+                    sets: (item.sets || []).map((set, index) => ({ reps: set.reps, weight: set.weight, rest: rests[index], ...(set.drop ? { drop: { ...set.drop } } : {}) }))
+                };
+            });
+            updateWorkouts(list => {
+                const existing = list.find(session => session.date === TK);
+                if (existing)
+                    return list.map(session => session.id === existing.id
+                        ? { ...session, title: session.title || preset.name, loadedPresetIds: [...new Set([...(session.loadedPresetIds || []), preset.id])], exercises: [...(session.exercises || []), ...exercises] }
+                        : session);
+                return [...list, { id: uid(), date: TK, title: preset.name, loadedPresetIds: [preset.id], exercises }];
+            });
+            setPresetManagerOpen(false);
+        };
         const [wpEdit, setWpEdit] = useState(null);
         const [wpDel, setWpDel] = useState(null);
         const [presetManagerOpen, setPresetManagerOpen] = useState(false);
@@ -9423,8 +9489,14 @@ try {
                     React.createElement(Ic, { size: 13 }),
                     l);
             })),
+            sub === "today" && React.createElement("button", { onClick: () => setPresetManagerOpen(true), className: "w-full p-3.5 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { minHeight: 64, background: "#FFFFFF", border: `1px solid ${hex(T.violet, .3)}`, boxShadow: "0 7px 18px rgba(83,67,43,.06)" } },
+                React.createElement("span", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.violet, .13), color: T.violet } }, React.createElement(LayersIcon, { size: 18 })),
+                React.createElement("div", { className: "flex-1 min-w-0" },
+                    React.createElement("div", { className: "text-sm font-extrabold" }, "จัดการ Preset ชุดท่า"),
+                    React.createElement("div", { className: "text-[10px] mt-0.5 truncate", style: { color: T.muted } }, workoutPresets.length ? `${workoutPresets.length} ชุด · แตะเพื่อสร้างหรือแก้ไข` : "สร้างชุดท่าสำหรับโหลดตอนเริ่มบันทึก")),
+                React.createElement(ChevronRight, { size: 17, style: { color: T.violet } })),
             (sub === "today" || sub === "history") && (React.createElement(WorkoutLog, { view: sub, workouts: workouts, updateWorkouts: updateWorkouts, events: events, exPresets: exPresets, setExPresets: setExPresets, workoutPresets: workoutPresets, setWorkoutPresets: setWorkoutPresets, offerUndo: offerUndo })),
-            sub === "today" && (() => { const row7 = Array.from({ length: 7 }, (_, i) => { const dt = addDays(today, -6 + i); const k = dkey(dt); return { dn: TH_D[dt.getDay()], trained: workouts.some(w => w.date === k), vol: workouts.filter(w => w.date === k).reduce((sum, w) => sum + (w.exercises || []).reduce((s2, e) => s2 + (e.sets || []).reduce((s3, st) => s3 + (Number(st.reps) || 0) * (Number(st.weight) || 0) + (st.drop ? (Number(st.drop.reps) || 0) * (Number(st.drop.weight) || 0) : 0), 0), 0), 0) }; }); const trainCount = row7.filter(x => x.trained).length; const volArr = row7.map(x => x.vol); const volSum = volArr.reduce((a, b) => a + b, 0); const maxVol = Math.max(1, ...volArr); return React.createElement(React.Fragment, null,
+            sub === "today" && (() => { const row7 = Array.from({ length: 7 }, (_, i) => { const dt = addDays(today, -6 + i); const k = dkey(dt); return { dn: TH_D[dt.getDay()], trained: workouts.some(w => w.date === k), vol: workouts.filter(w => w.date === k).reduce((sum, w) => sum + (w.exercises || []).reduce((s2, e) => s2 + (e.sets || []).reduce((s3, st) => s3 + workoutSetVolume(st) + (st.drop ? workoutSetVolume(st.drop) : 0), 0), 0), 0) }; }); const trainCount = row7.filter(x => x.trained).length; const volArr = row7.map(x => x.vol); const volSum = volArr.reduce((a, b) => a + b, 0); const maxVol = Math.max(1, ...volArr); return React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "grid grid-cols-2 gap-2.5" }, [["Session 7 วัน", `${trainCount}`, "วัน", T.green, Dumbbell], ["Volume 7 วัน", volSum >= 1000 ? (volSum / 1000).toFixed(1) + "k" : `${volSum}`, "kg", T.cyan, TrendingUp]].map(([lab, val, unit, c, Ic], i) => React.createElement(Glass, { key: i, className: "p-3 text-center" },
                     React.createElement("div", { className: "w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1.5", style: { background: hex(c, .16) } }, React.createElement(Ic, { size: 15, style: { color: c } })),
                     React.createElement("div", { className: "text-lg font-extrabold leading-none" }, val, React.createElement("span", { className: "text-[10px] font-bold ml-0.5", style: { color: T.muted } }, unit)),
@@ -9511,12 +9583,6 @@ try {
             sub === "nutrition" && (React.createElement(Glass, { className: "p-4" },
                 React.createElement("div", { className: "text-sm font-bold mb-3", style: { color: T.gold } }, "\u0E42\u0E20\u0E0A\u0E19\u0E32\u0E01\u0E32\u0E23"),
                 React.createElement(Nutrition, { nutrition: nutrition, setNutrition: setNutrition, nutriTargets: nutriTargets, setNutriTargets: setNutriTargets, foodLibrary: foodLibrary, setFoodLibrary: setFoodLibrary }))),
-            sub === "today" && React.createElement("button", { onClick: () => setPresetManagerOpen(true), className: "w-full p-3.5 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { minHeight: 64, background: "#FFFFFF", border: `1px solid ${hex(T.violet, .3)}`, boxShadow: "0 7px 18px rgba(83,67,43,.06)" } },
-                React.createElement("span", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.violet, .13), color: T.violet } }, React.createElement(LayersIcon, { size: 18 })),
-                React.createElement("div", { className: "flex-1 min-w-0" },
-                    React.createElement("div", { className: "text-sm font-extrabold" }, "จัดการ Preset ชุดท่า"),
-                    React.createElement("div", { className: "text-[10px] mt-0.5 truncate", style: { color: T.muted } }, workoutPresets.length ? `${workoutPresets.length} ชุด · แตะเพื่อสร้างหรือแก้ไข` : "สร้างชุดท่าสำหรับโหลดตอนเริ่มบันทึก")),
-                React.createElement(ChevronRight, { size: 17, style: { color: T.violet } })),
             presetManagerOpen && React.createElement(Sheet, { onClose: () => { setPresetManagerOpen(false); setWpDel(null); }, title: "จัดการ Preset ชุดท่า" },
                 React.createElement("div", { className: "rounded-2xl flex items-center gap-3 mb-4", style: { padding: 15, background: hex(T.violet, .09), border: `1px solid ${hex(T.violet, .26)}` } },
                     React.createElement("span", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: "#FFFFFF", color: T.violet, boxShadow: "0 4px 12px rgba(83,67,43,.08)" } }, React.createElement(LayersIcon, { size: 18 })),
@@ -9527,6 +9593,7 @@ try {
                         React.createElement("div", { className: "flex-1 min-w-0" },
                             React.createElement("div", { className: "font-bold text-sm truncate" }, p.name),
                             React.createElement("div", { className: "text-[10px] truncate", style: { color: T.muted } }, p.items.map(x => x.name).join(", "))),
+                        React.createElement("button", { onClick: () => startFromPreset(p), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold shrink-0", style: { background: T.green, color: "#000" } }, "\u0e40\u0e23\u0e34\u0e48\u0e21\u0e40\u0e25\u0e22"),
                         React.createElement("button", { onClick: () => setWpEdit(p), "aria-label": "\u0E41\u0E01\u0E49\u0E44\u0E02 preset", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.blue } },
                             React.createElement(Pencil, { size: 14 })),
                         wpDel === p.id
@@ -9534,9 +9601,14 @@ try {
                             : React.createElement("button", { onClick: () => setWpDel(p.id), className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.muted } },
                                 React.createElement(Trash2, { size: 14 }))))),
                 React.createElement("button", { onClick: () => setWpOpen(true), className: "w-full rounded-2xl text-xs font-bold active:scale-[.98]", style: { minHeight: 48, padding: "12px 16px", background: hex(T.violet, .12), color: T.violet, border: `1px solid ${hex(T.violet, .38)}`, boxShadow: "0 7px 18px rgba(112,83,171,.10)" } }, "+ \u0E2A\u0E23\u0E49\u0E32\u0E07 Preset \u0E0A\u0E38\u0E14\u0E17\u0E48\u0E32"))),
-            sub === "history" && (React.createElement(Glass, { className: "p-4" },
-                React.createElement("div", { className: "text-sm font-bold mb-2", style: { color: T.blue } }, "\u0E01\u0E23\u0E32\u0E1F\u0E04\u0E27\u0E32\u0E21\u0E01\u0E49\u0E32\u0E27\u0E2B\u0E19\u0E49\u0E32 (\u0E19\u0E49\u0E33\u0E2B\u0E19\u0E31\u0E01)"),
-                React.createElement(ProgressChart, { workouts: workouts }))),
+            sub === "history" && React.createElement(Glass, { className: "p-0 overflow-hidden" },
+                React.createElement("button", { onClick: () => setReportOpen(value => !value), className: "w-full p-4 flex items-center gap-3 text-left" },
+                    React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.blue, .14), color: T.blue } }, React.createElement(TrendingUp, { size: 17 })),
+                    React.createElement("div", { className: "flex-1 min-w-0" },
+                        React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.blue } }, "\u0e23\u0e35\u0e1e\u0e2d\u0e23\u0e4c\u0e15\u0e2a\u0e23\u0e38\u0e1b\u0e04\u0e27\u0e32\u0e21\u0e01\u0e49\u0e32\u0e27\u0e2b\u0e19\u0e49\u0e32"),
+                        React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: T.muted } }, reportOpen ? "\u0e01\u0e14\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e0b\u0e48\u0e2d\u0e19" : `\u0e01\u0e14\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e14\u0e39\u0e01\u0e23\u0e32\u0e1f \u00b7 ${workouts.length} session`)),
+                    React.createElement(ChevronDown, { size: 17, style: { color: T.muted, transform: reportOpen ? "rotate(180deg)" : "none", transition: "transform .18s" } })),
+                reportOpen && React.createElement("div", { className: "px-4 pb-4" }, React.createElement(ProgressChart, { workouts: workouts }))),
             sub === "week" && (React.createElement(React.Fragment, null,
                 React.createElement(Glass, { className: "p-4" },
                     React.createElement("div", { className: "flex items-center justify-between mb-1" },
@@ -9580,6 +9652,12 @@ try {
                             const on = fitnessStartDay === d;
                             return React.createElement("button", { key: d, onClick: () => setFitnessStartDay(d), className: "px-2 py-1 rounded-lg text-[11px] font-bold", style: { background: on ? hex(T.purple, .2) : T.surf2, color: on ? T.text : T.sub, border: `1px solid ${on ? T.purple : T.border}` } }, TH_D[d]);
                         }))),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement(Label, null, "\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e15\u0e32\u0e23\u0e32\u0e07\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08\u0e23\u0e39\u0e1b (\u0e01\u0e14\u0e41\u0e25\u0e49\u0e27\u0e41\u0e01\u0e49\u0e15\u0e48\u0e2d\u0e44\u0e14\u0e49)"),
+                        React.createElement("div", { className: "flex gap-1.5 flex-wrap" }, SPLIT_TEMPLATES.map(tpl =>
+                            React.createElement("button", { key: tpl.id, onClick: () => setDraft(Object.fromEntries(WEEK_ORDER.map(day => [day, { ...(tpl.days[day] || REST), parts: [...((tpl.days[day] || REST).parts || [])] }]))), className: "px-2.5 py-2 rounded-xl text-left", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                                React.createElement("div", { className: "text-[11px] font-extrabold", style: { color: T.text } }, tpl.name),
+                                React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, tpl.desc))))),
                     React.createElement("div", { className: "space-y-2" }, WEEK_ORDER.map(d => {
                         const cur = draft[d] || { kind: "rest", parts: [] };
                         return (React.createElement("div", { key: d, className: "p-2.5 rounded-xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
