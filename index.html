@@ -401,7 +401,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-24-fitness-ui-59";
+window.__TASKROUTINE_BUILD__="2026-07-24-ex-collapse-60";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -8154,6 +8154,7 @@ try {
             return [...seen.values()];
         }, [workouts, exPresets]);
         const [openEx, setOpenEx] = useState({});
+        const [openExDetail, setOpenExDetail] = useState({});
         const [confirmDelS, setConfirmDelS] = useState(false);
         const upsert = (sess) => updateWorkouts(ws => { const i = ws.findIndex(w => w.id === sess.id); if (i < 0)
             return [...ws, sess]; const c = [...ws]; c[i] = sess; return c; });
@@ -8392,12 +8393,20 @@ try {
                         React.createElement(ChevronDown, { size: 16, style: { color: T.muted, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" } }))),
                 isOpen && (React.createElement("div", { className: "px-3 pb-3" },
                     prev && React.createElement("div", { className: "mb-2 px-1.5 text-[10px]", style: { color: T.muted } }, `ครั้งก่อน (${shortDate(prev.date)}): ${setsSummary(prev.sets) || "—"}`),
-                    React.createElement("div", { className: "mb-2" },
-                        React.createElement("label", { className: "text-[9px] font-bold mb-1 block", style: { color: T.muted } }, "ส่วนกล้ามเนื้อ"),
-                        React.createElement("select", { value: ex.muscle || PRESET_MUSCLE_GROUPS[0], onChange: event => patchEx(ex.id, exercise => ({ ...exercise, muscle: event.target.value })), className: "w-full px-3 py-2 rounded-lg text-xs font-medium outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }, PRESET_MUSCLE_GROUPS.map(m => React.createElement("option", { key: m, value: m }, m)))),
-                    React.createElement("div", { className: "mb-2" },
-                        React.createElement("label", { className: "text-[9px] font-bold mb-1 block", style: { color: T.muted } }, "โน้ตระหว่างเล่น"),
-                        React.createElement("textarea", { value: ex.note || "", onChange: event => patchEx(ex.id, exercise => ({ ...exercise, note: event.target.value })), rows: 2, placeholder: "เพิ่มเทคนิค จังหวะ หรือสิ่งที่ต้องจำสำหรับท่านี้…", className: "w-full px-3 py-2 rounded-xl text-[11px] outline-none resize-none", style: { background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, lineHeight: 1.5 } })),
+                    (() => {
+                        const detailOpen = !!openExDetail[ex.id];
+                        return React.createElement("div", { className: "mb-2 rounded-xl overflow-hidden", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                            React.createElement("button", { type: "button", onClick: () => setOpenExDetail(state => ({ ...state, [ex.id]: !state[ex.id] })), className: "w-full px-3 py-2 flex items-center gap-2 text-left" },
+                                React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.sub } }, ex.muscle || PRESET_MUSCLE_GROUPS[0]),
+                                ex.note && !detailOpen && React.createElement("span", { className: "text-[9px] truncate flex-1 min-w-0", style: { color: T.muted } }, ex.note),
+                                React.createElement("span", { className: "text-[9px] ml-auto shrink-0", style: { color: T.muted } }, detailOpen ? "\u0e0b\u0e48\u0e2d\u0e19" : "\u0e41\u0e01\u0e49\u0e44\u0e02"),
+                                React.createElement(ChevronDown, { size: 13, style: { color: T.muted, transform: detailOpen ? "rotate(180deg)" : "none", transition: "transform .18s" } })),
+                            detailOpen && React.createElement("div", { className: "px-3 pb-3 pt-1" },
+                                React.createElement("label", { className: "text-[9px] font-bold mb-1 block", style: { color: T.muted } }, "\u0e2a\u0e48\u0e27\u0e19\u0e01\u0e25\u0e49\u0e32\u0e21\u0e40\u0e19\u0e37\u0e49\u0e2d"),
+                        React.createElement("select", { value: ex.muscle || PRESET_MUSCLE_GROUPS[0], onChange: event => patchEx(ex.id, exercise => ({ ...exercise, muscle: event.target.value })), className: "w-full px-3 py-2 rounded-lg text-xs font-medium outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }, PRESET_MUSCLE_GROUPS.map(m => React.createElement("option", { key: m, value: m }, m))),
+                                React.createElement("label", { className: "text-[9px] font-bold mb-1 mt-2 block", style: { color: T.muted } }, "\u0e42\u0e19\u0e49\u0e15\u0e23\u0e30\u0e2b\u0e27\u0e48\u0e32\u0e07\u0e40\u0e25\u0e48\u0e19"),
+                        React.createElement("textarea", { value: ex.note || "", onChange: event => patchEx(ex.id, exercise => ({ ...exercise, note: event.target.value })), rows: 2, placeholder: "เพิ่มเทคนิค จังหวะ หรือสิ่งที่ต้องจำสำหรับท่านี้…", className: "w-full px-3 py-2 rounded-xl text-[11px] outline-none resize-none", style: { background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, lineHeight: 1.5 } })));
+                    })(),
                     React.createElement("div", { className: "space-y-1.5" }, ex.sets.map((st, i) => {
                         const A = st.st === "active", D = st.st === "done";
                         const setDrop = (patch) => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, drop: patch === null ? undefined : { ...(s.drop || { reps: "", weight: "" }), ...patch } } : s) }));
