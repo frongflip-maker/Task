@@ -1,0 +1,16 @@
+{
+  "buildCommand": null,
+  "installCommand": null,
+  "framework": null,
+  "outputDirectory": ".",
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
+  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
