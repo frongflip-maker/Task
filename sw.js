@@ -1,10 +1,56 @@
-const SW_VERSION = "taskroutine-sw-1";
+const SW_VERSION = "taskroutine-sw-2";
 const SHELL_CACHE = `${SW_VERSION}-shell`;
 const LIB_CACHE = `${SW_VERSION}-lib`;
 const LIB_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com"];
+const MATCH_OPTIONS = { ignoreVary: true };
 
-self.addEventListener("install", () => {
+/* Libraries the app needs before it can boot. Precached at install time so the
+   very first offline launch works instead of needing a second online visit. */
+const PRECACHE_LIBS = [
+    "https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js",
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3",
+    "https://cdn.jsdelivr.net/npm/lucide@1.24.0/dist/umd/lucide.min.js"
+];
+
+async function precacheShell() {
+    try {
+        const cache = await caches.open(SHELL_CACHE);
+        const response = await fetch("/index.html", { cache: "reload" });
+        if (response && response.ok)
+            await cache.put("/index.html", response.clone());
+    } catch (error) {
+        // offline at install time; runtime caching fills this in later
+    }
+}
+
+async function precacheLibs() {
+    let cache;
+    try {
+        cache = await caches.open(LIB_CACHE);
+    } catch (error) {
+        return;
+    }
+    await Promise.all(PRECACHE_LIBS.map(async url => {
+        try {
+            const existing = await cache.match(url, MATCH_OPTIONS);
+            if (existing)
+                return;
+            const response = await fetch(url, { mode: "cors", credentials: "omit", cache: "reload" });
+            if (response && response.ok)
+                await cache.put(url, response.clone());
+        } catch (error) {
+            // one library failing must never block install
+        }
+    }));
+}
+
+self.addEventListener("install", event => {
     self.skipWaiting();
+    event.waitUntil((async () => {
+        await precacheShell();
+        await precacheLibs();
+    })());
 });
 
 self.addEventListener("activate", event => {
@@ -50,13 +96,29 @@ self.addEventListener("message", event => {
             }
         })());
     }
+    if (type === "SW_WARM") {
+        event.waitUntil((async () => {
+            await precacheShell();
+            await precacheLibs();
+            try {
+                const port = event.ports && event.ports[0];
+                if (port) {
+                    const shell = !!(await caches.match("/index.html", MATCH_OPTIONS));
+                    const cache = await caches.open(LIB_CACHE);
+                    const entries = await Promise.all(PRECACHE_LIBS.map(url => cache.match(url, MATCH_OPTIONS)));
+                    port.postMessage({ shell, libs: entries.filter(Boolean).length, total: PRECACHE_LIBS.length, version: SW_VERSION });
+                }
+            } catch (error) {
+                // ignore reporting failures
+            }
+        })());
+    }
 });
 
 const isDocumentRequest = request =>
-    request.mode === "navigate" || (request.destination === "document");
+    request.mode === "navigate" || request.destination === "document";
 
-const isLibRequest = url =>
-    LIB_HOSTS.includes(url.hostname);
+const isLibRequest = url => LIB_HOSTS.includes(url.hostname);
 
 self.addEventListener("fetch", event => {
     let request;
@@ -88,7 +150,7 @@ self.addEventListener("fetch", event => {
                 }
                 return fresh;
             } catch (error) {
-                const cached = await caches.match("/index.html");
+                const cached = await caches.match("/index.html", MATCH_OPTIONS);
                 if (cached)
                     return cached;
                 throw error;
@@ -100,7 +162,7 @@ self.addEventListener("fetch", event => {
     if (isLibRequest(url)) {
         event.respondWith((async () => {
             try {
-                const cached = await caches.match(request);
+                const cached = await caches.match(request, MATCH_OPTIONS);
                 if (cached)
                     return cached;
             } catch (error) {
@@ -108,7 +170,7 @@ self.addEventListener("fetch", event => {
             }
             const fresh = await fetch(request);
             try {
-                if (fresh && (fresh.ok || fresh.type === "opaque")) {
+                if (fresh && fresh.ok) {
                     const cache = await caches.open(LIB_CACHE);
                     await cache.put(request, fresh.clone());
                 }

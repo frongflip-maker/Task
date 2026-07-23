@@ -103,13 +103,40 @@ window.__TASKROUTINE_SW__ = true;
   }
   window.addEventListener("load", function () {
     try {
-      navigator.serviceWorker.register("/sw.js").catch(function (error) {
+      navigator.serviceWorker.register("/sw.js").then(function () {
+        return navigator.serviceWorker.ready;
+      }).then(function (registration) {
+        try {
+          var target = registration.active || navigator.serviceWorker.controller;
+          if (target)
+            target.postMessage({ type: "SW_WARM" });
+        } catch (error) { }
+      }).catch(function (error) {
         console.warn("sw register failed", error);
       });
     } catch (error) {
       console.warn("sw register threw", error);
     }
   });
+  window.__taskroutineOfflineStatus = function () {
+    return new Promise(function (resolve) {
+      var settled = false;
+      var finish = function (value) { if (!settled) { settled = true; resolve(value); } };
+      try {
+        if (!navigator.serviceWorker.controller)
+          return finish({ ready: false, reason: "sw-not-controlling" });
+        var channel = new MessageChannel();
+        channel.port1.onmessage = function (event) {
+          var data = event.data || {};
+          finish({ ready: !!data.shell && data.libs >= 2, shell: !!data.shell, libs: data.libs || 0, total: data.total || 0 });
+        };
+        navigator.serviceWorker.controller.postMessage({ type: "SW_WARM" }, [channel.port2]);
+        setTimeout(function () { finish({ ready: false, reason: "timeout" }); }, 8000);
+      } catch (error) {
+        finish({ ready: false, reason: "error" });
+      }
+    });
+  };
 })();
 </script>
 <style>
@@ -374,7 +401,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-24-pwa-offline-54";
+window.__TASKROUTINE_BUILD__="2026-07-24-pwa-precache-55";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3270,6 +3297,27 @@ try {
         const [showDataSettings, setShowDataSettings] = useState(false);
         const [showHistory, setShowHistory] = useState(false);
         const [showInstallHelp, setShowInstallHelp] = useState(false);
+        const [offlineReady, setOfflineReady] = useState(null);
+        useEffect(() => {
+            let alive = true;
+            const check = () => {
+                try {
+                    const probe = window.__taskroutineOfflineStatus;
+                    if (typeof probe !== "function") {
+                        if (alive)
+                            setOfflineReady({ ready: false, reason: "unsupported" });
+                        return;
+                    }
+                    probe().then(result => { if (alive) setOfflineReady(result); }).catch(() => { if (alive) setOfflineReady({ ready: false, reason: "error" }); });
+                }
+                catch (error) {
+                    if (alive)
+                        setOfflineReady({ ready: false, reason: "error" });
+                }
+            };
+            const timer = setTimeout(check, 1200);
+            return () => { alive = false; clearTimeout(timer); };
+        }, []);
         const [restoreConfirm, setRestoreConfirm] = useState(null);
         const [clearHistoryConfirm, setClearHistoryConfirm] = useState(false);
         const [confirmDataClear, setConfirmDataClear] = useState(false);
@@ -3496,6 +3544,14 @@ try {
                 React.createElement("div", { className: "flex-1 min-w-0" },
                     React.createElement("div", { className: "font-extrabold text-sm" }, "ล้างแคช + โหลดใหม่"),
                     React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "ใช้เมื่ออัปเดตไม่ขึ้น · ไม่กระทบข้อมูล"))),
+            React.createElement("div", { className: "px-4 py-2.5 rounded-xl text-[10px] font-semibold", style: { background: T.surf2, color: offlineReady?.ready ? T.green : T.muted, border: `1px solid ${offlineReady?.ready ? hex(T.green, .35) : T.border}` } },
+                offlineReady == null
+                    ? "กำลังตรวจสถานะออฟไลน์…"
+                    : offlineReady.ready
+                        ? `พร้อมใช้งานออฟไลน์ · เก็บไฟล์แล้ว ${offlineReady.libs}/${offlineReady.total}`
+                        : offlineReady.reason === "sw-not-controlling"
+                            ? "ยังไม่พร้อมออฟไลน์ · โหลดหน้าใหม่อีกครั้งขณะมีเน็ต"
+                            : `ยังไม่พร้อมออฟไลน์ · เก็บไฟล์ ${offlineReady.libs || 0}/${offlineReady.total || 4}`),
             React.createElement("button", { onClick: () => setShowTaxSettings(value => !value), className: "w-full p-4 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { background: T.surf, border: `1px solid ${T.border}`, minHeight: 68, boxShadow: "0 6px 18px rgba(83,67,43,.06)" } },
                 React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.blue, .15), color: T.blue } }, React.createElement(FileText, { size: 17 })),
                 React.createElement("div", { className: "flex-1 min-w-0" },
