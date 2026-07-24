@@ -368,7 +368,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-25-overlay-fix-72";
+window.__TASKROUTINE_BUILD__="2026-07-25-rest-sound-73";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -8044,6 +8044,14 @@ try {
                 return;
         }
         catch (error) { }
+        /* App in the foreground: our own beep/countdown is audible, so a system
+           notification would only stack the default iPhone sound on top of it.
+           Only notify when the app is backgrounded or the screen is locked. */
+        let hidden = true;
+        try { hidden = document.hidden || document.visibilityState === "hidden"; }
+        catch (error) { hidden = true; }
+        if (!hidden)
+            return;
         showAppNotification("หมดเวลาพัก ⏱️", { body: "กลับมาเล่นเซ็ตต่อได้เลย", tag: "rest-timer" });
     }
     function useRestTimer() {
