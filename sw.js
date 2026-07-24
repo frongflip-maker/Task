@@ -115,6 +115,23 @@ self.addEventListener("message", event => {
     }
 });
 
+self.addEventListener("notificationclick", event => {
+    event.notification.close();
+    event.waitUntil((async () => {
+        try {
+            const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+            const target = all.find(client => client.url.includes(self.location.origin));
+            if (target) {
+                await target.focus();
+                return;
+            }
+            await self.clients.openWindow("/");
+        } catch (error) {
+            // nothing else we can do
+        }
+    })());
+});
+
 const isDocumentRequest = request =>
     request.mode === "navigate" || request.destination === "document";
 

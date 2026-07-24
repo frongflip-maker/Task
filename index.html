@@ -401,7 +401,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-24-cashflow-match-63";
+window.__TASKROUTINE_BUILD__="2026-07-24-notify-3a-64";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -471,7 +471,7 @@ try {
     const BarChart3 = makeIcon("BarChart3");
     const Plus = makeIcon("Plus");
     const X = makeIcon("X");
-    const Check = makeIcon("Check"), Copy = makeIcon("Copy"), RefreshCw = makeIcon("RefreshCw"), Layers = makeIcon("Layers");
+    const Check = makeIcon("Check"), Copy = makeIcon("Copy"), RefreshCw = makeIcon("RefreshCw"), Layers = makeIcon("Layers"), Bell = makeIcon("Bell");
     const Flame = makeIcon("Flame");
     const Zap = makeIcon("Zap");
     const Briefcase = makeIcon("Briefcase");
@@ -3308,6 +3308,8 @@ try {
         const [showHistory, setShowHistory] = useState(false);
         const [showInstallHelp, setShowInstallHelp] = useState(false);
         const [offlineReady, setOfflineReady] = useState(null);
+        const [notifyPerm, setNotifyPerm] = useState(() => (typeof Notification !== "undefined" ? Notification.permission : "unsupported"));
+        const [restNotifyOn, setRestNotifyOn] = useState(() => localStorage.getItem("tr_notify_rest") !== "off");
         useEffect(() => {
             let alive = true;
             const check = () => {
@@ -3562,6 +3564,21 @@ try {
                         : offlineReady.reason === "sw-not-controlling"
                             ? "ยังไม่พร้อมออฟไลน์ · โหลดหน้าใหม่อีกครั้งขณะมีเน็ต"
                             : `ยังไม่พร้อมออฟไลน์ · เก็บไฟล์ ${offlineReady.libs || 0}/${offlineReady.total || 4}`),
+            React.createElement("div", { className: "p-4 rounded-2xl", style: { background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 6px 18px rgba(83,67,43,.06)" } },
+                React.createElement("div", { className: "flex items-center gap-3 mb-2" },
+                    React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.gold, .16), color: T.gold } }, React.createElement(Bell, { size: 18 })),
+                    React.createElement("div", { className: "flex-1 min-w-0" },
+                        React.createElement("div", { className: "font-extrabold text-sm" }, "\u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19\u0e2b\u0e21\u0e14\u0e40\u0e27\u0e25\u0e32\u0e1e\u0e31\u0e01"),
+                        React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, notifyPerm === "granted" ? "\u0e2d\u0e19\u0e38\u0e0d\u0e32\u0e15\u0e41\u0e25\u0e49\u0e27 \u00b7 \u0e21\u0e35\u0e40\u0e2a\u0e35\u0e22\u0e07\u0e41\u0e25\u0e30\u0e2a\u0e31\u0e48\u0e19\u0e15\u0e2d\u0e19\u0e2b\u0e21\u0e14\u0e40\u0e27\u0e25\u0e32" : notifyPerm === "denied" ? "\u0e16\u0e39\u0e01\u0e1b\u0e34\u0e14 \u00b7 \u0e40\u0e1b\u0e34\u0e14\u0e43\u0e2b\u0e21\u0e48\u0e17\u0e35\u0e48\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32\u0e02\u0e2d\u0e07\u0e40\u0e04\u0e23\u0e37\u0e48\u0e2d\u0e07" : "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e2d\u0e19\u0e38\u0e0d\u0e32\u0e15")),
+                    React.createElement("button", { type: "button", onClick: () => { const next = restNotifyOn ? "off" : "on"; localStorage.setItem("tr_notify_rest", next); setRestNotifyOn(!restNotifyOn); }, className: "w-11 h-6 rounded-full shrink-0 relative", style: { background: restNotifyOn ? T.green : T.surf2, border: `1px solid ${restNotifyOn ? T.green : T.border}` } },
+                        React.createElement("span", { style: { position: "absolute", top: 2, left: restNotifyOn ? 22 : 2, width: 18, height: 18, borderRadius: 999, background: "#fff", transition: "left .16s", boxShadow: "0 1px 3px rgba(0,0,0,.25)" } }))),
+                notifyPerm !== "granted" && React.createElement("button", { type: "button", onClick: async () => { try {
+                        const result = await Notification.requestPermission();
+                        setNotifyPerm(result);
+                    }
+                    catch (error) { } }, className: "w-full py-2 rounded-xl text-[11px] font-bold mb-2", style: { background: hex(T.gold, .14), color: T.gold, border: `1px solid ${hex(T.gold, .4)}` } }, "\u0e02\u0e2d\u0e2d\u0e19\u0e38\u0e0d\u0e32\u0e15\u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19"),
+                notifyPerm === "granted" && React.createElement("button", { type: "button", onClick: () => showAppNotification("\u0e17\u0e14\u0e2a\u0e2d\u0e1a\u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19 \ud83d\udd14", { body: "\u0e16\u0e49\u0e32\u0e40\u0e2b\u0e47\u0e19\u0e02\u0e49\u0e2d\u0e04\u0e27\u0e32\u0e21\u0e19\u0e35\u0e49 \u0e41\u0e2a\u0e14\u0e07\u0e27\u0e48\u0e32\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19\u0e44\u0e14\u0e49", tag: "test" }), className: "w-full py-2 rounded-xl text-[11px] font-bold mb-2", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, "\u0e17\u0e14\u0e2a\u0e2d\u0e1a\u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19"),
+                React.createElement("div", { className: "text-[10px] leading-relaxed", style: { color: T.muted } }, "iPhone \u0e15\u0e49\u0e2d\u0e07\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e41\u0e2d\u0e1b\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e08\u0e2d\u0e42\u0e2e\u0e21\u0e01\u0e48\u0e2d\u0e19 \u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e17\u0e33\u0e07\u0e32\u0e19 (\u0e02\u0e49\u0e2d\u0e08\u0e33\u0e01\u0e31\u0e14\u0e02\u0e2d\u0e07 iOS)")),
             React.createElement("button", { onClick: () => setShowTaxSettings(value => !value), className: "w-full p-4 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { background: T.surf, border: `1px solid ${T.border}`, minHeight: 68, boxShadow: "0 6px 18px rgba(83,67,43,.06)" } },
                 React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.blue, .15), color: T.blue } }, React.createElement(FileText, { size: 17 })),
                 React.createElement("div", { className: "flex-1 min-w-0" },
@@ -8026,7 +8043,30 @@ try {
         if (navigator.vibrate) navigator.vibrate([120, 200, 120, 200, 120]);
     } catch { } });
     function requestNotifyPermission() { try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => { }); } catch { } }
-    function notifyRestDone() { try { if ("Notification" in window && Notification.permission === "granted" && document.hidden) new Notification("หมดเวลาพัก ⏱️", { body: "กลับมาเล่นเซ็ตต่อได้เลย", tag: "rest-timer" }); } catch { } }
+    function showAppNotification(title, options = {}) {
+        try {
+            if (!("Notification" in window) || Notification.permission !== "granted")
+                return;
+            const payload = { badge: undefined, vibrate: [180, 90, 180], renotify: true, ...options };
+            if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistration) {
+                navigator.serviceWorker.getRegistration()
+                    .then(registration => {
+                        if (registration && registration.showNotification)
+                            return registration.showNotification(title, payload);
+                        return new Notification(title, payload);
+                    })
+                    .catch(() => { try { new Notification(title, payload); } catch { } });
+                return;
+            }
+            new Notification(title, payload);
+        }
+        catch { }
+    }
+    function notifyRestDone() {
+        if (localStorage.getItem("tr_notify_rest") === "off")
+            return;
+        showAppNotification("หมดเวลาพัก ⏱️", { body: "กลับมาเล่นเซ็ตต่อได้เลย", tag: "rest-timer" });
+    }
     function useRestTimer() {
         const [total, setTotal] = useState(90);
         const [left, setLeft] = useState(90);
