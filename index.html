@@ -401,7 +401,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-24-ex-collapse-60";
+window.__TASKROUTINE_BUILD__="2026-07-24-cashflow-filter-61";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -6886,6 +6886,7 @@ try {
         const [payFc, setPayFc] = useState(null);
         const [delFc, setDelFc] = useState(null);
         const [cfSel, setCfSel] = useState(null);
+        const [cfMode, setCfMode] = useState("all");
         const [showCategoryTargets, setShowCategoryTargets] = useState(false);
         const [showIncomeBreakdown, setShowIncomeBreakdown] = useState(false);
         const accountDnd = useLongPressSort(accounts, (from, to) => setAccounts(current => {
@@ -7459,7 +7460,7 @@ try {
                                         React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, React.createElement("span", { className: "text-[11px] font-bold", style: { color: T.sub } }, "Target ฿"), React.createElement("input", { type: "number", min: "0", value: row.target || "", onChange: event => { const value = Math.max(0, Number(event.target.value) || 0); setExpenseTargets(targets => ({ ...targets, [row.category]: value })); }, placeholder: "0", className: "w-28 px-2.5 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } }))),
                                     row.target > 0 && React.createElement("div", { className: "text-[11px] font-semibold mt-2", style: { color } }, row.spent > row.target ? `เกิน Target ${fmtBaht(row.spent - row.target)}` : `เหลือใช้ได้ ${fmtBaht(row.target - row.spent)}`));
                             }))),
-                    sub === "summary" && React.createElement("div", { className: "mt-3 rounded-xl overflow-hidden", style: { order: 4, background: T.surf2, border: `1px solid ${T.border}` } },
+                    sub === "summary" && React.createElement("div", { className: "mt-1.5 rounded-xl overflow-hidden", style: { order: 4, background: T.surf2, border: `1px solid ${T.border}` } },
                         React.createElement("button", { onClick: () => setShowIncomeBreakdown(value => !value), className: "w-full p-3.5 flex items-center gap-2.5 text-left" },
                             React.createElement(TrendingUp, { size: 18, style: { color: T.green } }),
                             React.createElement("div", { className: "flex-1 min-w-0 flex items-baseline gap-2 flex-wrap" },
@@ -7486,8 +7487,11 @@ try {
                     const selMk = cfSel && cfMonths.includes(cfSel) ? cfSel : cfMonths[cfMonths.length - 1];
                     const selData = cfData.find(x => x.mk === selMk);
                     const chartW = 480, chartH = 180, padL = 18, padR = 12, padT = 18, padB = 30;
-                    const minChart = Math.min(0, ...cfData.map(x => x.net));
-                    const maxChart = Math.max(1, ...cfData.flatMap(x => [x.inc, x.exp, x.net]));
+                    const showIn = cfMode === "all" || cfMode === "in";
+                    const showOut = cfMode === "all" || cfMode === "out";
+                    const showNet = cfMode === "all";
+                    const minChart = Math.min(0, ...(showNet ? cfData.map(x => x.net) : [0]));
+                    const maxChart = Math.max(1, ...cfData.flatMap(x => [...(showIn ? [x.inc] : []), ...(showOut ? [x.exp] : []), ...(showNet ? [x.net] : [])]));
                     const chartRange = Math.max(1, maxChart - minChart);
                     const yAt = value => padT + ((maxChart - value) / chartRange) * (chartH - padT - padB);
                     const zeroY = yAt(0), groupW = (chartW - padL - padR) / cfData.length, barW = Math.min(18, groupW * .24);
@@ -7498,28 +7502,26 @@ try {
                             React.createElement("div", { className: "flex items-center gap-2" },
                                 React.createElement(BarChart3, { size: 18, style: { color: T.blue } }),
                                 React.createElement("span", { className: "font-extrabold text-sm" }, "\u0E1B\u0E23\u0E30\u0E27\u0E31\u0E15\u0E34\u0E01\u0E23\u0E30\u0E41\u0E2A\u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14 (\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07 6 \u0E40\u0E14\u0E37\u0E2D\u0E19)")),
-                            React.createElement("span", { className: "text-[11px] flex items-center gap-1.5 shrink-0", style: { color: T.muted } },
-                                React.createElement("span", { style: { color: T.green } }, "\u25A0"),
-                                " เงินเข้า · ",
-                                React.createElement("span", { style: { color: T.red } }, "\u25A0"),
-                                " เงินออก · ",
-                                React.createElement("span", { style: { color: T.blue } }, "\u2014"),
-                                " \u0E2A\u0E38\u0E17\u0E18\u0E34")),
+                            React.createElement("div", { className: "flex items-center gap-1 shrink-0" }, [
+                                ["all", "\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14", T.blue],
+                                ["in", "\u0e23\u0e32\u0e22\u0e23\u0e31\u0e1a", T.green],
+                                ["out", "\u0e23\u0e32\u0e22\u0e08\u0e48\u0e32\u0e22", T.red]
+                            ].map(([mode, label, color]) => React.createElement("button", { key: mode, onClick: () => setCfMode(mode), className: "px-2 py-1 rounded-lg text-[10px] font-bold", style: { background: cfMode === mode ? hex(color, .16) : T.surf2, color: cfMode === mode ? color : T.muted, border: `1px solid ${cfMode === mode ? hex(color, .45) : T.border}` } }, label)))),
                         anyData ? React.createElement("svg", { viewBox: `0 0 ${chartW} ${chartH}`, width: "100%", className: "mt-3", style: { display: "block", overflow: "visible" } },
                             [0, .5, 1].map((fraction, index) => { const value = maxChart - chartRange * fraction, y = yAt(value); return React.createElement("line", { key: `grid-${index}`, x1: padL, y1: y, x2: chartW - padR, y2: y, stroke: hex(T.border, .7), strokeWidth: 1 }); }),
                             minChart < 0 && React.createElement("line", { x1: padL, y1: zeroY, x2: chartW - padR, y2: zeroY, stroke: hex(T.muted, .65), strokeWidth: 1.2 }),
                             cfData.map((row, index) => { const x = xAt(index), on = row.mk === selMk, incY = yAt(row.inc), expY = yAt(row.exp); return React.createElement("g", { key: row.mk, onClick: () => setCfSel(row.mk), style: { cursor: "pointer" } },
                                 on && React.createElement("rect", { x: x - groupW * .44, y: 4, width: groupW * .88, height: chartH - 8, rx: 10, fill: hex(T.blue, .09) }),
-                                React.createElement("rect", { x: x - barW - 2, y: Math.min(incY, zeroY), width: barW, height: Math.max(2, Math.abs(zeroY - incY)), rx: 5, fill: T.green, opacity: on ? 1 : .68 }),
-                                React.createElement("rect", { x: x + 2, y: Math.min(expY, zeroY), width: barW, height: Math.max(2, Math.abs(zeroY - expY)), rx: 5, fill: T.red, opacity: on ? 1 : .68 }),
+                                showIn && React.createElement("rect", { x: x - barW - 2, y: Math.min(incY, zeroY), width: barW, height: Math.max(2, Math.abs(zeroY - incY)), rx: 5, fill: T.green, opacity: on ? 1 : .68 }),
+                                showOut && React.createElement("rect", { x: x + 2, y: Math.min(expY, zeroY), width: barW, height: Math.max(2, Math.abs(zeroY - expY)), rx: 5, fill: T.red, opacity: on ? 1 : .68 }),
                                 React.createElement("text", { x, y: chartH - 9, textAnchor: "middle", fontSize: 10, fontWeight: on ? 700 : 500, fill: on ? T.text : T.muted }, TH_M[Number(row.mk.slice(5, 7)) - 1]),
                                 React.createElement("rect", { x: x - groupW / 2, y: 0, width: groupW, height: chartH, fill: "transparent" })); }),
-                            React.createElement("polyline", { points: netPoints, fill: "none", stroke: T.blue, strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round" }),
-                            cfData.map((row, index) => React.createElement("circle", { key: `net-${row.mk}`, cx: xAt(index), cy: yAt(row.net), r: row.mk === selMk ? 5 : 3.5, fill: T.surf, stroke: T.blue, strokeWidth: 2 }))) : React.createElement("div", { className: "h-[120px] flex items-center justify-center text-[11px]", style: { color: T.muted } }, "ยังไม่มีข้อมูลย้อนหลัง"),
+                            showNet && React.createElement("polyline", { points: netPoints, fill: "none", stroke: T.blue, strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round" }),
+                            showNet && cfData.map((row, index) => React.createElement("circle", { key: `net-${row.mk}`, cx: xAt(index), cy: yAt(row.net), r: row.mk === selMk ? 5 : 3.5, fill: T.surf, stroke: T.blue, strokeWidth: 2 }))) : React.createElement("div", { className: "h-[120px] flex items-center justify-center text-[11px]", style: { color: T.muted } }, "ยังไม่มีข้อมูลย้อนหลัง"),
                         selData && (React.createElement("div", { className: "flex items-center justify-between mt-3 pt-2.5 px-1", style: { borderTop: `1px solid ${hex(T.border, .7)}` } },
                             React.createElement("span", { className: "text-xs font-bold", style: { color: T.sub } }, monthLabel(selMk)),
-                            React.createElement("div", { className: "flex items-center gap-2.5 text-xs font-semibold" },
-                                React.createElement("span", { style: { color: T.green } },
+                            showNet && React.createElement("div", { className: "flex items-center gap-2.5 text-xs font-semibold" },
+                                showNet && React.createElement("span", { style: { color: T.green } },
                                     "เข้า ",
                                     fmtBaht(selData.inc)),
                                 React.createElement("span", { style: { color: T.red } },
