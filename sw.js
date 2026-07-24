@@ -1,4 +1,4 @@
-const SW_VERSION = "taskroutine-sw-2";
+const SW_VERSION = "taskroutine-sw-3";
 const SHELL_CACHE = `${SW_VERSION}-shell`;
 const LIB_CACHE = `${SW_VERSION}-lib`;
 const LIB_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com"];
@@ -177,24 +177,28 @@ self.addEventListener("fetch", event => {
     }
 
     if (isLibRequest(url)) {
+        /* Only serve from cache when the browser is offline. Online we let the
+           real request through so CORS headers always come straight from the CDN
+           (a replayed cached response can turn a script error into an opaque
+           "Script error." with no detail). */
         event.respondWith((async () => {
             try {
+                const fresh = await fetch(request);
+                try {
+                    if (fresh && fresh.ok) {
+                        const cache = await caches.open(LIB_CACHE);
+                        await cache.put(request, fresh.clone());
+                    }
+                } catch (error) {
+                    // ignore cache write failures
+                }
+                return fresh;
+            } catch (error) {
                 const cached = await caches.match(request, MATCH_OPTIONS);
                 if (cached)
                     return cached;
-            } catch (error) {
-                // ignore cache read failures
+                throw error;
             }
-            const fresh = await fetch(request);
-            try {
-                if (fresh && fresh.ok) {
-                    const cache = await caches.open(LIB_CACHE);
-                    await cache.put(request, fresh.clone());
-                }
-            } catch (error) {
-                // ignore cache write failures
-            }
-            return fresh;
         })());
     }
 });
