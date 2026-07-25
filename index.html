@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-col-align-104";
+window.__TASKROUTINE_BUILD__="2026-07-26-savebtn-105";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -6437,10 +6437,8 @@ try {
               position: "sticky",
               bottom: "-28px",
               zIndex: 4,
-              margin: "0 -20px -28px",
-              width: "auto",
-              boxSizing: "border-box",
-              padding: "12px 20px 20px",
+              margin: "0 0 -28px",
+              padding: "12px 0 20px",
               background: `linear-gradient(to top, ${T.surf} 78%, ${hex(T.surf, 0)})`,
             },
           },
