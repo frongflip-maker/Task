@@ -1,4 +1,4 @@
-const SW_VERSION = "taskroutine-sw-3";
+const SW_VERSION = "taskroutine-sw-4";
 const SHELL_CACHE = `${SW_VERSION}-shell`;
 const LIB_CACHE = `${SW_VERSION}-lib`;
 const LIB_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net", "unpkg.com"];
@@ -177,15 +177,20 @@ self.addEventListener("fetch", event => {
     }
 
     if (isLibRequest(url)) {
-        /* Only serve from cache when the browser is offline. Online we let the
-           real request through so CORS headers always come straight from the CDN
-           (a replayed cached response can turn a script error into an opaque
-           "Script error." with no detail). */
+        /* Pinned library versions never change, so answer from cache immediately
+           (this is what removes the startup delay) and refresh in the background.
+           Only responses that passed CORS are cached, so replaying one keeps the
+           same headers the browser saw originally. */
         event.respondWith((async () => {
+            let cached = null;
             try {
-                const fresh = await fetch(request);
+                cached = await caches.match(request, MATCH_OPTIONS);
+            } catch (error) {
+                cached = null;
+            }
+            const network = fetch(request).then(async fresh => {
                 try {
-                    if (fresh && fresh.ok) {
+                    if (fresh && fresh.ok && fresh.type !== "opaque") {
                         const cache = await caches.open(LIB_CACHE);
                         await cache.put(request, fresh.clone());
                     }
@@ -193,12 +198,12 @@ self.addEventListener("fetch", event => {
                     // ignore cache write failures
                 }
                 return fresh;
-            } catch (error) {
-                const cached = await caches.match(request, MATCH_OPTIONS);
-                if (cached)
-                    return cached;
-                throw error;
+            });
+            if (cached) {
+                network.catch(() => { });
+                return cached;
             }
+            return network;
         })());
     }
 });
