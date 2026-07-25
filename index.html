@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-notif-bell-109";
+window.__TASKROUTINE_BUILD__="2026-07-26-polish-110";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -600,6 +600,7 @@ try {
         return new Date(firstOfTarget.getFullYear(), firstOfTarget.getMonth(), Math.min(Math.max(1, Number(anchorDay) || 1), lastDay));
     };
     const EN_D = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    const EN_M_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const EN_M = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const toMin = (t) => { if (!t)
         return 0; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
@@ -2850,14 +2851,14 @@ try {
             return list;
         })();
         const NOTIF_TONE = { soon: T.orange, run: T.violet, todo: T.blue, due: T.green, sync: T.red };
-        return (React.createElement("div", { className: "px-4 pb-8", style: { paddingTop: "calc(68px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "18px" } },
+        return (React.createElement("div", { className: "px-4 pb-8", style: { paddingTop: "calc(10px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "14px" } },
             React.createElement("div", { className: "flex items-center justify-end" },
                 React.createElement("button", { onClick: () => setNotifOpen(true), "aria-label": `การแจ้งเตือน ${notifications.length} รายการ`, className: "flex items-center justify-center active:scale-90", style: { position: "relative", width: 38, height: 38, borderRadius: 999, background: T.surf, border: `1px solid ${T.border}` } },
                     React.createElement(Bell, { size: 18, style: { color: notifications.length ? T.purple : T.muted } }),
                     notifications.length > 0 && React.createElement("span", { className: "font-extrabold flex items-center justify-center", style: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, fontSize: 10, background: T.red, color: "#fff", border: `2px solid ${T.bg}` } }, notifications.length > 99 ? "99+" : notifications.length))),
             notifOpen && React.createElement(Sheet, { title: "การแจ้งเตือน", onClose: () => setNotifOpen(false) }, notifications.length === 0
                 ? React.createElement("div", { className: "text-center text-sm", style: { padding: "24px 0", color: T.muted } }, "ไม่มีอะไรค้าง 🎉")
-                : React.createElement("div", { className: "space-y-2" }, notifications.map(item => React.createElement("button", { key: item.id, onClick: item.act, className: "w-full flex items-center gap-3 p-3 rounded-2xl text-left active:scale-[.99]", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                : React.createElement("div", null, notifications.map(item => React.createElement("button", { key: item.id, onClick: item.act, className: "w-full flex items-center gap-3 text-left active:scale-[.99]", style: { padding: "11px 2px", background: "transparent" } },
                     React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 32, height: 32, borderRadius: 10, background: hex(NOTIF_TONE[item.kind] || T.sub, .14), color: NOTIF_TONE[item.kind] || T.sub } }, React.createElement(item.icon, { size: 16 })),
                     React.createElement("span", { className: "flex-1 min-w-0" },
                         React.createElement("span", { className: "text-sm font-extrabold truncate", style: { display: "block" } }, item.title),
@@ -2943,10 +2944,7 @@ try {
             React.createElement(Section, { title: "Timeline", icon: Clock }, todayEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
                 React.createElement("div", { className: "mx-auto flex items-center justify-center", style: { width: 48, height: 48, borderRadius: 16, background: hex(T.purple, .13), color: T.purple, border: `1px solid ${hex(T.purple, .3)}` } }, React.createElement(CalendarDays, { size: 23 })),
                 React.createElement("div", { className: "font-extrabold", style: { fontSize: 17, marginTop: 14 } }, "วันนี้ยังไม่มีงาน"),
-                React.createElement("div", { style: { fontSize: 12, marginTop: 6, lineHeight: 1.6, color: T.muted } }, "เพิ่ม Event แรก แล้ว Timeline จะจัดเวลาให้ทันที"),
-                React.createElement("div", { className: "flex items-center justify-center flex-wrap", style: { gap: 8, marginTop: 20 } },
-                    React.createElement("button", { onClick: () => props.openAdd("income"), className: "font-extrabold active:scale-[.98]", style: { minHeight: 44, padding: "10px 16px", borderRadius: 12, fontSize: 12, background: T.green, color: "#18200f", boxShadow: "0 5px 13px rgba(92,126,61,.20)" } }, "Income Event"),
-                    React.createElement("button", { onClick: () => props.openAdd("no-income"), className: "font-extrabold active:scale-[.98]", style: { minHeight: 44, padding: "10px 16px", borderRadius: 12, fontSize: 12, background: T.blue, color: "#fff", boxShadow: "0 5px 13px rgba(57,105,150,.20)" } }, "No-Income Event"))) :
+                React.createElement("div", { style: { fontSize: 12, marginTop: 6, lineHeight: 1.6, color: T.muted } }, "กดปุ่ม + มุมขวาล่างเพื่อเพิ่ม Event แรก")) :
                 React.createElement("div", null, todayEvents.map((e, ei) => {
                     const ET = EVENT_TYPES[e.type];
                     const done = e.status === "done";
@@ -7852,7 +7850,7 @@ try {
                                 const dt = parseK(it.workDate || it.date);
                                 const tag = srcTag(it.kind, it.category);
                                 return React.createElement(Glass, { key: it.key, className: "p-3 flex items-center gap-3", glowColor: sectionKey === "overdue" ? T.orange : undefined },
-                                    React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[dt.getDay()]), React.createElement("div", { className: "text-base font-bold leading-none", style: { color } }, dt.getDate()), React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_M[dt.getMonth()])),
+                                    React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_D[dt.getDay()].slice(0, 3)), React.createElement("div", { className: "font-extrabold leading-none", style: { fontSize: 19, color } }, dt.getDate()), React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_M_SHORT[dt.getMonth()])),
                                     React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-semibold text-sm truncate" }, it.title), React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5" }, React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(tag.c, .16), color: tag.c } }, tag.t)), Number(it.receivedAmount) > 0 && React.createElement("div", { className: "text-[9px] mt-1", style: { color: T.green } }, `รับแล้ว ${fmtBaht(it.receivedAmount)} · เหลือ ${fmtBaht(it.amount)}`)),
                                     React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("div", { className: "flex items-center gap-1.5 mt-1 justify-end" }, it.kind === "incomeSource" && React.createElement("button", { onClick: () => deleteIncomeSourceOnly?.(it.id), className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { background: hex(T.red, .1), color: T.red, border: `1px solid ${hex(T.red, .3)}` } }, React.createElement(Trash2, { size: 13 })), React.createElement("button", { onClick: () => tickDue(it), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน"))));
                             })));
@@ -8683,11 +8681,11 @@ try {
                         (workoutPresets || []).length > 0 && React.createElement("span", { className: "px-1.5 rounded-full text-[9px] font-extrabold", style: { background: hex(T.violet, .18), color: T.violet } }, workoutPresets.length),
                         React.createElement(ChevronRight, { size: 11, style: { color: T.muted } }))),
                 sorted.length === 0 ? React.createElement(Empty, { text: view === "history" ? "ยังไม่มีประวัติการเล่นก่อนหน้า" : "ยังไม่มีบันทึกวันนี้ — กดเริ่มบันทึกด้านบน" }) : visibleSorted.map(w => (React.createElement(Glass, { key: w.id, className: "p-3 flex items-center gap-3 active:scale-[.99]", onClick: () => setActiveId(w.id), style: { cursor: "pointer" } },
-                    React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 13 } }, w.startedAt && !w.endedAt ? React.createElement("span", { "aria-label": "กำลังบันทึกอยู่", title: "กำลังบันทึกอยู่", style: { width: 13, height: 13, borderRadius: "50%", border: `2px solid ${hex(T.green, .28)}`, borderTopColor: T.green, animation: "spin .9s linear infinite" } }) : null),
+                    view !== "history" && React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 13, marginRight: -6 } }, w.startedAt && !w.endedAt ? React.createElement("span", { "aria-label": "กำลังบันทึกอยู่", title: "กำลังบันทึกอยู่", style: { width: 13, height: 13, borderRadius: "50%", border: `2px solid ${hex(T.green, .28)}`, borderTopColor: T.green, animation: "spin .9s linear infinite" } }) : null),
                     React.createElement("div", { className: "w-11 text-center shrink-0" },
-                        React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[parseK(w.date).getDay()]),
-                        React.createElement("div", { className: "text-base font-bold leading-none" }, parseK(w.date).getDate()),
-                        React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_M[parseK(w.date).getMonth()])),
+                        React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_D[parseK(w.date).getDay()].slice(0, 3)),
+                        React.createElement("div", { className: "font-extrabold leading-none", style: { fontSize: 19 } }, parseK(w.date).getDate()),
+                        React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_M_SHORT[parseK(w.date).getMonth()])),
                     React.createElement("div", { className: "flex-1 min-w-0" },
                         React.createElement("div", { className: "font-semibold text-sm truncate" }, w.title || "(ไม่มีชื่อ)"),
                         React.createElement("div", { className: "text-[10px]", style: { color: T.muted } },
