@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-25-fab-88";
+window.__TASKROUTINE_BUILD__="2026-07-25-fab-fix-89";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2744,12 +2744,12 @@ try {
                         React.createElement("span", null, toast.text)))),
                 FAB_TABS.includes(tab) && React.createElement(React.Fragment, null,
                     fabOpen && React.createElement("div", { onClick: () => setFabOpen(false), className: "fixed inset-0 z-30" }),
-                    React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-30 pointer-events-none", style: { bottom: "calc(84px + env(safe-area-inset-bottom))" } },
+                    React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-30", style: { bottom: "calc(84px + env(safe-area-inset-bottom))", pointerEvents: "none" } },
                         React.createElement("div", { className: "app-shell px-4 flex flex-col items-end", style: { gap: 10 } },
-                            fabOpen && React.createElement("div", { className: "pointer-events-auto overflow-hidden", style: { minWidth: 210, borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 18px 44px rgba(46,36,22,.22)" } }, ADD_MENU.map(([kind, label, color], i) => React.createElement("button", { key: kind, onClick: () => openAdd(kind), className: "w-full flex items-center gap-2.5 px-3.5 text-left active:opacity-60", style: { minHeight: 46, borderTop: i ? `1px solid ${T.border}` : "none" } },
+                            fabOpen && React.createElement("div", { className: "overflow-hidden", style: { pointerEvents: "auto", minWidth: 210, borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 18px 44px rgba(46,36,22,.22)" } }, ADD_MENU.map(([kind, label, color], i) => React.createElement("button", { key: kind, onClick: () => openAdd(kind), className: "w-full flex items-center gap-2.5 px-3.5 text-left active:opacity-60", style: { minHeight: 46, borderTop: i ? `1px solid ${T.border}` : "none" } },
                                 React.createElement("span", { style: { width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 } }),
-                                React.createElement("span", { className: "text-[12px] font-extrabold", style: { color: T.text } }, label)))),
-                            React.createElement("button", { onClick: () => setFabOpen(v => !v), "aria-label": "เพิ่มงาน", className: "pointer-events-auto flex items-center justify-center active:scale-90", style: { width: 52, height: 52, borderRadius: 999, background: T.purple, color: "#fff", boxShadow: "0 10px 26px rgba(173,95,68,.34)", transform: fabOpen ? "rotate(45deg)" : "none", transition: "transform .16s ease" } },
+                                React.createElement("span", { className: "font-extrabold", style: { fontSize: 12, color: T.text } }, label)))),
+                            React.createElement("button", { onClick: () => setFabOpen(v => !v), "aria-label": "เพิ่มงาน", className: "flex items-center justify-center active:scale-90", style: { pointerEvents: "auto", width: 52, height: 52, borderRadius: 999, background: T.purple, color: "#fff", boxShadow: "0 10px 26px rgba(173,95,68,.34)", transform: fabOpen ? "rotate(45deg)" : "none", transition: "transform .16s ease" } },
                                 React.createElement(Plus, { size: 24 }))))),
                 addSheet === "booking" && React.createElement(BookingModal, { bookings: bookings, events: events, defaultDate: sel, onClose: () => setAddSheet(null), onSave: booking => { if (addBooking(booking) !== false)
                         setAddSheet(null); } }),
