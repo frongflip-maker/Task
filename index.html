@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-event-remind-111";
+window.__TASKROUTINE_BUILD__="2026-07-26-remind-select-113";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1006,7 +1006,11 @@ try {
             L.push("LOCATION:" + icsEsc(e.location));
         if (descBits)
             L.push("DESCRIPTION:" + icsEsc(descBits));
-        L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(e.title || "แจ้งเตือน"), "TRIGGER:-PT" + ICS_ALARM_MIN + "M", "END:VALARM", "END:VEVENT");
+        const alarms = Array.isArray(e.remind) && e.remind.length ? [...new Set(e.remind.map(Number).filter(n => Number.isFinite(n) && n >= 0))] : [ICS_ALARM_MIN];
+        alarms.sort((a, b) => b - a).forEach(minutes => {
+            L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(e.title || "แจ้งเตือน"), "TRIGGER:-PT" + minutes + "M", "END:VALARM");
+        });
+        L.push("END:VEVENT");
         return L.map(icsFold).join("\r\n");
     }
     function buildICS(events) {
@@ -1051,7 +1055,29 @@ try {
         return true;
     }
     function downloadICS(filename, events) {
-        saveFile(filename, buildICS(events), "text/calendar;charset=utf-8");
+        const blob = new Blob([buildICS(events)], { type: "text/calendar;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        /* iOS recognises the calendar MIME type and opens its "Add to Calendar"
+           importer. Going through navigator.share() instead only offers "Save to
+           Files", which is not what this button is for. */
+        if (isIOSDevice()) {
+            window.location.href = url;
+            setTimeout(() => { try {
+                URL.revokeObjectURL(url);
+            }
+            catch { } }, 8000);
+            return;
+        }
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { try {
+            document.body.removeChild(a);
+        }
+        catch { } URL.revokeObjectURL(url); }, 800);
     }
     const SUPABASE_URL = "https://nqouixqynfawxctamxuu.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8FKWi3aIx-qcN9dr3H04HQ_D7JqlpI_";
@@ -2126,7 +2152,7 @@ try {
         };
         const confirmFitnessWeek = (weekKey, evs) => { setEvents(es => [...es, ...evs.map(e => ({ id: uid(), status: "scheduled", ...e }))]); setFitnessConfirmed(m => ({ ...m, [weekKey]: true })); };
         const saveFitnessSplit = (split) => setFitnessSplit(split);
-        const exportEventICS = (e) => { downloadICS(`event-${e.date || dkey(new Date())}.ics`, [e]); setEvents(es => es.map(x => x.id === e.id ? { ...x, icsAdded: true } : x)); fireToast("เลือก “ปฏิทิน” ในเมนูแชร์ เพื่อเพิ่มและรับแจ้งเตือน"); };
+        const exportEventICS = (e) => { downloadICS(`event-${e.date || dkey(new Date())}.ics`, [e]); setEvents(es => es.map(x => x.id === e.id ? { ...x, icsAdded: true } : x)); fireToast("กำลังเปิดปฏิทิน — กด “เพิ่ม” เพื่อรับแจ้งเตือน"); };
         const exportDayICS = (dateK) => {
             const list = events.filter(e => e.date === dateK && e.startTime);
             if (!list.length) {
@@ -3304,13 +3330,30 @@ try {
                             React.createElement(TxtBoxE, { value: f.fitRun.tTime, onChange: v => setRun("tTime", v), ph: "30:00" }),
                             React.createElement(TxtBoxE, { value: f.fitRun.aTime, onChange: v => setRun("aTime", v), ph: "30:00" })))))))),
             React.createElement(TimeRangePicker, { startTime: f.startTime, endTime: f.endTime, timeMode: f.timeMode, durationHours: f.durationHours, onChange: patch => setF({ ...f, ...patch }) }),
-            f.startTime && React.createElement("div", { className: "mb-3" },
-                React.createElement(Label, null, "แจ้งเตือนล่วงหน้า"),
-                React.createElement("div", { className: "flex flex-wrap", style: { gap: 6 } }, REMIND_CHOICES.map(([minutes, label]) => {
-                    const on = (f.remind || []).includes(minutes);
-                    return React.createElement("button", { key: minutes, type: "button", onClick: () => setF(current => ({ ...current, remind: on ? (current.remind || []).filter(m => m !== minutes) : [...(current.remind || []), minutes] })), className: "font-bold active:scale-95", style: { minHeight: 32, padding: "0 11px", borderRadius: 999, fontSize: 11, background: on ? T.purple : T.surf, color: on ? "#fff" : T.sub, border: `1px solid ${on ? T.purple : T.border}` } }, label);
-                })),
-                React.createElement("div", { style: { fontSize: 10, marginTop: 6, color: T.muted } }, (f.remind || []).length ? "เด้งเฉพาะตอนเปิดแอปอยู่ (ยังไม่มี push server)" : "ไม่แจ้งเตือน")),
+            f.startTime && (() => {
+                const picked = f.remind || [];
+                const rows = picked.length ? picked : [""];
+                const writeRow = (index, raw) => setF(current => {
+                    const next = [...(current.remind || [])];
+                    if (raw === "") {
+                        next.splice(index, 1);
+                        return { ...current, remind: next };
+                    }
+                    const value = Number(raw);
+                    if (next.length <= index)
+                        next.push(value);
+                    else
+                        next[index] = value;
+                    return { ...current, remind: [...new Set(next)] };
+                });
+                return React.createElement("div", { className: "mb-3" },
+                    React.createElement(Label, null, "แจ้งเตือนล่วงหน้า"),
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, rows.map((value, index) => React.createElement("select", { key: index, value: value === "" ? "" : String(value), onChange: event => writeRow(index, event.target.value), className: "w-full px-3 rounded-xl text-sm font-semibold outline-none", style: { minHeight: 44, background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, colorScheme: "light", boxShadow: "0 3px 10px rgba(83,67,43,.05)" } },
+                        React.createElement("option", { value: "" }, "ไม่แจ้งเตือน"),
+                        REMIND_CHOICES.map(([minutes, label]) => React.createElement("option", { key: minutes, value: String(minutes) }, label))))),
+                    picked.length > 0 && picked.length < REMIND_CHOICES.length && React.createElement("button", { type: "button", onClick: () => setF(current => { const used = current.remind || []; const free = REMIND_CHOICES.map(choice => choice[0]).find(minutes => !used.includes(minutes)); return free === undefined ? current : { ...current, remind: [...used, free] }; }), className: "font-bold active:scale-95", style: { marginTop: 6, minHeight: 34, padding: "0 12px", borderRadius: 10, fontSize: 11, background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, "+ เพิ่มการเตือน"),
+                    React.createElement("div", { style: { fontSize: 10, marginTop: 6, color: T.muted } }, picked.length ? "ใส่ลงปฏิทินตอนกด “เพิ่มเข้าปฏิทิน” ด้วย" : "ไม่แจ้งเตือน"));
+            })(),
             React.createElement(Input, { label: "\u0E2A\u0E16\u0E32\u0E19\u0E17\u0E35\u0E48 (optional)", value: f.location, onChange: v => setF({ ...f, location: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E15\u0E39\u0E14\u0E34\u0E42\u0E2D" }),
             React.createElement(Input, { label: "หมายเหตุ (ไม่บังคับ)", value: f.note, onChange: v => setF({ ...f, note: v }), placeholder: "เช่น รับเงินสดแล้ว / ลูกค้าขอเลื่อน" }),
             f.incomeEnabled && React.createElement(React.Fragment, null,
