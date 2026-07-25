@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-25-fab-fix-89";
+window.__TASKROUTINE_BUILD__="2026-07-25-fab-budget-91";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1076,8 +1076,17 @@ try {
         return { retryable: true, message: `${action}ไม่สำเร็จ · ${raw}` };
     };
     const APP_TABS = ["today", "calendar", "studio", "budget", "fitness", "settings"];
-    const FAB_TABS = ["today", "calendar"];
-    const ADD_MENU = [["income", "Income Event", T.green], ["no-income", "No-Income Event", T.blue], ["booking", "Studio Booking", T.purple]];
+    const EVENT_ADD_MENU = [["income", "Income Event"], ["no-income", "No-Income Event"], ["booking", "Studio Booking"]];
+    const ADD_MENUS = {
+        today: EVENT_ADD_MENU,
+        calendar: EVENT_ADD_MENU,
+        budget: [["txn-in", "เพิ่มรายรับ"], ["txn-out", "เพิ่มรายจ่าย"]],
+        "fitness:today": [["fit-session", "เริ่มบันทึกเวิร์คเอาต์"], ["fit-preset-pick", "เลือกจาก Preset"]],
+        "fitness:history": [],
+        "fitness:nutrition": [["food-add", "เพิ่มอาหาร"], ["food-manage", "จัดการรายการอาหาร"]],
+        "fitness:week": [["fit-preset-new", "สร้าง Preset ชุดท่า"]]
+    };
+    const addMenuFor = (tab, sub) => ADD_MENUS[sub ? `${tab}:${sub}` : tab] || ADD_MENUS[tab] || [];
     const LEGACY_EVENT_FINANCE_KEYS = ["payments", "paid", "paidDate", "accountId", "payer", "reconcileStatus", "tip", "tipAccountId", "tipCombined", "tipReconcileStatus", "payMethod", "tipMethod"];
     const LEGACY_BOOKING_FINANCE_KEYS = ["deposit", "depositDate", "depositAccountId", "depositPayer", "depositReconcileStatus", "payments", "paid", "paymentStatus", "paidDate", "accountId", "payer", "reconcileStatus", "payMethod"];
     const stripLegacyFinanceKeys = (record, keys) => {
@@ -1272,7 +1281,9 @@ try {
         const [dataMsg, setDataMsg] = useState("");
         const [fabOpen, setFabOpen] = useState(false);
         const [addSheet, setAddSheet] = useState(null);
+        const [tabSub, setTabSub] = useState(null);
         const openAdd = (kind) => { setFabOpen(false); setAddSheet(kind); };
+        const clearAdd = () => setAddSheet(null);
         const [toast, setToast] = useState(null);
         const fireToast = (text, kind = "ok") => { setToast({ text, kind }); setTimeout(() => setToast(null), 3200); };
         const [undoInfo, setUndoInfo] = useState(null);
@@ -1726,6 +1737,7 @@ try {
             localStorage.setItem("taskroutine_last_tab", tab);
         }
         catch { } }, [tab]);
+        useEffect(() => { setFabOpen(false); }, [tab]);
         const [, setDayKey] = useState(TK);
         useEffect(() => {
             const check = () => {
@@ -2705,7 +2717,7 @@ try {
             workouts, updateWorkouts: setWorkouts,
             nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, taxTypeMap, setTaxTypeMap,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
-            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd };
+            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, reportSub: setTabSub };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
         if (!authUser) {
             const waiting = cloudState === "checking";
@@ -2742,18 +2754,17 @@ try {
                     React.createElement("div", { className: "mx-4 px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-semibold shadow-lg max-w-md", style: { background: toast.kind === "err" ? hex(T.red, .95) : hex(T.green, .95), color: toast.kind === "err" ? "#fff" : "#000", border: `1px solid ${toast.kind === "err" ? T.red : T.green}` } },
                         toast.kind === "err" ? React.createElement(AlertCircle, { size: 15 }) : React.createElement(Check, { size: 15 }),
                         React.createElement("span", null, toast.text)))),
-                FAB_TABS.includes(tab) && React.createElement(React.Fragment, null,
+                addMenuFor(tab, tabSub).length > 0 && React.createElement(React.Fragment, null,
                     fabOpen && React.createElement("div", { onClick: () => setFabOpen(false), className: "fixed inset-0 z-30" }),
                     React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-30", style: { bottom: "calc(84px + env(safe-area-inset-bottom))", pointerEvents: "none" } },
                         React.createElement("div", { className: "app-shell px-4 flex flex-col items-end", style: { gap: 10 } },
-                            fabOpen && React.createElement("div", { className: "overflow-hidden", style: { pointerEvents: "auto", minWidth: 210, borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 18px 44px rgba(46,36,22,.22)" } }, ADD_MENU.map(([kind, label, color], i) => React.createElement("button", { key: kind, onClick: () => openAdd(kind), className: "w-full flex items-center gap-2.5 px-3.5 text-left active:opacity-60", style: { minHeight: 46, borderTop: i ? `1px solid ${T.border}` : "none" } },
-                                React.createElement("span", { style: { width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 } }),
+                            fabOpen && React.createElement("div", { className: "overflow-hidden", style: { pointerEvents: "auto", minWidth: 210, borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 18px 44px rgba(46,36,22,.22)" } }, addMenuFor(tab, tabSub).map(([kind, label], i) => React.createElement("button", { key: kind, onClick: () => openAdd(kind), className: "w-full flex items-center px-3.5 text-left active:opacity-60", style: { minHeight: 46, borderTop: i ? `1px solid ${T.border}` : "none" } },
                                 React.createElement("span", { className: "font-extrabold", style: { fontSize: 12, color: T.text } }, label)))),
                             React.createElement("button", { onClick: () => setFabOpen(v => !v), "aria-label": "เพิ่มงาน", className: "flex items-center justify-center active:scale-90", style: { pointerEvents: "auto", width: 52, height: 52, borderRadius: 999, background: T.purple, color: "#fff", boxShadow: "0 10px 26px rgba(173,95,68,.34)", transform: fabOpen ? "rotate(45deg)" : "none", transition: "transform .16s ease" } },
                                 React.createElement(Plus, { size: 24 }))))),
                 addSheet === "booking" && React.createElement(BookingModal, { bookings: bookings, events: events, defaultDate: sel, onClose: () => setAddSheet(null), onSave: booking => { if (addBooking(booking) !== false)
                         setAddSheet(null); } }),
-                addSheet && addSheet !== "booking" && React.createElement(EventModal, { events: events, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, mode: "add", eventKind: addSheet, defaultDate: sel, onClose: () => setAddSheet(null), onSave: evs => { evs.forEach(addEvent); setAddSheet(null); } }),
+                ["income", "no-income"].includes(addSheet) && React.createElement(EventModal, { events: events, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, mode: "add", eventKind: addSheet, defaultDate: sel, onClose: () => setAddSheet(null), onSave: evs => { evs.forEach(addEvent); setAddSheet(null); } }),
                 React.createElement("nav", { className: "fixed bottom-0 left-0 right-0 flex justify-center z-30", style: { paddingBottom: "env(safe-area-inset-bottom)" } },
                     React.createElement("div", { className: "app-shell px-3 pb-3 pt-2", style: { background: `linear-gradient(to top, ${T.bg}, ${hex(T.bg, .85)} 70%, transparent)` } },
                         React.createElement("div", { className: "flex items-center justify-around rounded-2xl p-1.5", style: { background: T.surf, border: `1px solid ${T.border}` } }, NAV.map(([id, Icon, label]) => {
@@ -4520,6 +4531,7 @@ try {
       bookings = [],
       onSavePaidStudioBookingIncome = null,
       onSaveManualIncome = null,
+      initialKind = "out",
     }) {
       const paymentEditMode = !!initialIncomeSourcePayment;
       const effectiveInitialIncomeSourceId = initialIncomeSourcePayment?.incomeSourceId || initialIncomeSourceId || "";
@@ -4612,7 +4624,7 @@ try {
               paymentStage: "",
               studioService: "room",
               amount: initialIncomeSourceId ? String(incomeSourceRemainingAmount(incomeSources.find(source => source.id === initialIncomeSourceId), payments) || "") : "",
-              kind: initialIncomeSourceId ? "in" : studioMode ? "out" : "out",
+              kind: initialIncomeSourceId ? "in" : initialKind,
               date: TK,
               accountId: accounts[0]?.id || null,
               category: initialIncomeSourceId ? normalizeIncomeCategory(incomeSources.find(source => source.id === initialIncomeSourceId)?.category || "Work") : studioMode ? "ห้องซ้อม" : "",
@@ -6925,8 +6937,17 @@ try {
         const [txFilterDraft, setTxFilterDraft] = useState({ category: "all", account: "all" });
         const [ledgerPage, setLedgerPage] = useState(0);
         const [txnOpen, setTxnOpen] = useState(false);
+        const [txnKind, setTxnKind] = useState("out");
         const [editTxn, setEditTxn] = useState(null);
         const [duplicateTxn, setDuplicateTxn] = useState(null);
+        useEffect(() => {
+            if (props.addSheet !== "txn-in" && props.addSheet !== "txn-out")
+                return;
+            setTxnIncomeSourceId("");
+            setTxnKind(props.addSheet === "txn-in" ? "in" : "out");
+            setTxnOpen(true);
+            props.clearAdd();
+        }, [props.addSheet]);
         const [refundExpense, setRefundExpense] = useState(null);
         const [delTxnConfirm, setDelTxnConfirm] = useState(null);
         const [txnActionItem, setTxnActionItem] = useState(null);
@@ -7447,9 +7468,6 @@ try {
                         }))));
             })(),
             (sub === "summary" || (sub === "transactions" && transactionSection === "all")) && (React.createElement(React.Fragment, null,
-                sub === "transactions" && React.createElement("button", { onClick: () => { setTxnIncomeSourceId(""); setTxnOpen(true); }, className: "w-full rounded-2xl font-bold flex items-center justify-center gap-2.5 active:scale-[.98]", style: { minHeight: 52, padding: "12px 16px", background: T.green, color: "#16200f", border: `1px solid ${hex(T.green, .7)}`, boxShadow: "0 10px 24px rgba(91,126,61,.22)" } },
-                    React.createElement("span", { className: "w-7 h-7 rounded-full flex items-center justify-center", style: { background: "rgba(255,255,255,.38)" } }, React.createElement(Plus, { size: 17 })),
-                    " \u0E40\u0E1E\u0E34\u0E48\u0E21\u0E23\u0E32\u0E22\u0E23\u0E31\u0E1A-\u0E23\u0E32\u0E22\u0E08\u0E48\u0E32\u0E22"),
                 sub === "summary" && (() => {
                     const balanceOf = (accId) => {
                         let bal = accounts.find(a => a.id === accId)?.startBalance || 0;
@@ -7996,7 +8014,7 @@ try {
                             }, className: "py-2.5 rounded-lg text-xs font-bold", style: { background: T.red, color: "#fff" } }, "ยืนยันลบ"))))),
             editPassThrough && React.createElement(PassThroughEditModal, { initial: editPassThrough.initial, accounts, onClose: () => setEditPassThrough(null), onSave: data => { if (savePassThroughData(editPassThrough.item, data) !== false) setEditPassThrough(null); } }),
             editIncomePayment && React.createElement(TxnModal, { accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourcePayment: editIncomePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, onClose: () => setEditIncomePayment(null), onSave: () => {} }),
-            txnOpen && React.createElement(TxnModal, { accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, bookings, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onSaveManualIncome: addManualIncomeWithAllocations, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
+            txnOpen && React.createElement(TxnModal, { initialKind: txnKind, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, bookings, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onSaveManualIncome: addManualIncomeWithAllocations, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
             refundExpense && React.createElement(TxnModal, { initial: { title: refundExpense.title, amount: refundExpense.amount, kind: "in", date: TK, accountId: accounts[0]?.id || null, category: txnCategories.income?.[0] || "อื่นๆ", taxable: false, payer: refundExpense.payer || "", moneyType: "reimbursement", linkedExpenseId: refundExpense.id, note: `รับคืนจากรายการ ${refundExpense.raw?.title || "สำรองจ่าย"}` }, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setRefundExpense(null), onSave: (list) => { list.forEach(addTxn); setRefundExpense(null); } }),
             duplicateTxn && React.createElement(TxnModal, { initial: duplicateTxn, duplicateMode: true, studioMode: !!duplicateTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setDuplicateTxn(null), onSave: (list) => { list.forEach(addTxn); setDuplicateTxn(null); } }),
             editTxn && React.createElement(TxnModal, { initial: editTxn, studioMode: !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
@@ -8316,7 +8334,7 @@ try {
             return previous ? { ...previous, name: String(exercise.name).trim(), note: exercise.note || previous.note || "", unit: exercise.unit || previous.unit || "kg", ss: exercise.ss || null } : { ...workoutPresetItemsFromSession({ exercises: [exercise] })[0], sets: (exercise.target || exercise.sets || []).map(workoutPresetSet) };
         });
     }
-    function WorkoutLog({ view = "today", workouts, updateWorkouts, events, exPresets, setExPresets, workoutPresets, setWorkoutPresets, offerUndo }) {
+    function WorkoutLog({ view = "today", workouts, updateWorkouts, events, exPresets, setExPresets, workoutPresets, setWorkoutPresets, offerUndo, addSheet = null, clearAdd = () => { } }) {
         const t = useRestTimer();
         const [restOv, setRestOv] = useState(false);
         const [finOpen, setFinOpen] = useState(false);
@@ -8422,6 +8440,16 @@ try {
             setActiveId(s.id);
             setConfirmDelS(false);
         };
+        useEffect(() => {
+            if (addSheet === "fit-session") {
+                newSession();
+                clearAdd();
+            }
+            else if (addSheet === "fit-preset-pick") {
+                setPresetPickOpen(true);
+                clearAdd();
+            }
+        }, [addSheet]);
         const linkUp = (idx) => { const exs = active.exercises; if (idx <= 0)
             return; const gid = exs[idx - 1].ss || uid(); upsert({ ...active, exercises: exs.map((e, j) => j === idx ? { ...e, ss: gid } : j === idx - 1 ? { ...e, ss: gid } : e) }); };
         const unlinkEx = (idx) => upsert({ ...active, exercises: active.exercises.map((e, j) => j === idx ? { ...e, ss: null } : e) });
@@ -9346,7 +9374,7 @@ try {
                     React.createElement("div", { className: "text-[9px] text-center mt-1", style: { color: T.muted } }, unit))))),
             React.createElement(SaveBtn, { disabled: invalid, onClick: save }, "บันทึก Target"));
     }
-    function Nutrition({ nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary = [], setFoodLibrary }) {
+    function Nutrition({ nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary = [], setFoodLibrary, addSheet = null, clearAdd = () => { } }) {
         const [targetOpen, setTargetOpen] = useState(false);
         const [addSlot, setAddSlot] = useState("breakfast");
         const [addOpen, setAddOpen] = useState(false);
@@ -9354,6 +9382,16 @@ try {
         const [delMealId, setDelMealId] = useState(null);
         const [nd, setNd] = useState(TK);
         const [collapsedSlots, setCollapsedSlots] = useState({});
+        useEffect(() => {
+            if (addSheet === "food-add") {
+                setAddOpen(true);
+                clearAdd();
+            }
+            else if (addSheet === "food-manage") {
+                setManageOpen(true);
+                clearAdd();
+            }
+        }, [addSheet]);
         const loggedFoodNames = useMemo(() => {
             const seen = new globalThis.Map();
             Object.keys(nutrition || {})
@@ -9735,6 +9773,14 @@ try {
             localStorage.setItem("dos_fit_sub", k);
         }
         catch { } };
+        useEffect(() => { props.reportSub(sub); return () => props.reportSub(null); }, [sub]);
+        useEffect(() => {
+            if (props.addSheet !== "fit-preset-new")
+                return;
+            setSub("week");
+            setWpOpen(true);
+            props.clearAdd();
+        }, [props.addSheet]);
         const [draft, setDraft] = useState(() => fitnessSplit || {});
         const [editing, setEditing] = useState(false);
         const todayD = parseK(TK);
@@ -9774,7 +9820,7 @@ try {
                     React.createElement("div", { className: "text-sm font-extrabold" }, "จัดการ Preset ชุดท่า"),
                     React.createElement("div", { className: "text-[10px] mt-0.5 truncate", style: { color: T.muted } }, workoutPresets.length ? `${workoutPresets.length} ชุด · แตะเพื่อสร้างหรือแก้ไข` : "สร้างชุดท่าสำหรับโหลดตอนเริ่มบันทึก")),
                 React.createElement(ChevronRight, { size: 17, style: { color: T.violet } })),
-            (sub === "today" || sub === "history") && (React.createElement(WorkoutLog, { view: sub, workouts: workouts, updateWorkouts: updateWorkouts, events: events, exPresets: exPresets, setExPresets: setExPresets, workoutPresets: workoutPresets, setWorkoutPresets: setWorkoutPresets, offerUndo: offerUndo })),
+            (sub === "today" || sub === "history") && (React.createElement(WorkoutLog, { view: sub, workouts: workouts, updateWorkouts: updateWorkouts, events: events, exPresets: exPresets, setExPresets: setExPresets, workoutPresets: workoutPresets, setWorkoutPresets: setWorkoutPresets, offerUndo: offerUndo, addSheet: props.addSheet, clearAdd: props.clearAdd })),
             sub === "today" && (() => { const row7 = Array.from({ length: 7 }, (_, i) => { const dt = addDays(today, -6 + i); const k = dkey(dt); return { dn: TH_D[dt.getDay()], trained: workouts.some(w => w.date === k), vol: workouts.filter(w => w.date === k).reduce((sum, w) => sum + (w.exercises || []).reduce((s2, e) => s2 + (e.sets || []).reduce((s3, st) => s3 + workoutSetVolume(st) + (st.drop ? workoutSetVolume(st.drop) : 0), 0), 0), 0) }; }); const trainCount = row7.filter(x => x.trained).length; const volArr = row7.map(x => x.vol); const volSum = volArr.reduce((a, b) => a + b, 0); const maxVol = Math.max(1, ...volArr); return React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "grid grid-cols-2 gap-2.5" }, [["Session 7 วัน", `${trainCount}`, "วัน", T.green, Dumbbell], ["Volume 7 วัน", volSum >= 1000 ? (volSum / 1000).toFixed(1) + "k" : `${volSum}`, "kg", T.cyan, TrendingUp]].map(([lab, val, unit, c, Ic], i) => React.createElement(Glass, { key: i, className: "p-3 text-center" },
                     React.createElement("div", { className: "w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1.5", style: { background: hex(c, .16) } }, React.createElement(Ic, { size: 15, style: { color: c } })),
@@ -9861,7 +9907,7 @@ try {
                 })()); })(),
             sub === "nutrition" && (React.createElement(Glass, { className: "p-4" },
                 React.createElement("div", { className: "text-sm font-bold mb-3", style: { color: T.gold } }, "\u0E42\u0E20\u0E0A\u0E19\u0E32\u0E01\u0E32\u0E23"),
-                React.createElement(Nutrition, { nutrition: nutrition, setNutrition: setNutrition, nutriTargets: nutriTargets, setNutriTargets: setNutriTargets, foodLibrary: foodLibrary, setFoodLibrary: setFoodLibrary }))),
+                React.createElement(Nutrition, { nutrition: nutrition, setNutrition: setNutrition, nutriTargets: nutriTargets, setNutriTargets: setNutriTargets, foodLibrary: foodLibrary, setFoodLibrary: setFoodLibrary, addSheet: props.addSheet, clearAdd: props.clearAdd }))),
             presetManagerOpen && React.createElement(Sheet, { onClose: () => { setPresetManagerOpen(false); setWpDel(null); }, title: "จัดการ Preset ชุดท่า" },
                 React.createElement("div", { className: "rounded-2xl flex items-center gap-3 mb-4", style: { padding: 15, background: hex(T.violet, .09), border: `1px solid ${hex(T.violet, .26)}` } },
                     React.createElement("span", { className: "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", style: { background: "#FFFFFF", color: T.violet, boxShadow: "0 4px 12px rgba(83,67,43,.08)" } }, React.createElement(LayersIcon, { size: 18 })),
