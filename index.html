@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-25-no-shrink-85";
+window.__TASKROUTINE_BUILD__="2026-07-25-fab-88";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -997,29 +997,44 @@ try {
         return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Discipline OS//TH//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
             ...evs.map(eventToVEVENT), "END:VCALENDAR"].join("\r\n");
     }
-    function downloadICS(filename, events) {
-        const content = buildICS(events);
-        const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        if (isIOS) {
-            window.location.href = url;
-            setTimeout(() => { try {
-                URL.revokeObjectURL(url);
+    const isIOSDevice = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    function saveFile(filename, content, mime) {
+        const blob = new Blob([content], { type: mime });
+        const openFallback = () => {
+            const url = URL.createObjectURL(blob);
+            if (isIOSDevice()) {
+                window.open(url, "_blank");
+                setTimeout(() => { try {
+                    URL.revokeObjectURL(url);
+                }
+                catch { } }, 8000);
+                return;
             }
-            catch { } }, 4000);
-            return;
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.rel = "noopener";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { try {
+                document.body.removeChild(a);
+            }
+            catch { } URL.revokeObjectURL(url); }, 800);
+        };
+        try {
+            const file = new File([blob], filename, { type: mime });
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file] }).catch(error => { if (!error || error.name !== "AbortError")
+                    openFallback(); });
+                return true;
+            }
         }
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { try {
-            document.body.removeChild(a);
-        }
-        catch { } URL.revokeObjectURL(url); }, 800);
+        catch { }
+        openFallback();
+        return true;
+    }
+    function downloadICS(filename, events) {
+        saveFile(filename, buildICS(events), "text/calendar;charset=utf-8");
     }
     const SUPABASE_URL = "https://nqouixqynfawxctamxuu.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8FKWi3aIx-qcN9dr3H04HQ_D7JqlpI_";
@@ -1061,6 +1076,8 @@ try {
         return { retryable: true, message: `${action}ไม่สำเร็จ · ${raw}` };
     };
     const APP_TABS = ["today", "calendar", "studio", "budget", "fitness", "settings"];
+    const FAB_TABS = ["today", "calendar"];
+    const ADD_MENU = [["income", "Income Event", T.green], ["no-income", "No-Income Event", T.blue], ["booking", "Studio Booking", T.purple]];
     const LEGACY_EVENT_FINANCE_KEYS = ["payments", "paid", "paidDate", "accountId", "payer", "reconcileStatus", "tip", "tipAccountId", "tipCombined", "tipReconcileStatus", "payMethod", "tipMethod"];
     const LEGACY_BOOKING_FINANCE_KEYS = ["deposit", "depositDate", "depositAccountId", "depositPayer", "depositReconcileStatus", "payments", "paid", "paymentStatus", "paidDate", "accountId", "payer", "reconcileStatus", "payMethod"];
     const stripLegacyFinanceKeys = (record, keys) => {
@@ -1236,6 +1253,8 @@ try {
         const cloudSyncing = React.useRef(false);
         const cloudRetryDelay = React.useRef(4000);
         const cloudSyncFn = React.useRef(null);
+        const cloudPullFn = React.useRef(null);
+        const cloudLastPull = React.useRef(0);
         const cloudUpdatedAt = React.useRef(null);
         const cloudRevision = React.useRef(0);
         const cloudApplying = React.useRef(false);
@@ -1251,6 +1270,9 @@ try {
         const pwaIsIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
         const localErrorShown = React.useRef(false);
         const [dataMsg, setDataMsg] = useState("");
+        const [fabOpen, setFabOpen] = useState(false);
+        const [addSheet, setAddSheet] = useState(null);
+        const openAdd = (kind) => { setFabOpen(false); setAddSheet(kind); };
         const [toast, setToast] = useState(null);
         const fireToast = (text, kind = "ok") => { setToast({ text, kind }); setTimeout(() => setToast(null), 3200); };
         const [undoInfo, setUndoInfo] = useState(null);
@@ -1376,6 +1398,11 @@ try {
             if (cloudSyncing.current) {
                 cloudDirty.current = true;
                 return false;
+            }
+            if (manual && !override) {
+                const pulled = await cloudPullFn.current?.({ force: true });
+                if (pulled === "applied" || pulled === "conflict")
+                    return pulled === "applied";
             }
             cloudSyncing.current = true;
             cloudDirty.current = false;
@@ -1587,6 +1614,51 @@ try {
             setCloudMsg("กำลังใช้ข้อมูลเครื่องนี้แทนข้อมูล Cloud…");
             await syncCloudNow(true, { allowConflict: true, updatedAt: conflict.updatedAt, revision: conflict.revision });
         };
+        const pullCloudIfNewer = async (options = {}) => {
+            if (!loaded || !authUser || !sb || cloudConflict || cloudSyncing.current)
+                return "skip";
+            if (navigator.onLine === false)
+                return "skip";
+            const now = Date.now();
+            if (!options.force && now - cloudLastPull.current < 8000)
+                return "skip";
+            cloudLastPull.current = now;
+            try {
+                const { data: head, error: headError } = await cloudQuery("ตรวจข้อมูลล่าสุด", () => sb.from("app_state").select("updated_at").eq("user_id", authUser.id).maybeSingle());
+                if (headError || !head?.updated_at)
+                    return "skip";
+                if (head.updated_at === cloudUpdatedAt.current)
+                    return "same";
+                const { data: remote, error: remoteError } = await cloudQuery("โหลดข้อมูลล่าสุด", () => sb.from("app_state").select("data,updated_at").eq("user_id", authUser.id).maybeSingle());
+                if (remoteError || !remote?.data)
+                    return "skip";
+                if (cloudConflict || cloudSyncing.current)
+                    return "skip";
+                const remoteRevision = Number(remote.data?.revision) || 0;
+                if (cloudDirty.current || syncQueue.load(authUser.id)) {
+                    setCloudConflict({ data: remote.data, updatedAt: remote.updated_at, revision: remoteRevision });
+                    setCloudState("conflict");
+                    setCloudMsg(`พบข้อมูลใหม่กว่าจากอุปกรณ์อื่น · revision ${remoteRevision}`);
+                    fireToast("ข้อมูลชนกัน — เลือกข้อมูลที่จะใช้ในหน้าตั้งค่า", "err");
+                    return "conflict";
+                }
+                saveHistoryCheckpoint(buildSnapshot(), "ก่อนดึงข้อมูลล่าสุดจาก Cloud", true);
+                cloudApplying.current = true;
+                applySnapshot(migrate(remote.data));
+                cloudUpdatedAt.current = remote.updated_at;
+                cloudRevision.current = remoteRevision;
+                cloudDirty.current = false;
+                cloudReady.current = true;
+                setCloudState("synced");
+                setCloudMsg(`ใช้ข้อมูล Cloud revision ${remoteRevision} แล้ว`);
+                fireToast("อัปเดตข้อมูลล่าสุดแล้ว");
+                return "applied";
+            }
+            catch (error) {
+                return "skip";
+            }
+        };
+        cloudPullFn.current = pullCloudIfNewer;
         useEffect(() => {
             const displayMode = window.matchMedia?.("(display-mode: standalone)");
             const updateInstalled = () => setPwaInstalled(!!displayMode?.matches || window.navigator.standalone === true);
@@ -1811,25 +1883,24 @@ try {
         }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             const flush = () => { if (cloudDirty.current) cloudSyncFn.current?.(); };
-            const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
-            window.addEventListener("online", flush);
+            const pull = () => { cloudPullFn.current?.(); };
+            const onVisibility = () => { if (document.visibilityState === "hidden")
+                flush();
+            else
+                pull(); };
+            const onOnline = () => { flush(); pull(); };
+            window.addEventListener("online", onOnline);
             document.addEventListener("visibilitychange", onVisibility);
             return () => {
-                window.removeEventListener("online", flush);
+                window.removeEventListener("online", onOnline);
                 document.removeEventListener("visibilitychange", onVisibility);
                 if (cloudRetryTimer.current) clearTimeout(cloudRetryTimer.current);
             };
         }, []);
         const exportData = () => {
             try {
-                const blob = new Blob([JSON.stringify(buildSnapshot(), null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `discipline-os-${dkey(new Date())}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                setDataMsg("ดาวน์โหลดไฟล์สำรองแล้ว ✓");
+                saveFile(`discipline-os-${dkey(new Date())}.json`, JSON.stringify(buildSnapshot(), null, 2), "application/json");
+                setDataMsg("เตรียมไฟล์สำรองแล้ว ✓ เลือกที่บันทึกได้เลย");
             }
             catch {
                 setDataMsg("export ไม่สำเร็จในหน้านี้ (preview) — ใช้ได้บนเว็บจริง");
@@ -1960,7 +2031,7 @@ try {
         };
         const confirmFitnessWeek = (weekKey, evs) => { setEvents(es => [...es, ...evs.map(e => ({ id: uid(), status: "scheduled", ...e }))]); setFitnessConfirmed(m => ({ ...m, [weekKey]: true })); };
         const saveFitnessSplit = (split) => setFitnessSplit(split);
-        const exportEventICS = (e) => { downloadICS(`event-${e.date || dkey(new Date())}.ics`, [e]); setEvents(es => es.map(x => x.id === e.id ? { ...x, icsAdded: true } : x)); fireToast("กำลังเปิดปฏิทิน — กด “เพิ่ม” เพื่อรับแจ้งเตือน"); };
+        const exportEventICS = (e) => { downloadICS(`event-${e.date || dkey(new Date())}.ics`, [e]); setEvents(es => es.map(x => x.id === e.id ? { ...x, icsAdded: true } : x)); fireToast("เลือก “ปฏิทิน” ในเมนูแชร์ เพื่อเพิ่มและรับแจ้งเตือน"); };
         const exportDayICS = (dateK) => {
             const list = events.filter(e => e.date === dateK && e.startTime);
             if (!list.length) {
@@ -2634,7 +2705,7 @@ try {
             workouts, updateWorkouts: setWorkouts,
             nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, taxTypeMap, setTaxTypeMap,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
-            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast };
+            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
         if (!authUser) {
             const waiting = cloudState === "checking";
@@ -2656,21 +2727,33 @@ try {
                 React.createElement("button", { onClick: () => setTab("settings"), title: cloudMsg, "aria-label": "สถานะซิงก์ Supabase", className: "absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-2 rounded-full active:scale-95", style: { top: "calc(12px + env(safe-area-inset-top))", background: T.surf, border: `1px solid ${cloudState === "error" ? T.red : cloudState === "pending" ? T.orange : cloudState === "loading" || cloudState === "saving" ? hex(T.blue, .55) : hex(T.green, .5)}` } },
                     React.createElement(Cloud, { size: 13, style: { color: cloudState === "error" ? T.red : cloudState === "pending" ? T.orange : cloudState === "loading" || cloudState === "saving" ? T.blue : T.green } }),
                     (["loading", "saving", "pending", "error"].includes(cloudState)) && React.createElement("span", { className: "text-[10px] font-bold pr-1", style: { color: T.text } }, cloudState === "loading" ? "กำลังซิงก์…" : cloudState === "saving" ? "กำลังเซฟ…" : cloudState === "pending" ? "รอซิงก์" : "ผิดพลาด")),
-                React.createElement("main", { className: "flex-1 pb-24" },
+                React.createElement("main", { className: "flex-1 pb-32" },
                     tab === "today" && React.createElement(Today, { ...shared }),
                     tab === "calendar" && React.createElement(Calendar, { ...shared }),
                     tab === "studio" && React.createElement(Studio, { ...shared }),
                     tab === "budget" && React.createElement(Budget, { ...shared }),
                     tab === "fitness" && React.createElement(Fitness, { ...shared }),
                     tab === "settings" && React.createElement(SettingsPage, { ...shared })),
-                undoInfo && (React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-50", style: { bottom: 132 } },
+                undoInfo && (React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-50", style: { bottom: 206 } },
                     React.createElement("div", { className: "mx-4 px-3.5 py-2.5 rounded-xl flex items-center gap-3 text-xs font-semibold shadow-lg max-w-md", style: { background: "#2E2A22", color: "#F3EEE4", border: "1px solid #4A443A" } },
                         React.createElement("span", { className: "min-w-0 truncate" }, undoInfo.label),
                         React.createElement("button", { onClick: performUndo, className: "shrink-0 px-3 py-1.5 rounded-lg font-extrabold active:scale-95", style: { background: T.gold, color: "#241d0e" } }, "เลิกทำ")))),
-                toast && (React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-50 pointer-events-none", style: { bottom: 88 } },
+                toast && (React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-50 pointer-events-none", style: { bottom: 150 } },
                     React.createElement("div", { className: "mx-4 px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-semibold shadow-lg max-w-md", style: { background: toast.kind === "err" ? hex(T.red, .95) : hex(T.green, .95), color: toast.kind === "err" ? "#fff" : "#000", border: `1px solid ${toast.kind === "err" ? T.red : T.green}` } },
                         toast.kind === "err" ? React.createElement(AlertCircle, { size: 15 }) : React.createElement(Check, { size: 15 }),
                         React.createElement("span", null, toast.text)))),
+                FAB_TABS.includes(tab) && React.createElement(React.Fragment, null,
+                    fabOpen && React.createElement("div", { onClick: () => setFabOpen(false), className: "fixed inset-0 z-30" }),
+                    React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-30 pointer-events-none", style: { bottom: "calc(84px + env(safe-area-inset-bottom))" } },
+                        React.createElement("div", { className: "app-shell px-4 flex flex-col items-end", style: { gap: 10 } },
+                            fabOpen && React.createElement("div", { className: "pointer-events-auto overflow-hidden", style: { minWidth: 210, borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 18px 44px rgba(46,36,22,.22)" } }, ADD_MENU.map(([kind, label, color], i) => React.createElement("button", { key: kind, onClick: () => openAdd(kind), className: "w-full flex items-center gap-2.5 px-3.5 text-left active:opacity-60", style: { minHeight: 46, borderTop: i ? `1px solid ${T.border}` : "none" } },
+                                React.createElement("span", { style: { width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 } }),
+                                React.createElement("span", { className: "text-[12px] font-extrabold", style: { color: T.text } }, label)))),
+                            React.createElement("button", { onClick: () => setFabOpen(v => !v), "aria-label": "เพิ่มงาน", className: "pointer-events-auto flex items-center justify-center active:scale-90", style: { width: 52, height: 52, borderRadius: 999, background: T.purple, color: "#fff", boxShadow: "0 10px 26px rgba(173,95,68,.34)", transform: fabOpen ? "rotate(45deg)" : "none", transition: "transform .16s ease" } },
+                                React.createElement(Plus, { size: 24 }))))),
+                addSheet === "booking" && React.createElement(BookingModal, { bookings: bookings, events: events, defaultDate: sel, onClose: () => setAddSheet(null), onSave: booking => { if (addBooking(booking) !== false)
+                        setAddSheet(null); } }),
+                addSheet && addSheet !== "booking" && React.createElement(EventModal, { events: events, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, mode: "add", eventKind: addSheet, defaultDate: sel, onClose: () => setAddSheet(null), onSave: evs => { evs.forEach(addEvent); setAddSheet(null); } }),
                 React.createElement("nav", { className: "fixed bottom-0 left-0 right-0 flex justify-center z-30", style: { paddingBottom: "env(safe-area-inset-bottom)" } },
                     React.createElement("div", { className: "app-shell px-3 pb-3 pt-2", style: { background: `linear-gradient(to top, ${T.bg}, ${hex(T.bg, .85)} 70%, transparent)` } },
                         React.createElement("div", { className: "flex items-center justify-around rounded-2xl p-1.5", style: { background: T.surf, border: `1px solid ${T.border}` } }, NAV.map(([id, Icon, label]) => {
@@ -2683,7 +2766,6 @@ try {
     function Today(props) {
         const { sel, setSel, events, todayEvents, addEvent, editEvent, shiftEventSeries, exportEventICS } = props;
         const d = parseK(sel);
-        const [addEvOpen, setAddEvOpen] = useState(null);
         const [editEv, setEditEv] = useState(null);
         const [showOverdue, setShowOverdue] = useState(false);
         const [rescheduleEv, setRescheduleEv] = useState(null);
@@ -2776,15 +2858,13 @@ try {
                         React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, isNow ? "จะจบในอีก" : "เริ่มในอีก"),
                         React.createElement("span", { className: "text-2xl font-extrabold tabular-nums", style: { color: ET.color } }, fmtDur(Math.max(0, mins))))));
             })(),
-            React.createElement(Section, { title: "Timeline", icon: Clock, action: todayEvents.length > 0 ? React.createElement("div", { className: "flex items-center", style: { gap: 6 } },
-                    React.createElement("button", { onClick: () => setAddEvOpen("income"), className: "font-extrabold active:scale-95", style: { minHeight: 36, padding: "7px 11px", borderRadius: 10, fontSize: 11, background: T.green, color: "#18200f", boxShadow: "0 5px 13px rgba(92,126,61,.20)" } }, "+ Income"),
-                    React.createElement("button", { onClick: () => setAddEvOpen("no-income"), className: "font-extrabold active:scale-95", style: { minHeight: 36, padding: "7px 11px", borderRadius: 10, fontSize: 11, background: T.blue, color: "#fff", boxShadow: "0 5px 13px rgba(57,105,150,.20)" } }, "+ No-Income")) : null }, todayEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
+            React.createElement(Section, { title: "Timeline", icon: Clock }, todayEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
                 React.createElement("div", { className: "mx-auto flex items-center justify-center", style: { width: 48, height: 48, borderRadius: 16, background: hex(T.purple, .13), color: T.purple, border: `1px solid ${hex(T.purple, .3)}` } }, React.createElement(CalendarDays, { size: 23 })),
                 React.createElement("div", { className: "font-extrabold", style: { fontSize: 17, marginTop: 14 } }, "วันนี้ยังไม่มีงาน"),
                 React.createElement("div", { style: { fontSize: 12, marginTop: 6, lineHeight: 1.6, color: T.muted } }, "เพิ่ม Event แรก แล้ว Timeline จะจัดเวลาให้ทันที"),
                 React.createElement("div", { className: "flex items-center justify-center flex-wrap", style: { gap: 8, marginTop: 20 } },
-                    React.createElement("button", { onClick: () => setAddEvOpen("income"), className: "font-extrabold active:scale-[.98]", style: { minHeight: 44, padding: "10px 16px", borderRadius: 12, fontSize: 12, background: T.green, color: "#18200f", boxShadow: "0 5px 13px rgba(92,126,61,.20)" } }, "Income Event"),
-                    React.createElement("button", { onClick: () => setAddEvOpen("no-income"), className: "font-extrabold active:scale-[.98]", style: { minHeight: 44, padding: "10px 16px", borderRadius: 12, fontSize: 12, background: T.blue, color: "#fff", boxShadow: "0 5px 13px rgba(57,105,150,.20)" } }, "No-Income Event"))) :
+                    React.createElement("button", { onClick: () => props.openAdd("income"), className: "font-extrabold active:scale-[.98]", style: { minHeight: 44, padding: "10px 16px", borderRadius: 12, fontSize: 12, background: T.green, color: "#18200f", boxShadow: "0 5px 13px rgba(92,126,61,.20)" } }, "Income Event"),
+                    React.createElement("button", { onClick: () => props.openAdd("no-income"), className: "font-extrabold active:scale-[.98]", style: { minHeight: 44, padding: "10px 16px", borderRadius: 12, fontSize: 12, background: T.blue, color: "#fff", boxShadow: "0 5px 13px rgba(57,105,150,.20)" } }, "No-Income Event"))) :
                 React.createElement("div", null, todayEvents.map((e, ei) => {
                     const ET = EVENT_TYPES[e.type];
                     const done = e.status === "done";
@@ -2816,7 +2896,6 @@ try {
                                         React.createElement(Pencil, { size: 13 })))))));
                 }))),
             rescheduleEv && React.createElement(RescheduleModal, { item: rescheduleEv.event, initialDate: rescheduleEv.targetDate, events, onClose: () => setRescheduleEv(null), onSaveOne: targetDate => { editEvent(rescheduleEv.event.id, { date: targetDate }); setRescheduleEv(null); }, onSaveSeries: rescheduleEv.event.seriesId ? targetDate => { shiftEventSeries(rescheduleEv.event, targetDate); setRescheduleEv(null); } : null }),
-            addEvOpen && React.createElement(EventModal, { events: events, txnCategories: props.txnCategories, setTxnCategories: props.setTxnCategories, onRenameCategory: props.renameTxnCategory, onDeleteCategory: props.deleteTxnCategory, mode: "add", eventKind: addEvOpen, defaultDate: sel, onClose: () => setAddEvOpen(null), onSave: (evs) => { evs.forEach(addEvent); setAddEvOpen(null); } }),
             editEv && React.createElement(EventModal, { events: events, txnCategories: props.txnCategories, setTxnCategories: props.setTxnCategories, onRenameCategory: props.renameTxnCategory, onDeleteCategory: props.deleteTxnCategory, mode: "edit", initial: editEv, onClose: () => setEditEv(null), onSave: (patch) => { editEvent(editEv.id, patch); setEditEv(null); }, onSaveSeries: editEv.seriesId ? (patch) => { props.editEventSeries(editEv, patch); setEditEv(null); } : null, onDelete: () => { if (props.delEvent(editEv.id) !== false) setEditEv(null); }, onDeleteSeries: editEv.seriesId ? () => { if (props.delEventSeries(editEv) !== false) setEditEv(null); } : null })));
     }
     const CAL_VIEWS = [["day", "วัน"], ["week", "สัปดาห์"], ["month", "เดือน"]];
@@ -2824,8 +2903,6 @@ try {
         const { sel, setSel, events, addEvent, editEvent, toggleEvent, delEvent, exportEventICS, exportDayICS, exportWeekICS } = props;
         const d = parseK(sel);
         const [view, setView] = useState("day");
-        const [open, setOpen] = useState(null);
-        const [bookingOpen, setBookingOpen] = useState(false);
         const [editEv, setEditEv] = useState(null);
         const [confirmDel, setConfirmDel] = useState(null);
         const week = useMemo(() => { const s = addDays(d, -d.getDay()); return Array.from({ length: 7 }, (_, i) => addDays(s, i)); }, [sel]);
@@ -2856,7 +2933,6 @@ try {
                 cells.push(null);
             return cells;
         }, [sel]);
-        const onAdd = (es) => { es.forEach(addEvent); setOpen(false); };
         const onEdit = (patch) => { editEvent(editEv.id, patch); setEditEv(null); };
         const EventRow = (e) => {
             const ET = EVENT_TYPES[e.type] || EVENT_TYPES.other;
@@ -2884,11 +2960,7 @@ try {
         };
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
-                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "Calendar"),
-                React.createElement("div", { className: "grid grid-cols-3 gap-2 p-1.5 rounded-2xl", style: { background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 8px 24px rgba(86,68,43,.08)" } },
-                    React.createElement("button", { onClick: () => setOpen("income"), className: "py-2.5 px-2 rounded-xl text-[11px] font-extrabold active:scale-[.98]", style: { minHeight: 44, background: T.green, color: "#18200f", boxShadow: "0 5px 13px rgba(92,126,61,.20)" } }, "Income Event"),
-                    React.createElement("button", { onClick: () => setOpen("no-income"), className: "py-2.5 px-2 rounded-xl text-[11px] font-extrabold active:scale-[.98]", style: { minHeight: 44, background: T.blue, color: "#fff", boxShadow: "0 5px 13px rgba(57,105,150,.20)" } }, "No-Income Event"),
-                    React.createElement("button", { onClick: () => setBookingOpen(true), className: "py-2.5 px-2 rounded-xl text-[11px] font-extrabold active:scale-[.98]", style: { minHeight: 44, background: T.purple, color: "#fff", boxShadow: "0 5px 13px rgba(173,95,68,.20)" } }, "Studio Booking"))),
+                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "Calendar")),
             React.createElement("div", { className: "flex gap-1.5 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                     React.createElement("button", { onClick: () => exportDayICS(sel), className: "flex-1 text-[11px] font-bold px-2.5 py-2.5 rounded-xl flex items-center justify-center gap-1 active:scale-95", style: { minHeight: 40, background: "#FFFFFF", color: T.green, border: `1px solid ${hex(T.green, .3)}`, boxShadow: "0 3px 10px rgba(83,67,43,.05)" } },
                         React.createElement(CalendarPlus, { size: 12 }),
@@ -2946,8 +3018,6 @@ try {
                         React.createElement("span", { className: "text-[10px]", style: { color: T.muted } }, evs.length ? `${evs.length} รายการ` : "ว่าง")),
                     evs.length > 0 && React.createElement("div", { className: "space-y-2" }, evs.map(EventRow))));
             }))),
-            open && React.createElement(EventModal, { events: events, txnCategories: props.txnCategories, setTxnCategories: props.setTxnCategories, onRenameCategory: props.renameTxnCategory, onDeleteCategory: props.deleteTxnCategory, mode: "add", eventKind: open, defaultDate: sel, onClose: () => setOpen(null), onSave: onAdd }),
-            bookingOpen && React.createElement(BookingModal, { bookings: props.bookings, events: events, defaultDate: sel, onClose: () => setBookingOpen(false), onSave: booking => { if (props.addBooking(booking) !== false) setBookingOpen(false); } }),
             editEv && React.createElement(EventModal, { events: events, txnCategories: props.txnCategories, setTxnCategories: props.setTxnCategories, onRenameCategory: props.renameTxnCategory, onDeleteCategory: props.deleteTxnCategory, mode: "edit", initial: editEv, onClose: () => setEditEv(null), onSave: onEdit, onSaveSeries: editEv.seriesId ? (patch) => { props.editEventSeries(editEv, patch); setEditEv(null); } : null, onDelete: () => { if (delEvent(editEv.id) !== false) setEditEv(null); }, onDeleteSeries: editEv.seriesId ? () => { if (props.delEventSeries(editEv) !== false) setEditEv(null); } : null })));
     }
     const NumBoxE = ({ value, onChange }) => (React.createElement("input", { type: "number", inputMode: "decimal", value: value, onChange: e => onChange(e.target.value), className: "px-2 py-1.5 rounded-lg text-sm font-bold text-center outline-none w-full", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } }));
@@ -3284,16 +3354,7 @@ try {
             fallback();
     }
     function downloadCSV(filename, rows) {
-        const csv = "\uFEFF" + toCSV(rows);
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        saveFile(filename, "\uFEFF" + toCSV(rows), "text/csv;charset=utf-8;");
     }
     function SettingsPage(props) {
         const { events, bookings, incomeSources = [], payments = [], transactions, accounts, closedMonths, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase, exportData, importData, clearAllData, dataMsg, historyEntries = [], restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt, pwaIsIos, requestPwaInstall } = props;
