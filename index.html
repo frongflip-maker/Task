@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-25-pr-nowrap-82";
+window.__TASKROUTINE_BUILD__="2026-07-25-even-gap-83";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -8189,7 +8189,7 @@ try {
     /* Every track is a fixed pixel width so a row can never reflow: the buttons
        keep their place whether or not a set has a hint or a drop set. Only the
        hint track absorbs leftover space on wider phones. */
-    const SET_ROW_GRID = `${SET_COL.label}px ${SET_COL.num}px ${SET_COL.sign}px ${SET_COL.num}px ${SET_COL.unit}px minmax(${SET_COL.hint}px,1fr) ${SET_COL.drop}px ${SET_COL.done}px ${SET_COL.del}px`;
+    const SET_ROW_GRID = `${SET_COL.label}px ${SET_COL.num}px ${SET_COL.sign}px ${SET_COL.num}px ${SET_COL.unit}px ${SET_COL.hint}px ${SET_COL.drop}px ${SET_COL.done}px ${SET_COL.del}px`;
     const SET_PRESET_GRID = `${SET_COL.label}px ${SET_COL.num}px ${SET_COL.num}px ${SET_COL.num}px ${SET_COL.act}px`;
     /* Nutrition inputs: label stretches, the number box and the unit stay fixed so
        every row lines up even though "kcal", "g" and "mg" differ in width. */
@@ -8550,7 +8550,7 @@ try {
                         const A = st.st === "active", D = st.st === "done";
                         const setDrop = (patch) => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, drop: patch === null ? undefined : { ...(s.drop || { reps: "", weight: "" }), ...patch } } : s) }));
                         return (React.createElement(React.Fragment, { key: i },
-                            React.createElement("div", { className: "px-1.5 py-1 rounded-lg", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", columnGap: `${SET_COL.gap}px`, background: A ? hex(T.green, .14) : "transparent", border: `1px solid ${A ? hex(T.green, .6) : "transparent"}`, opacity: D ? 0.55 : 1 } },
+                            React.createElement("div", { className: "px-1.5 py-1 rounded-lg", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", justifyContent: "space-between", columnGap: `${SET_COL.gap}px`, background: A ? hex(T.green, .14) : "transparent", border: `1px solid ${A ? hex(T.green, .6) : "transparent"}`, opacity: D ? 0.55 : 1 } },
                             React.createElement("div", { className: "min-w-0 flex flex-col items-start" },
                                 React.createElement("span", { className: "text-[10px] font-semibold", style: { color: A ? T.green : T.sub, textDecoration: D ? "line-through" : "none", whiteSpace: "nowrap" } },
                                     "\u0E40\u0E0B\u0E47\u0E15 ",
@@ -8575,7 +8575,7 @@ try {
                                     React.createElement(Check, { size: 16, strokeWidth: 2.5 }))) : (React.createElement("button", { onClick: () => doneSet(ex.id, i), "aria-label": "ทำเครื่องหมายว่าเซ็ตนี้เสร็จแล้ว", "aria-pressed": false, className: "w-full h-8 rounded-lg flex items-center justify-center", style: { background: A ? hex(T.green, .08) : "#FFFFFF", border: `1.5px solid ${A ? T.green : T.border}` } })),
                                 React.createElement("button", { onClick: () => patchEx(ex.id, e => ({ ...e, sets: e.sets.filter((_, j) => j !== i) })), className: "w-full h-7 rounded-lg flex items-center justify-center", style: { color: T.muted } },
                                     React.createElement(Minus, { size: 14 }))),
-                            st.drop && React.createElement("div", { className: "px-1.5 py-1 rounded-lg", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", columnGap: `${SET_COL.gap}px`, background: hex("#4a6fa5", .07), border: `1px dashed ${hex("#4a6fa5", .35)}`, opacity: D ? 0.55 : 1 } },
+                            st.drop && React.createElement("div", { className: "px-1.5 py-1 rounded-lg", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", justifyContent: "space-between", columnGap: `${SET_COL.gap}px`, background: hex("#4a6fa5", .07), border: `1px dashed ${hex("#4a6fa5", .35)}`, opacity: D ? 0.55 : 1 } },
                                 React.createElement("span", { className: "text-[10px] font-bold truncate min-w-0", style: { color: "#4a6fa5" } }, "↳ drop"),
                                 React.createElement(NumBox, { w: "100%", max: WORKOUT_REPS_MAX, value: st.drop.reps, onChange: v => setDrop({ reps: v === "" ? "" : Number(v) }), w: 50 }),
                                 React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, "\u00D7"),
