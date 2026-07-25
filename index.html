@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-remind-select-113";
+window.__TASKROUTINE_BUILD__="2026-07-26-goals-116";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -659,7 +659,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 11;
+    const SCHEMA_VERSION = 12;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1780,6 +1780,32 @@ try {
         }
         catch { } }, [tab]);
         useEffect(() => { setFabOpen(false); }, [tab]);
+        /* Home-screen badge. iOS only honours this for an installed PWA with
+           notification permission, and only while JS is running — so it holds the
+           last known count once the app is backgrounded. */
+        useEffect(() => {
+            if (!navigator.setAppBadge)
+                return;
+            const sync = () => {
+                if (localStorage.getItem("tr_app_badge") === "off") { try {
+                    navigator.clearAppBadge();
+                }
+                catch { } return; }
+                const count = buildAlerts({ events, workouts, incomeSources, payments, cloudState }).length;
+                try {
+                    if (count > 0)
+                        navigator.setAppBadge(count);
+                    else
+                        navigator.clearAppBadge();
+                }
+                catch { }
+            };
+            sync();
+            const onHide = () => { if (document.visibilityState === "hidden") sync(); };
+            document.addEventListener("visibilitychange", onHide);
+            const id = setInterval(sync, 60000);
+            return () => { document.removeEventListener("visibilitychange", onHide); clearInterval(id); };
+        }, [events, workouts, incomeSources, payments, cloudState]);
         /* Fires event reminders while the app is open. iOS suspends JS once the app is
            backgrounded and has no Notification Triggers API, so anything missed while
            away is simply skipped — Phase 3 push will cover that case server-side. */
@@ -2884,10 +2910,43 @@ try {
                                 React.createElement("span", { className: "font-semibold truncate w-full text-center", style: { fontSize: 9, color: on ? T.text : T.muted, maxHeight: navCompact ? 0 : 14, opacity: navCompact ? 0 : 1, overflow: "hidden", transition: "max-height .18s ease, opacity .18s ease" } }, label)));
                         })))))));
     }
+    /* Single source of truth for the bell list and the home-screen badge.
+       Returns plain data; Today attaches the tap actions by kind. */
+    const buildAlerts = ({ events = [], workouts = [], incomeSources = [], payments = [], cloudState = "", now = Date.now() }) => {
+        const list = [];
+        const today = dkey(new Date(now));
+        const nowMinutes = new Date(now).getHours() * 60 + new Date(now).getMinutes();
+        const todays = events.filter(e => e.date === today);
+        const soonIds = new Set();
+        todays.filter(e => e.status !== "done" && e.startTime).forEach(e => {
+            const startsIn = toMin(e.startTime) - nowMinutes;
+            if (startsIn >= 0 && startsIn <= 60) {
+                soonIds.add(e.id);
+                list.push({ id: `soon-${e.id}`, kind: "soon", eventId: e.id, title: e.title || "Event", detail: startsIn === 0 ? "ถึงเวลาแล้ว" : `เริ่มในอีก ${startsIn} นาที` });
+            }
+        });
+        const running = workouts.find(w => w.startedAt && !w.endedAt);
+        if (running)
+            list.push({ id: `run-${running.id}`, kind: "run", title: running.title || "เวิร์คเอาต์", detail: "กำลังบันทึกอยู่ · ยังไม่กดจบ" });
+        todays.filter(e => e.status !== "done" && !soonIds.has(e.id)).forEach(e => {
+            list.push({ id: `todo-${e.id}`, kind: "todo", eventId: e.id, title: e.title || "Event", detail: e.startTime ? `${e.startTime}${e.endTime ? `–${e.endTime}` : ""} · ยังไม่ติ๊กเสร็จ` : "ยังไม่ติ๊กเสร็จ" });
+        });
+        incomeSources.forEach(source => {
+            const remaining = incomeSourceRemainingAmount(source, payments);
+            if (remaining > 0 && String(source.dueDate || "") < today)
+                list.push({ id: `due-${source.id}`, kind: "due", title: source.title || "งานค้างรับ", detail: `ค้าง ${fmtBaht(remaining)} · ครบกำหนด ${shortDate(source.dueDate)}` });
+        });
+        if (["pending", "error", "conflict"].includes(cloudState))
+            list.push({ id: "sync", kind: "sync", title: cloudState === "error" ? "ซิงก์ไม่สำเร็จ" : cloudState === "conflict" ? "ข้อมูลชนกัน" : "ยังไม่ได้ซิงก์", detail: "แตะเพื่อไปหน้าตั้งค่า" });
+        return list;
+    };
+    const ALERT_ICONS = { soon: Clock, run: Dumbbell, todo: CalendarDays, due: Wallet, sync: Cloud };
     function Today(props) {
         const { sel, setSel, events, todayEvents, addEvent, editEvent, shiftEventSeries, exportEventICS } = props;
         const d = parseK(sel);
         const [notifOpen, setNotifOpen] = useState(false);
+        const goalEvents = todayEvents.filter(e => e.isGoal);
+        const timedEvents = todayEvents.filter(e => !e.isGoal);
         const [editEv, setEditEv] = useState(null);
         const [showOverdue, setShowOverdue] = useState(false);
         const [rescheduleEv, setRescheduleEv] = useState(null);
@@ -2902,33 +2961,14 @@ try {
         const quickMove = (event, targetDate) => { if (event.bookingId)
             props.openStudioBooking(event.bookingId); else if (event.seriesId)
             setRescheduleEv({ event, targetDate }); else editEvent(event.id, { date: targetDate }); };
-        const notifications = (() => {
-            const list = [];
-            const nowMinutes = new Date(nowTick).getHours() * 60 + new Date(nowTick).getMinutes();
-            const soonIds = new Set();
-            if (sel === TK)
-                todayEvents.filter(e => e.status !== "done" && e.startTime).forEach(e => {
-                    const startsIn = toMin(e.startTime) - nowMinutes;
-                    if (startsIn >= 0 && startsIn <= 60) {
-                        soonIds.add(e.id);
-                        list.push({ id: `soon-${e.id}`, kind: "soon", icon: Clock, title: e.title || "Event", detail: startsIn === 0 ? "ถึงเวลาแล้ว" : `เริ่มในอีก ${startsIn} นาที`, act: () => { setNotifOpen(false); setEditEv(e); } });
-                    }
-                });
-            const running = (props.workouts || []).find(w => w.startedAt && !w.endedAt);
-            if (running)
-                list.push({ id: `run-${running.id}`, kind: "run", icon: Dumbbell, title: running.title || "เวิร์คเอาต์", detail: "กำลังบันทึกอยู่ · ยังไม่กดจบ", act: () => { setNotifOpen(false); props.goTab("fitness"); } });
-            todayEvents.filter(e => e.status !== "done" && !soonIds.has(e.id)).forEach(e => {
-                list.push({ id: `todo-${e.id}`, kind: "todo", icon: CalendarDays, title: e.title || "Event", detail: e.startTime ? `${e.startTime}${e.endTime ? `–${e.endTime}` : ""} · ยังไม่ติ๊กเสร็จ` : "ยังไม่ติ๊กเสร็จ", act: () => { setNotifOpen(false); setEditEv(e); } });
-            });
-            (props.incomeSources || []).forEach(source => {
-                const remaining = incomeSourceRemainingAmount(source, props.payments || []);
-                if (remaining > 0 && String(source.dueDate || "") < TK)
-                    list.push({ id: `due-${source.id}`, kind: "due", icon: Wallet, title: source.title || "งานค้างรับ", detail: `ค้าง ${fmtBaht(remaining)} · ครบกำหนด ${shortDate(source.dueDate)}`, act: () => { setNotifOpen(false); props.goTab("budget"); } });
-            });
-            if (["pending", "error", "conflict"].includes(props.cloudState))
-                list.push({ id: "sync", kind: "sync", icon: Cloud, title: props.cloudState === "error" ? "ซิงก์ไม่สำเร็จ" : props.cloudState === "conflict" ? "ข้อมูลชนกัน" : "ยังไม่ได้ซิงก์", detail: "แตะเพื่อไปหน้าตั้งค่า", act: () => { setNotifOpen(false); props.goTab("settings"); } });
-            return list;
-        })();
+        const notifications = buildAlerts({ events, workouts: props.workouts, incomeSources: props.incomeSources, payments: props.payments, cloudState: props.cloudState, now: nowTick })
+            .map(alert => ({ ...alert, icon: ALERT_ICONS[alert.kind], act: () => {
+                setNotifOpen(false);
+                if (alert.eventId) { const target = events.find(e => e.id === alert.eventId); if (target) setEditEv(target); return; }
+                if (alert.kind === "run") return props.goTab("fitness");
+                if (alert.kind === "due") return props.goTab("budget");
+                props.goTab("settings");
+            } }));
         const NOTIF_TONE = { soon: T.orange, run: T.violet, todo: T.blue, due: T.green, sync: T.red };
         return (React.createElement("div", { className: "px-4 pb-8", style: { paddingTop: "calc(10px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "14px" } },
             React.createElement("div", { className: "flex items-center justify-end" },
@@ -2973,7 +3013,7 @@ try {
                                     React.createElement("span", { className: "text-xl font-extrabold leading-none", style: { color: rc } },
                                         pct,
                                         React.createElement("span", { className: "text-[11px]" }, "%")),
-                                    React.createElement("span", { className: "text-[8px] font-bold tracking-wide mt-0.5", style: { color: T.muted } }, "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E40\u0E2A\u0E23\u0E47\u0E08")))),
+                                    React.createElement("span", { className: "font-bold tracking-wide mt-0.5", style: { fontSize: 8, color: T.muted } }, "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E40\u0E2A\u0E23\u0E47\u0E08")))),
                         React.createElement("button", { onClick: () => setSel(dkey(addDays(d, 1))), "aria-label": "\u0E27\u0E31\u0E19\u0E16\u0E31\u0E14\u0E44\u0E1B", className: "self-stretch px-3 shrink-0 flex items-center active:scale-90" },
                             React.createElement(ChevronRight, { size: 18, style: { color: T.muted } })))));
             })(),
@@ -3020,14 +3060,24 @@ try {
                         React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, isNow ? "จะจบในอีก" : "เริ่มในอีก"),
                         React.createElement("span", { className: "text-2xl font-extrabold tabular-nums", style: { color: ET.color } }, fmtDur(Math.max(0, mins))))));
             })(),
-            React.createElement(Section, { title: "Timeline", icon: Clock }, todayEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
+            goalEvents.length > 0 && React.createElement(Section, { title: "เป้าหมายวันนี้", icon: Target, action: React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.muted } }, `${goalEvents.filter(e => e.status === "done").length}/${goalEvents.length}`) },
+                React.createElement(Glass, { className: "p-0 overflow-hidden" }, goalEvents.map((e, gi) => {
+                    const done = e.status === "done";
+                    return React.createElement("div", { key: e.id, className: "flex items-center gap-3 px-3", style: { minHeight: 52, borderTop: gi ? `1px solid ${T.border}` : "none" } },
+                        React.createElement("button", { onClick: () => props.toggleEvent(e.id), "aria-label": done ? "ยกเลิกว่าทำแล้ว" : "ทำเสร็จแล้ว", className: "shrink-0 flex items-center justify-center active:scale-90", style: { width: 24, height: 24, borderRadius: 7, background: done ? T.green : "transparent", border: `1.5px solid ${done ? T.green : T.border}`, color: "#fff" } }, done ? React.createElement(Check, { size: 14, strokeWidth: 3 }) : null),
+                        React.createElement("button", { onClick: () => setEditEv(e), className: "flex-1 min-w-0 text-left" },
+                            React.createElement("div", { className: "text-sm font-bold truncate", style: { color: done ? T.muted : T.text, textDecoration: done ? "line-through" : "none" } }, e.title || "เป้าหมาย"),
+                            e.note && React.createElement("div", { className: "text-[10px] truncate", style: { color: T.muted } }, e.note)),
+                        React.createElement("span", { className: "shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full", style: { background: hex(EVENT_TYPES[e.type]?.color || T.sub, .14), color: EVENT_TYPES[e.type]?.color || T.sub } }, (EVENT_TYPES[e.type] || {}).label || "Goal"));
+                }))),
+            React.createElement(Section, { title: "Timeline", icon: Clock }, timedEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
                 React.createElement("div", { className: "mx-auto flex items-center justify-center", style: { width: 48, height: 48, borderRadius: 16, background: hex(T.purple, .13), color: T.purple, border: `1px solid ${hex(T.purple, .3)}` } }, React.createElement(CalendarDays, { size: 23 })),
                 React.createElement("div", { className: "font-extrabold", style: { fontSize: 17, marginTop: 14 } }, "วันนี้ยังไม่มีงาน"),
                 React.createElement("div", { style: { fontSize: 12, marginTop: 6, lineHeight: 1.6, color: T.muted } }, "กดปุ่ม + มุมขวาล่างเพื่อเพิ่ม Event แรก")) :
-                React.createElement("div", null, todayEvents.map((e, ei) => {
+                React.createElement("div", null, timedEvents.map((e, ei) => {
                     const ET = EVENT_TYPES[e.type];
                     const done = e.status === "done";
-                    const lastRow = ei === todayEvents.length - 1;
+                    const lastRow = ei === timedEvents.length - 1;
                     return (React.createElement("div", { key: e.id, className: "flex gap-2.5" },
                         React.createElement("div", { className: "flex flex-col items-center shrink-0 pt-3", style: { width: 50 } },
                             React.createElement("div", { className: "text-sm font-extrabold tabular-nums leading-none", style: { color: done ? T.muted : T.text } }, e.startTime || "—"),
@@ -3157,7 +3207,7 @@ try {
                     const n = countOn(k);
                     return (React.createElement("button", { key: i, onClick: () => { setSel(k); setView("day"); }, className: "aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 transition active:scale-95", style: { background: on ? T.purple : T.surf, border: `1px solid ${on ? T.purple : isToday ? hex(T.gold, .6) : T.border}` } },
                         React.createElement("span", { className: "text-xs font-bold", style: { color: isToday ? T.gold : T.text } }, cell.getDate()),
-                        n > 0 && React.createElement("span", { className: "text-[8px] font-bold px-1 rounded-full", style: { background: hex(T.purple, .18), color: T.text } }, n)));
+                        n > 0 && React.createElement("span", { className: "font-bold px-1 rounded-full", style: { fontSize: 8, background: hex(T.purple, .18), color: T.text } }, n)));
                 })),
                 React.createElement("div", { className: "text-[10px] text-center mt-3", style: { color: T.muted } }, "\u0E41\u0E15\u0E30\u0E27\u0E31\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E14\u0E39\u0E23\u0E32\u0E22\u0E25\u0E30\u0E40\u0E2D\u0E35\u0E22\u0E14 \u00B7 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02 = \u0E08\u0E33\u0E19\u0E27\u0E19 event \u0E27\u0E31\u0E19\u0E19\u0E31\u0E49\u0E19"))),
             view === "day" && (React.createElement("div", { className: "space-y-2" }, dayEvents.length === 0 ? React.createElement(Empty, { text: "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E27\u0E48\u0E32\u0E07 \u2014 \u0E40\u0E1E\u0E34\u0E48\u0E21 Event \u0E2B\u0E23\u0E37\u0E2D\u0E1E\u0E31\u0E01\u0E01\u0E47\u0E44\u0E14\u0E49" }) : dayEvents.map(EventRow))),
@@ -3226,18 +3276,19 @@ try {
     }
     function EventModal({ onClose, onSave, onSaveSeries, mode = "add", eventKind = null, initial = null, defaultDate = null, events = [], txnCategories, setTxnCategories, onRenameCategory, onDeleteCategory, onDelete, onDeleteSeries }) {
         const [f, setF] = useState(initial
-            ? { remind: Array.isArray(initial.remind) ? initial.remind : [], title: initial.title || "", type: initial.type || "work", date: initial.date || defaultDate || TK, startTime: initial.startTime || "09:00", endTime: initial.endTime || "10:00", timeMode: initial.timeMode || (initial.durationHours ? "duration" : "end"), durationHours: initial.durationHours || hoursBetween(initial.startTime || "09:00", initial.endTime || "10:00") || 1, location: initial.location || "", note: initial.note || "", energyCost: initial.energyCost ?? 2, incomeEnabled: initial.incomeEnabled ?? ((Number(initial.income) || 0) > 0), income: initial.income || "", category: initial.category || (EVENT_TYPES[initial.type || "work"] || EVENT_TYPES.work).label, incomeSubtype: initial.incomeSubtype || "", customerName: initial.customerName || "", fitKind: initial.fitKind || "weight", fitParts: initial.fitParts || [], fitSport: initial.fitSport || "", fitRun: initial.fitRun || { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } }
-            : { remind: [0], title: "", type: "work", date: defaultDate || TK, startTime: "09:00", endTime: "10:00", timeMode: "duration", durationHours: 1, location: "", note: "", energyCost: 2, incomeEnabled: eventKind === "income", income: "", category: normalizeIncomeCategory((txnCategories?.income || EVENT_CATEGORY_DEFAULTS)[0] || EVENT_TYPES.work.label), incomeSubtype: "", customerName: "", fitKind: "weight", fitParts: [], fitSport: "", fitRun: { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } });
+            ? { isGoal: !!initial.isGoal, remind: Array.isArray(initial.remind) ? initial.remind : [], title: initial.title || "", type: initial.type || "work", date: initial.date || defaultDate || TK, startTime: initial.startTime || "09:00", endTime: initial.endTime || "10:00", timeMode: initial.timeMode || (initial.durationHours ? "duration" : "end"), durationHours: initial.durationHours || hoursBetween(initial.startTime || "09:00", initial.endTime || "10:00") || 1, location: initial.location || "", note: initial.note || "", energyCost: initial.energyCost ?? 2, incomeEnabled: initial.incomeEnabled ?? ((Number(initial.income) || 0) > 0), income: initial.income || "", category: initial.category || (EVENT_TYPES[initial.type || "work"] || EVENT_TYPES.work).label, incomeSubtype: initial.incomeSubtype || "", customerName: initial.customerName || "", fitKind: initial.fitKind || "weight", fitParts: initial.fitParts || [], fitSport: initial.fitSport || "", fitRun: initial.fitRun || { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } }
+            : { isGoal: false, remind: [0], title: "", type: "work", date: defaultDate || TK, startTime: "09:00", endTime: "10:00", timeMode: "duration", durationHours: 1, location: "", note: "", energyCost: 2, incomeEnabled: eventKind === "income", income: "", category: normalizeIncomeCategory((txnCategories?.income || EVENT_CATEGORY_DEFAULTS)[0] || EVENT_TYPES.work.label), incomeSubtype: "", customerName: "", fitKind: "weight", fitParts: [], fitSport: "", fitRun: { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } });
         const isEdit = mode === "edit";
         const [repeat, setRepeat] = useState(false);
         const [repeatFreq, setRepeatFreq] = useState("week");
         const [repeatCount, setRepeatCount] = useState(4);
+        const [repeatDays, setRepeatDays] = useState([]);
         const [delConfirm, setDelConfirm] = useState(null);
         const [allowConflict, setAllowConflict] = useState(false);
         const togglerPart = (p) => setF(s => ({ ...s, fitParts: s.fitParts.includes(p) ? s.fitParts.filter(x => x !== p) : [...s.fitParts, p] }));
         const setRun = (k, v) => setF(s => ({ ...s, fitRun: { ...s.fitRun, [k]: v } }));
         const isRun = f.fitSport === "วิ่ง";
-        useEffect(() => { setAllowConflict(false); }, [f.date, f.startTime, f.endTime, repeat, repeatFreq, repeatCount]);
+        useEffect(() => { setAllowConflict(false); }, [f.date, f.startTime, f.endTime, f.isGoal, repeat, repeatFreq, repeatCount, repeatDays]);
         const previewCandidates = (() => {
             if (isEdit && initial?.seriesId)
                 return events.filter(event => event.seriesId === initial.seriesId && event.date >= initial.date).map(event => ({ ...f, date: event.date }));
@@ -3245,6 +3296,16 @@ try {
                 return [f];
             const cnt = Math.max(2, Math.min(52, Number(repeatCount) || 2));
             const baseDate = parseK(f.date);
+            if (repeatFreq === "days") {
+                if (!repeatDays.length)
+                    return [f];
+                const out = [];
+                [...repeatDays].sort((a, b) => a - b).forEach(weekday => {
+                    for (let week = 0; week < cnt; week++)
+                        out.push({ ...f, date: dkey(addDays(baseDate, (weekday - baseDate.getDay() + 7) % 7 + week * 7)) });
+                });
+                return out;
+            }
             return Array.from({ length: cnt }, (_, i) => {
                 let nextDate;
                 if (repeatFreq === "month") {
@@ -3255,7 +3316,7 @@ try {
                 return { ...f, date: dkey(nextDate) };
             });
         })();
-        const scheduleConflicts = previewCandidates.map(candidate => {
+        const scheduleConflicts = f.isGoal ? [] : previewCandidates.map(candidate => {
             const [start, end] = bookingRange(candidate.date, candidate.startTime, candidate.endTime);
             const hit = events.find(event => {
                 if (event.id === initial?.id || (initial?.seriesId && event.seriesId === initial.seriesId) || !event.date || !event.startTime)
@@ -3329,8 +3390,14 @@ try {
                             React.createElement("span", { className: "text-[11px]", style: { color: T.sub } }, "\u0E40\u0E27\u0E25\u0E32"),
                             React.createElement(TxtBoxE, { value: f.fitRun.tTime, onChange: v => setRun("tTime", v), ph: "30:00" }),
                             React.createElement(TxtBoxE, { value: f.fitRun.aTime, onChange: v => setRun("aTime", v), ph: "30:00" })))))))),
-            React.createElement(TimeRangePicker, { startTime: f.startTime, endTime: f.endTime, timeMode: f.timeMode, durationHours: f.durationHours, onChange: patch => setF({ ...f, ...patch }) }),
-            f.startTime && (() => {
+            React.createElement("button", { type: "button", onClick: () => setF(current => ({ ...current, isGoal: !current.isGoal })), className: "w-full flex items-center gap-3 mb-3 p-3 rounded-xl text-left", style: { background: T.surf2, border: `1px solid ${f.isGoal ? hex(T.gold, .55) : T.border}` } },
+                React.createElement("span", { className: "w-11 h-6 rounded-full relative shrink-0", style: { background: f.isGoal ? T.gold : T.muted, border: `1px solid ${f.isGoal ? T.gold : T.border}` } },
+                    React.createElement("span", { style: { position: "absolute", top: 1, left: f.isGoal ? 22 : 1, width: 20, height: 20, borderRadius: 10, background: T.surf, transition: "left .16s ease" } })),
+                React.createElement("span", { className: "flex-1 min-w-0" },
+                    React.createElement("span", { className: "text-xs font-bold", style: { display: "block" } }, "เป็นเป้าหมายของวัน"),
+                    React.createElement("span", { className: "text-[10px]", style: { display: "block", color: T.muted } }, "ไม่ระบุเวลา · ขึ้นแยกไว้บนสุดของหน้าวันนี้"))),
+            !f.isGoal && React.createElement(TimeRangePicker, { startTime: f.startTime, endTime: f.endTime, timeMode: f.timeMode, durationHours: f.durationHours, onChange: patch => setF({ ...f, ...patch }) }),
+            !f.isGoal && f.startTime && (() => {
                 const picked = f.remind || [];
                 const rows = picked.length ? picked : [""];
                 const writeRow = (index, raw) => setF(current => {
@@ -3367,16 +3434,20 @@ try {
                         React.createElement("div", { className: "text-xs font-bold" }, "\u0E17\u0E33\u0E0B\u0E49\u0E33"),
                         React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "\u0E40\u0E0A\u0E48\u0E19 \u0E40\u0E25\u0E48\u0E19\u0E23\u0E49\u0E32\u0E19\u0E40\u0E14\u0E34\u0E21\u0E17\u0E38\u0E01\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C"))),
                 repeat && (React.createElement("div", { className: "mt-3 space-y-2.5" },
-                    React.createElement("div", { className: "flex gap-1.5" }, [["day", "ทุกวัน"], ["week", "ทุกสัปดาห์"], ["month", "ทุกเดือน"]].map(([k, l]) => {
+                    React.createElement("div", { className: "flex gap-1.5" }, [["day", "ทุกวัน"], ["week", "ทุกสัปดาห์"], ["month", "ทุกเดือน"], ["days", "เลือกวัน"]].map(([k, l]) => {
                         const on = repeatFreq === k;
                         return React.createElement("button", { key: k, onClick: () => setRepeatFreq(k), className: "flex-1 py-2 rounded-lg text-xs font-bold", style: { background: on ? T.purple : T.surf, color: on ? "#fff" : T.sub, border: `1px solid ${on ? T.purple : T.border}` } }, l);
                     })),
+                    repeatFreq === "days" && React.createElement("div", { className: "flex", style: { gap: 4 } }, TH_D.map((label, index) => {
+                        const on = repeatDays.includes(index);
+                        return React.createElement("button", { key: index, type: "button", onClick: () => setRepeatDays(current => on ? current.filter(d => d !== index) : [...current, index]), className: "flex-1 font-bold", style: { minHeight: 34, borderRadius: 9, fontSize: 11, background: on ? T.purple : T.surf, color: on ? "#fff" : T.sub, border: `1px solid ${on ? T.purple : T.border}` } }, label);
+                    })),
                     React.createElement("div", { className: "flex items-center gap-2" },
-                        React.createElement(Label, null, "\u0E08\u0E33\u0E19\u0E27\u0E19\u0E04\u0E23\u0E31\u0E49\u0E07"),
+                        React.createElement(Label, null, repeatFreq === "days" ? "กี่สัปดาห์" : "\u0E08\u0E33\u0E19\u0E27\u0E19\u0E04\u0E23\u0E31\u0E49\u0E07"),
                         React.createElement("input", { type: "number", min: 2, max: 52, value: repeatCount, onChange: e => { const v = e.target.value; setRepeatCount(v === "" ? "" : Number(v)); }, onBlur: e => setRepeatCount(Math.max(2, Math.min(52, Number(e.target.value) || 2))), className: "w-20 px-3 py-2 rounded-lg text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } })),
                     React.createElement("div", { className: "text-[10px]", style: { color: T.muted } },
                         "\u0E08\u0E30\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14 ",
-                        repeatCount,
+                        repeatFreq === "days" ? (repeatDays.length ? repeatCount * repeatDays.length : 0) : repeatCount,
                         " \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23 (\u0E41\u0E01\u0E49/\u0E25\u0E1A\u0E17\u0E35\u0E2B\u0E25\u0E31\u0E07\u0E41\u0E22\u0E01\u0E17\u0E35\u0E25\u0E30\u0E2D\u0E31\u0E19\u0E44\u0E14\u0E49\u0E15\u0E32\u0E21\u0E1B\u0E01\u0E15\u0E34)"))))),
             firstConflict && React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: hex(T.red, .14), border: `1px solid ${hex(T.red, .55)}` } },
                 React.createElement("div", { className: "flex items-start gap-2" }, React.createElement(AlertCircle, { size: 16, style: { color: T.red, marginTop: 1 } }), React.createElement("div", { className: "flex-1 min-w-0" },
@@ -3387,7 +3458,14 @@ try {
             (() => {
                 const buildBase = () => {
                     const base = { ...f, incomeEnabled: !!f.incomeEnabled, income: f.incomeEnabled ? (Number(f.income) || 0) : 0, customerName: "", incomeSubtype: "" };
-                    const remind = f.startTime ? remindList(f) : [];
+                    base.isGoal = !!f.isGoal;
+                    if (base.isGoal) {
+                        base.startTime = "";
+                        base.endTime = "";
+                    }
+                    else
+                        delete base.isGoal;
+                    const remind = (!base.isGoal && f.startTime) ? remindList(f) : [];
                     if (remind.length)
                         base.remind = remind;
                     else
@@ -3415,18 +3493,32 @@ try {
                         React.createElement(SaveBtn, { disabled: !f.title.trim() || (!!firstConflict && !allowConflict), onClick: () => onSave(buildBase()) }, "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49"),
                         onSaveSeries && (React.createElement("button", { disabled: !f.title.trim() || (!!firstConflict && !allowConflict), onClick: () => onSaveSeries(buildBase()), className: "w-full py-3 rounded-xl font-bold text-sm active:scale-[.98] disabled:opacity-40", style: { background: T.surf2, color: T.purple, border: `1px solid ${hex(T.purple, .5)}` } }, "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E19\u0E35\u0E49 + \u0E17\u0E38\u0E01\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23\u0E43\u0E19\u0E2D\u0E19\u0E32\u0E04\u0E15 (\u0E0A\u0E37\u0E48\u0E2D\u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19)"))));
                 }
-                return (React.createElement(SaveBtn, { disabled: !f.title.trim() || (!!firstConflict && !allowConflict), onClick: () => {
+                return (React.createElement(SaveBtn, { disabled: !f.title.trim() || (!!firstConflict && !allowConflict) || (repeat && repeatFreq === "days" && repeatDays.length === 0), onClick: () => {
                         const base = buildBase();
                         const cnt = Math.max(2, Math.min(52, Number(repeatCount) || 2));
-                        if (repeat && cnt > 1) {
+                        const byWeekday = repeatFreq === "days" && repeatDays.length > 0;
+                        if (repeat && (cnt > 1 || byWeekday)) {
                             const baseDate = parseK(base.date);
-                            const stepDate = (i) => { if (repeatFreq === "month") {
-                                return addMonthsClamped(baseDate, i, baseDate.getDate());
-                            } return addDays(baseDate, (repeatFreq === "day" ? 1 : 7) * i); };
                             const list = [];
                             const seriesId = uid();
-                            for (let i = 0; i < cnt; i++)
-                                list.push({ ...base, date: dkey(stepDate(i)), seriesId });
+                            if (byWeekday) {
+                                /* cnt counts weeks here: walk forward from the base date and
+                                   keep every day whose weekday was ticked. */
+                                const days = [...repeatDays].sort((a, b) => a - b);
+                                for (let week = 0; week < cnt; week++)
+                                    days.forEach(weekday => {
+                                        const offset = (weekday - baseDate.getDay() + 7) % 7 + week * 7;
+                                        list.push({ ...base, date: dkey(addDays(baseDate, offset)), seriesId });
+                                    });
+                                list.sort((a, b) => a.date.localeCompare(b.date));
+                            }
+                            else {
+                                const stepDate = (i) => { if (repeatFreq === "month") {
+                                    return addMonthsClamped(baseDate, i, baseDate.getDate());
+                                } return addDays(baseDate, (repeatFreq === "day" ? 1 : 7) * i); };
+                                for (let i = 0; i < cnt; i++)
+                                    list.push({ ...base, date: dkey(stepDate(i)), seriesId });
+                            }
                             onSave(list);
                         }
                         else {
@@ -3575,6 +3667,10 @@ try {
         catch (error) { return true; } });
         const [eventNotifyOn, setEventNotifyOn] = useState(() => { try {
             return localStorage.getItem("tr_notify_events") !== "off";
+        }
+        catch (error) { return true; } });
+        const [appBadgeOn, setAppBadgeOn] = useState(() => { try {
+            return localStorage.getItem("tr_app_badge") !== "off";
         }
         catch (error) { return true; } });
         const [countStyleSel, setCountStyleSel] = useState(() => { try {
@@ -3852,6 +3948,17 @@ try {
                     }
                     catch (error) { } setEventNotifyOn(!eventNotifyOn); }, className: "w-11 h-6 rounded-full shrink-0 relative", style: { background: eventNotifyOn ? T.green : T.surf2, border: `1px solid ${eventNotifyOn ? T.green : T.border}` } },
                         React.createElement("span", { style: { position: "absolute", top: 2, left: eventNotifyOn ? 22 : 2, width: 18, height: 18, borderRadius: 9, background: "#fff", transition: "left .16s ease" } }))),
+                React.createElement("div", { className: "flex items-center gap-3 mb-2" },
+                    React.createElement("div", { className: "flex-1 min-w-0" },
+                        React.createElement("div", { className: "font-extrabold text-sm" }, "ตัวเลขบนไอคอนแอป"),
+                        React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "จำนวนเดียวกับกระดิ่ง · อัปเดตตอนเปิดแอป")),
+                    React.createElement("button", { type: "button", onClick: () => { try {
+                        localStorage.setItem("tr_app_badge", appBadgeOn ? "off" : "on");
+                        if (appBadgeOn && navigator.clearAppBadge)
+                            navigator.clearAppBadge();
+                    }
+                    catch (error) { } setAppBadgeOn(!appBadgeOn); }, className: "w-11 h-6 rounded-full shrink-0 relative", style: { background: appBadgeOn ? T.green : T.surf2, border: `1px solid ${appBadgeOn ? T.green : T.border}` } },
+                        React.createElement("span", { style: { position: "absolute", top: 2, left: appBadgeOn ? 22 : 2, width: 18, height: 18, borderRadius: 9, background: "#fff", transition: "left .16s ease" } }))),
                 notifyPerm !== "granted" && React.createElement("button", { type: "button", onClick: async () => { try {
                         const result = await Notification.requestPermission();
                         setNotifyPerm(result);
@@ -4629,7 +4736,7 @@ try {
                 React.createElement("div", { className: "flex gap-2" },
                     React.createElement("input", { value: value, onChange: event => { setTypingMode(true); setShowSuggest(true); onPick(event.target.value, true); }, placeholder: "ชื่อรายการ", className: "flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
                     onAddPreset && React.createElement("button", { type: "button", disabled: !value.trim(), onClick: () => onAddPreset(value.trim(), rememberAmount), className: "px-3 py-2 rounded-xl text-[10px] font-bold shrink-0", style: { background: value.trim() ? T.blue : T.border, color: value.trim() ? "#fff" : T.muted } }, "บันทึก Template")),
-                showSuggest && suggestions.length > 0 && React.createElement("div", { className: "mt-1.5 rounded-xl overflow-hidden", style: { border: `1px solid ${T.border}` } }, suggestions.map((item, idx) => React.createElement("button", { key: item.name, type: "button", onClick: () => { setShowSuggest(false); setTypingMode(false); onPick(item.name); }, className: "w-full px-3 py-2.5 flex items-center gap-2 text-left active:opacity-70", style: { background: "#FFFDF8", borderTop: idx > 0 ? `1px solid ${T.border}` : "none" } },
+                showSuggest && suggestions.length > 0 && React.createElement("div", { className: "mt-1.5 rounded-xl overflow-hidden", style: { border: `1px solid ${T.border}` } }, suggestions.map((item, idx) => React.createElement("button", { key: item.name, type: "button", onClick: () => { setShowSuggest(false); setTypingMode(false); onPick(item.name); }, className: "w-full px-3 py-2.5 flex items-center gap-2 text-left active:scale-[.98]", style: { background: "#FFFDF8", borderTop: idx > 0 ? `1px solid ${T.border}` : "none" } },
                     React.createElement(Search, { size: 13, style: { color: T.muted, flexShrink: 0 } }),
                     React.createElement("span", { className: "flex-1 min-w-0 truncate text-sm" }, item.name),
                     item.isPreset && React.createElement("span", { className: "shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(T.blue, .14), color: T.blue } }, "Template")))),
@@ -8906,7 +9013,7 @@ try {
                             React.createElement("div", { className: "min-w-0 flex flex-col items-center" },
                                 React.createElement("span", { className: "text-[10px] font-semibold", style: { color: A ? T.green : T.sub, textDecoration: D ? "line-through" : "none", whiteSpace: "nowrap" } },
                                     i + 1),
-                                (() => { const wNow = Number(st.weight) || 0; const hist = histMax[workoutExerciseKey(ex.name)] || 0; return hist > 0 && wNow > hist ? React.createElement("span", { className: "text-[8px] font-extrabold px-1 rounded mt-0.5", style: { whiteSpace: "nowrap", lineHeight: 1.3, color: T.gold, background: hex(T.gold, .16), border: `1px solid ${hex(T.gold, .45)}` } }, "PR!") : null; })()),
+                                (() => { const wNow = Number(st.weight) || 0; const hist = histMax[workoutExerciseKey(ex.name)] || 0; return hist > 0 && wNow > hist ? React.createElement("span", { className: "font-extrabold px-1 rounded mt-0.5", style: { fontSize: 8, whiteSpace: "nowrap", lineHeight: 1.3, color: T.gold, background: hex(T.gold, .16), border: `1px solid ${hex(T.gold, .45)}` } }, "PR!") : null; })()),
                             React.createElement(NumBox, { w: "100%", max: WORKOUT_REPS_MAX, value: st.reps, onChange: v => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, reps: v === "" ? "" : Number(v) } : s) })) }),
                             React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, "\u00D7"),
                             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: `${SET_COL.unitGap}px` } },
@@ -9793,7 +9900,7 @@ try {
                                 React.createElement("span", { className: "text-[9px] font-bold ml-auto", style: { color: selectedTrend.proPct >= 100 ? T.green : T.sub } }, `${Math.round(selectedTrend.proPct)}%`)))),
                     React.createElement("div", { className: "relative mt-4", style: { height: 136, paddingTop: 4 } },
                         React.createElement("div", { className: "absolute left-0 right-0", style: { bottom: `${100 / trendScaleMax * 100}%`, borderTop: `1.5px dashed ${hex(T.sub, .55)}`, zIndex: 1 } },
-                            React.createElement("span", { className: "absolute left-0 text-[8px] font-bold px-1.5 rounded", style: { top: -15, color: T.sub, background: T.surf2, zIndex: 2 } }, "100% TARGET")),
+                            React.createElement("span", { className: "absolute left-0 font-bold px-1.5 rounded", style: { fontSize: 8, top: -15, color: T.sub, background: T.surf2, zIndex: 2 } }, "100% TARGET")),
                         React.createElement("div", { className: "flex items-end justify-between gap-1.5 h-full" }, days7.map(item => {
                             const selected = item.k === nd;
                             const calOverTarget = item.calPct > 100;
@@ -9802,7 +9909,7 @@ try {
                                     React.createElement("div", { className: "rounded-t-md", title: `Calories ${Math.round(item.calPct)}%`, style: { width: "40%", height: trendBarHeight(item.calPct), background: item.cal ? (calOverTarget ? T.red : T.gold) : T.border, opacity: selected ? 1 : .72, boxShadow: selected && item.cal ? `0 0 7px ${hex(calOverTarget ? T.red : T.gold, .45)}` : "none" } }),
                                     React.createElement("div", { className: "rounded-t-md", title: `Protein ${Math.round(item.proPct)}%`, style: { width: "40%", height: trendBarHeight(item.proPct), background: item.pro ? T.green : T.border, opacity: selected ? 1 : .72, boxShadow: selected && item.pro ? `0 0 7px ${hex(T.green, .45)}` : "none" } })),
                                 React.createElement("span", { className: "text-[9px] font-extrabold", style: { color: selected ? T.text : T.muted } }, TH_D[item.dt.getDay()]),
-                                React.createElement("span", { className: "text-[8px] font-bold", style: { color: selected ? T.gold : T.muted } }, item.dt.getDate()));
+                                React.createElement("span", { className: "font-bold", style: { fontSize: 8, color: selected ? T.gold : T.muted } }, item.dt.getDate()));
                         }))),
                     React.createElement("div", { className: "flex items-center justify-center gap-3 mt-2 text-[9px]", style: { color: T.muted } },
                         React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2 rounded-sm", style: { background: T.gold } }), "Calories"),
@@ -10125,7 +10232,7 @@ try {
                         React.createElement("span", { className: "text-sm font-bold" }, "Volume การยก (kg)"),
                         React.createElement("span", { className: "text-[10px] ml-auto", style: { color: T.muted } }, "รวม ", volSum.toLocaleString(), " kg")),
                     React.createElement("div", { className: "flex items-end justify-between gap-1.5", style: { height: 90 } }, row7.map((x, i) => (React.createElement("div", { key: i, className: "flex-1 flex flex-col items-center gap-1 h-full justify-end" },
-                        React.createElement("span", { className: "text-[8px] font-bold", style: { color: x.vol ? T.green : T.muted } }, x.vol ? (x.vol >= 1000 ? (x.vol / 1000).toFixed(1) + "k" : x.vol) : "–"),
+                        React.createElement("span", { className: "font-bold", style: { fontSize: 8, color: x.vol ? T.green : T.muted } }, x.vol ? (x.vol >= 1000 ? (x.vol / 1000).toFixed(1) + "k" : x.vol) : "–"),
                         React.createElement("div", { className: "w-full rounded-t-md", style: { height: `${x.vol ? Math.max(6, (x.vol / maxVol) * 100) : 4}%`, background: x.vol ? T.green : T.border } }),
                         React.createElement("span", { className: "text-[9px]", style: { color: T.muted } }, x.dn))))),
                     React.createElement("div", { className: "text-[9px] text-center mt-1.5", style: { color: T.muted } }, "Σ ครั้ง × น้ำหนัก จากบันทึกการเล่นจริง 7 วันล่าสุด")),
