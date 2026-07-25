@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-multidrop-107";
+window.__TASKROUTINE_BUILD__="2026-07-26-preset-auto-108";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -8302,13 +8302,13 @@ try {
     const dropHasValue = (d) => !!(Number(d?.reps) || Number(d?.weight));
     const cleanDrops = (list) => (list || []).filter(dropHasValue).slice(0, MAX_DROPS).map(d => ({ reps: Number(d.reps) || 0, weight: d.weight === "" ? "" : Number(d.weight) || 0 }));
     const withDrops = (set, list) => { const drops = cleanDrops(list); const next = { ...set }; delete next.drop; if (drops.length) next.drops = drops; else delete next.drops; return next; };
-    const SET_COL = { label: 34, num: 46, sign: 8, unit: 26, hint: 46, drop: 40, done: 26, del: 20, act: 28, gap: 4 };
+    const SET_COL = { label: 34, num: 46, sign: 8, unit: 26, unitGap: 8, hint: 46, drop: 40, done: 26, del: 20, act: 28, gap: 4 };
     /* Every track is a fixed pixel width so a row can never reflow: the buttons
        keep their place whether or not a set has a hint or a drop set. Only the
        hint track absorbs leftover space on wider phones. */
     /* weight + unit share one track: the unit belongs to that number, so it must
        never drift away when the leftover width is distributed. */
-    const SET_ROW_GRID = `${SET_COL.label}px ${SET_COL.num}px ${SET_COL.sign}px ${SET_COL.num + SET_COL.unit + 3}px ${SET_COL.hint}px ${SET_COL.drop}px ${SET_COL.done}px ${SET_COL.del}px`;
+    const SET_ROW_GRID = `${SET_COL.label}px ${SET_COL.num}px ${SET_COL.sign}px ${SET_COL.num + SET_COL.unit + SET_COL.unitGap}px ${SET_COL.hint}px ${SET_COL.drop}px ${SET_COL.done}px ${SET_COL.del}px`;
     const SET_PRESET_GRID = `${SET_COL.label}px ${SET_COL.num}px ${SET_COL.num}px ${SET_COL.num}px ${SET_COL.act}px`;
     /* Nutrition inputs: label stretches, the number box and the unit stay fixed so
        every row lines up even though "kcal", "g" and "mg" differ in width. */
@@ -8642,8 +8642,8 @@ try {
                         (workoutPresets || []).length > 0 && React.createElement("span", { className: "px-1.5 rounded-full text-[9px] font-extrabold", style: { background: hex(T.violet, .18), color: T.violet } }, workoutPresets.length),
                         React.createElement(ChevronRight, { size: 11, style: { color: T.muted } }))),
                 sorted.length === 0 ? React.createElement(Empty, { text: view === "history" ? "ยังไม่มีประวัติการเล่นก่อนหน้า" : "ยังไม่มีบันทึกวันนี้ — กดเริ่มบันทึกด้านบน" }) : visibleSorted.map(w => (React.createElement(Glass, { key: w.id, className: "p-3 flex items-center gap-3 active:scale-[.99]", onClick: () => setActiveId(w.id), style: { cursor: "pointer" } },
-                    React.createElement("div", { className: "w-11 text-center shrink-0", style: { position: "relative" } },
-                        w.startedAt && !w.endedAt && React.createElement("span", { "aria-label": "กำลังบันทึกอยู่", title: "กำลังบันทึกอยู่", style: { position: "absolute", top: -3, left: -3, width: 13, height: 13, borderRadius: "50%", border: `2px solid ${hex(T.green, .28)}`, borderTopColor: T.green, animation: "spin .9s linear infinite" } }),
+                    React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 13 } }, w.startedAt && !w.endedAt ? React.createElement("span", { "aria-label": "กำลังบันทึกอยู่", title: "กำลังบันทึกอยู่", style: { width: 13, height: 13, borderRadius: "50%", border: `2px solid ${hex(T.green, .28)}`, borderTopColor: T.green, animation: "spin .9s linear infinite" } }) : null),
+                    React.createElement("div", { className: "w-11 text-center shrink-0" },
                         React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_D[parseK(w.date).getDay()]),
                         React.createElement("div", { className: "text-base font-bold leading-none" }, parseK(w.date).getDate()),
                         React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, TH_M[parseK(w.date).getMonth()])),
@@ -8724,10 +8724,10 @@ try {
                         React.createElement("textarea", { value: ex.note || "", onChange: event => patchEx(ex.id, exercise => ({ ...exercise, note: event.target.value })), rows: 2, placeholder: "เพิ่มเทคนิค จังหวะ หรือสิ่งที่ต้องจำสำหรับท่านี้…", className: "w-full px-3 py-2 rounded-xl text-[11px] outline-none resize-none", style: { background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, lineHeight: 1.5 } })));
                     })(),
                     React.createElement("div", { className: "px-1.5 pb-1", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", justifyContent: "space-between", columnGap: `${SET_COL.gap}px`, border: "1px solid transparent", color: T.muted } },
-                        React.createElement("span", { className: "font-bold", style: { fontSize: 8 } }, "Set"),
+                        React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, "Set"),
                         React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, "Reps"),
                         React.createElement("span", null),
-                        React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 3 } },
+                        React.createElement("span", { style: { display: "flex", alignItems: "center", gap: SET_COL.unitGap } },
                             React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8, width: SET_COL.num } }, "Weight"),
                             React.createElement("span", { style: { width: SET_COL.unit, flexShrink: 0 } })),
                         React.createElement("span", { className: "font-bold", style: { fontSize: 8 } }, "Prev"),
@@ -8743,13 +8743,13 @@ try {
                         const removeDrop = (di) => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? withDrops(s, dropsOf(s).filter((_, k) => k !== di)) : s) }));
                         return (React.createElement(React.Fragment, { key: i },
                             React.createElement("div", { className: "px-1.5 py-1 rounded-lg", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", justifyContent: "space-between", columnGap: `${SET_COL.gap}px`, background: A ? hex(T.green, .14) : "transparent", border: `1px solid ${A ? hex(T.green, .6) : "transparent"}`, opacity: D ? 0.55 : 1 } },
-                            React.createElement("div", { className: "min-w-0 flex flex-col items-start" },
+                            React.createElement("div", { className: "min-w-0 flex flex-col items-center" },
                                 React.createElement("span", { className: "text-[10px] font-semibold", style: { color: A ? T.green : T.sub, textDecoration: D ? "line-through" : "none", whiteSpace: "nowrap" } },
                                     i + 1),
                                 (() => { const wNow = Number(st.weight) || 0; const hist = histMax[workoutExerciseKey(ex.name)] || 0; return hist > 0 && wNow > hist ? React.createElement("span", { className: "text-[8px] font-extrabold px-1 rounded mt-0.5", style: { whiteSpace: "nowrap", lineHeight: 1.3, color: T.gold, background: hex(T.gold, .16), border: `1px solid ${hex(T.gold, .45)}` } }, "PR!") : null; })()),
                             React.createElement(NumBox, { w: "100%", max: WORKOUT_REPS_MAX, value: st.reps, onChange: v => patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, reps: v === "" ? "" : Number(v) } : s) })) }),
                             React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, "\u00D7"),
-                            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "3px" } },
+                            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: `${SET_COL.unitGap}px` } },
                                 React.createElement(NumBox, { w: SET_COL.num, max: WORKOUT_WEIGHT_MAX, value: st.weight === "" ? "" : wDisplay(st.weight, ex.unit || "kg"), onChange: v => { const kgVal = v === "" ? "" : wToKg(v, ex.unit || "kg"); patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s, j) => j === i ? { ...s, weight: kgVal } : s) })); } }),
                                 React.createElement("button", { onClick: () => patchEx(ex.id, e => ({ ...e, unit: (e.unit || "kg") === "kg" ? "lbs" : "kg" })), "aria-label": "\u0E2A\u0E25\u0E31\u0E1A\u0E2B\u0E19\u0E48\u0E27\u0E22\u0E19\u0E49\u0E33\u0E2B\u0E19\u0E31\u0E01", className: "text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0", style: { color: T.blue, background: hex(T.blue, .14) } }, ex.unit || "kg")),
                             (!prev?.sets?.[i] ? React.createElement("span", { key: "hint-slot" }) : (() => {
@@ -8771,7 +8771,7 @@ try {
                                 React.createElement("span", { className: "text-[10px] font-bold truncate min-w-0", style: { color: "#4a6fa5" } }, `\u21B3 d${di + 1}`),
                                 React.createElement(NumBox, { max: WORKOUT_REPS_MAX, value: dp.reps, onChange: v => patchDrop(di, { reps: v === "" ? "" : Number(v) }), w: 50 }),
                                 React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, "\u00D7"),
-                                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "3px" } },
+                                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: `${SET_COL.unitGap}px` } },
                                     React.createElement(NumBox, { w: SET_COL.num, max: WORKOUT_WEIGHT_MAX, value: dp.weight === "" ? "" : wDisplay(dp.weight, ex.unit || "kg"), onChange: v => patchDrop(di, { weight: v === "" ? "" : wToKg(v, ex.unit || "kg") }) }),
                                     React.createElement("span", { className: "text-[10px] shrink-0", style: { color: T.muted } }, ex.unit || "kg")),
                                 React.createElement("span", null),
@@ -9759,8 +9759,15 @@ try {
                     "\u0E19\u0E49\u0E33\u0E2B\u0E19\u0E31\u0E01\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E15\u0E48\u0E2D\u0E04\u0E23\u0E31\u0E49\u0E07 \u00B7 \u0E17\u0E48\u0E32: ",
                     pick)))));
     }
-    function WorkoutPresetModal({ onClose, onSave, initial }) {
+    function WorkoutPresetModal({ onClose, onSave, initial, nameOptions = [] }) {
         const [name, setName] = useState(initial ? initial.name : "");
+        const [suggestFor, setSuggestFor] = useState(null);
+        const suggestionsFor = (query) => {
+            const key = workoutExerciseKey(query || "");
+            if (!key)
+                return [];
+            return nameOptions.filter(option => { const k = workoutExerciseKey(option); return k !== key && k.includes(key); }).slice(0, 6);
+        };
         const mkSet = (prev) => prev ? { ...prev } : { reps: 12, weight: "", rest: 90 };
         const [items, setItems] = useState(() => initial
             ? initial.items.map(it => ({ _dndId: uid(), name: it.name, note: it.note || "", unit: it.unit || "kg", libraryGroup: it.libraryGroup || exerciseLibraryGroupFor(it.name), muscle: it.muscle || PRESET_MUSCLE_GROUPS[0], ss: it.ss || null, sets: it.sets.map(st => ({ reps: st.reps, weight: st.weight, rest: (st.rest ?? it.rest ?? 90), ...(dropsOf(st).length ? { drops: dropsOf(st).map(d => ({ ...d })) } : {}) })) }))
@@ -9790,9 +9797,11 @@ try {
             React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D\u0E0A\u0E38\u0E14 (\u0E40\u0E0A\u0E48\u0E19 \u0E2D\u0E01, \u0E2B\u0E25\u0E31\u0E07+\u0E44\u0E1A\u0E40\u0E0B\u0E47\u0E1A)", value: name, onChange: setName, placeholder: "\u0E2D\u0E01" }),
             React.createElement("div", { className: "space-y-2 mb-3" },
                 items.map((x, i) => { const groupedPrev = !!(x.ss && i > 0 && items[i - 1].ss === x.ss); const groupedNext = !!(x.ss && i < items.length - 1 && items[i + 1].ss === x.ss); const inGroup = groupedPrev || groupedNext; return (React.createElement("div", { key: x._dndId, ...presetDnd.itemProps(i), className: "p-3 rounded-xl space-y-2", style: { ...presetDnd.itemStyle(i), background: presetDnd.activeIndex === i ? T.surf : T.surf2, border: `1px solid ${presetDnd.activeIndex === i ? T.blue : inGroup ? hex(T.violet, .45) : T.border}`, borderLeft: presetDnd.activeIndex === i ? undefined : inGroup ? `3px solid ${hex(T.violet, .7)}` : undefined } },
-                    React.createElement("div", { className: "flex items-center gap-2" },
+                    React.createElement("div", { className: "flex items-center gap-2", style: { position: "relative" } },
                         React.createElement("span", { className: "shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-extrabold", style: { background: hex(T.green, .16), color: T.green } }, i + 1),
-                        React.createElement("input", { value: x.name, onChange: e => patch(i, { name: e.target.value }), placeholder: `ท่าที่ ${i + 1} เช่น Bench Press`, className: "flex-1 px-2.5 py-2 rounded-lg text-sm outline-none min-w-0", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+                        React.createElement("input", { value: x.name, onChange: e => { patch(i, { name: e.target.value }); setSuggestFor(i); }, onFocus: () => setSuggestFor(i), onBlur: () => setTimeout(() => setSuggestFor(current => current === i ? null : current), 120), placeholder: `ท่าที่ ${i + 1} เช่น Bench Press`, className: "flex-1 px-2.5 py-2 rounded-lg text-sm outline-none min-w-0", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+                        suggestFor === i && suggestionsFor(x.name).length > 0 && React.createElement("div", { className: "rounded-xl overflow-hidden", style: { position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 10px 24px rgba(83,67,43,.14)", zIndex: 50 } }, suggestionsFor(x.name).map((option, oi) => React.createElement("button", { key: option, type: "button", onMouseDown: event => event.preventDefault(), onClick: () => { patch(i, { name: option, libraryGroup: exerciseLibraryGroupFor(option) }); setSuggestFor(null); }, className: "w-full px-3 py-2.5 flex items-center gap-2 text-left", style: { background: T.surf, borderTop: oi ? `1px solid ${T.border}` : "none" } },
+                            React.createElement("span", { className: "text-sm font-semibold truncate", style: { color: T.text } }, option)))),
                         i > 0 && React.createElement("button", { onClick: () => toggleGroup(i), "aria-label": groupedPrev ? "ถอดออกจากกลุ่ม" : "รวมกลุ่มกับท่าบน", title: groupedPrev ? "ถอดท่านี้ออกจากกลุ่ม Superset/Circuit" : "รวมท่านี้เข้ากลุ่มกับท่าบน (2 ท่า = Superset, 3+ = Circuit)", className: "w-7 h-7 rounded-lg flex items-center justify-center shrink-0", style: { color: groupedPrev ? T.violet : T.muted, background: groupedPrev ? hex(T.violet, .16) : "transparent" } },
                             React.createElement(Repeat, { size: 14 })),
                         React.createElement(GripVertical, { size: 18, style: { color: presetDnd.activeIndex === i || presetDnd.armedIndex === i ? T.blue : T.muted, flexShrink: 0 } }),
@@ -9839,6 +9848,30 @@ try {
         const { fitnessSplit, saveFitnessSplit, fitnessStartDay, setFitnessStartDay, fitnessConfirmed, confirmFitnessWeek, events, workouts, updateWorkouts, nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, offerUndo } = props;
         const [wpOpen, setWpOpen] = useState(false);
         const [focusMode, setFocusMode] = useState(false);
+        const presetNameOptions = useMemo(() => {
+            const seen = new globalThis.Map();
+            [...(workouts || [])]
+                .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+                .forEach(session => (session.exercises || []).forEach(item => {
+                    const clean = String(item.name || "").trim();
+                    const key = workoutExerciseKey(clean);
+                    if (clean && !seen.has(key))
+                        seen.set(key, clean);
+                }));
+            [...(exPresets || []), ...(workoutPresets || []).flatMap(preset => preset.items || [])].forEach(entry => {
+                const clean = String(entry?.name || "").trim();
+                const key = workoutExerciseKey(clean);
+                if (clean && !seen.has(key))
+                    seen.set(key, clean);
+            });
+            Object.keys(EXERCISE_LIBRARY).forEach(group => EXERCISE_LIBRARY[group].exercises.forEach(entry => {
+                const clean = String(entry[0] || "").trim();
+                const key = workoutExerciseKey(clean);
+                if (clean && !seen.has(key))
+                    seen.set(key, clean);
+            }));
+            return [...seen.values()];
+        }, [workouts, exPresets, workoutPresets]);
         const [reportOpen, setReportOpen] = useState(false);
         const startFromPreset = preset => {
             const exercises = (preset.items || []).map(item => {
@@ -10109,7 +10142,7 @@ try {
                     React.createElement("div", { className: "flex gap-2 mt-3" },
                         React.createElement("button", { onClick: () => { saveFitnessSplit(draft); setEditing(false); }, className: "flex-1 py-2.5 rounded-xl font-bold", style: { background: T.green, color: "#000" } }, "\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E15\u0E32\u0E23\u0E32\u0E07"),
                         React.createElement("button", { onClick: () => setEditing(false), className: "flex-1 py-2.5 rounded-xl font-bold", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, "\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01")))))),
-            (wpOpen || wpEdit) && React.createElement(WorkoutPresetModal, { initial: wpEdit, onClose: () => { setWpOpen(false); setWpEdit(null); }, onSave: (p) => { setWorkoutPresets(ps => ps.some(x => x.id === p.id) ? ps.map(x => x.id === p.id ? p : x) : [...ps, p]); setWpOpen(false); setWpEdit(null); } }),
+            (wpOpen || wpEdit) && React.createElement(WorkoutPresetModal, { nameOptions: presetNameOptions, initial: wpEdit, onClose: () => { setWpOpen(false); setWpEdit(null); }, onSave: (p) => { setWorkoutPresets(ps => ps.some(x => x.id === p.id) ? ps.map(x => x.id === p.id ? p : x) : [...ps, p]); setWpOpen(false); setWpEdit(null); } }),
             sub === "week" && React.createElement("div", { className: "text-[10px] text-center pb-2", style: { color: T.muted } }, "\u0E15\u0E32\u0E23\u0E32\u0E07\u0E19\u0E35\u0E49\u0E0B\u0E49\u0E33\u0E17\u0E38\u0E01\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C\u0E42\u0E14\u0E22\u0E44\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E25\u0E48\u0E27\u0E07\u0E2B\u0E19\u0E49\u0E32 \u2014 \u0E1E\u0E2D\u0E16\u0E36\u0E07\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C\u0E43\u0E2B\u0E21\u0E48\u0E21\u0E32\u0E01\u0E14\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E23\u0E49\u0E32\u0E07 event \u0E08\u0E23\u0E34\u0E07\u0E40\u0E02\u0E49\u0E32 Calendar")));
     }
     const Section = ({ title, icon: Icon, dot, action, children }) => (React.createElement("div", null,
