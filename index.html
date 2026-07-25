@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-polish-110";
+window.__TASKROUTINE_BUILD__="2026-07-26-event-remind-111";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -601,6 +601,10 @@ try {
     };
     const EN_D = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const EN_M_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    /* Minutes before an event starts. 0 means "right when it starts". */
+    const REMIND_CHOICES = [[0, "ตอนเริ่ม"], [5, "5 นาที"], [10, "10 นาที"], [15, "15 นาที"], [30, "30 นาที"], [60, "1 ชม."]];
+    const remindList = (event) => Array.isArray(event?.remind) ? [...new Set(event.remind.map(Number).filter(n => Number.isFinite(n) && n >= 0))].sort((a, b) => b - a) : [];
+    const remindLabel = (minutes) => (REMIND_CHOICES.find(choice => choice[0] === minutes) || [minutes, `${minutes} นาที`])[1];
     const EN_M = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const toMin = (t) => { if (!t)
         return 0; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
@@ -655,7 +659,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 10;
+    const SCHEMA_VERSION = 11;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1750,6 +1754,55 @@ try {
         }
         catch { } }, [tab]);
         useEffect(() => { setFabOpen(false); }, [tab]);
+        /* Fires event reminders while the app is open. iOS suspends JS once the app is
+           backgrounded and has no Notification Triggers API, so anything missed while
+           away is simply skipped — Phase 3 push will cover that case server-side. */
+        useEffect(() => {
+            const FIRED_KEY = "tr_fired_reminders";
+            const readFired = () => { try {
+                const raw = JSON.parse(localStorage.getItem(FIRED_KEY) || "{}");
+                return raw && typeof raw === "object" ? raw : {};
+            }
+            catch {
+                return {};
+            } };
+            const tick = () => {
+                if (localStorage.getItem("tr_notify_events") === "off")
+                    return;
+                if (!("Notification" in window) || Notification.permission !== "granted")
+                    return;
+                const today = dkey(new Date());
+                const now = new Date();
+                const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                const fired = readFired();
+                let changed = false;
+                Object.keys(fired).forEach(key => { if (!key.startsWith(`${today}|`)) {
+                    delete fired[key];
+                    changed = true;
+                } });
+                events.filter(e => e.date === today && e.status !== "done" && e.startTime).forEach(event => {
+                    const startMinutes = toMin(event.startTime);
+                    remindList(event).forEach(lead => {
+                        const dueAt = startMinutes - lead;
+                        if (nowMinutes < dueAt || nowMinutes > dueAt + 2)
+                            return;
+                        const key = `${today}|${event.id}|${lead}`;
+                        if (fired[key])
+                            return;
+                        fired[key] = 1;
+                        changed = true;
+                        showAppNotification(event.title || "Event", { body: lead === 0 ? `ถึงเวลาแล้ว · ${event.startTime}` : `เริ่มในอีก ${remindLabel(lead)} · ${event.startTime}`, tag: `event-${event.id}-${lead}` });
+                    });
+                });
+                if (changed) { try {
+                    localStorage.setItem(FIRED_KEY, JSON.stringify(fired));
+                }
+                catch { } }
+            };
+            tick();
+            const id = setInterval(tick, 30000);
+            return () => clearInterval(id);
+        }, [events]);
         useEffect(() => {
             let last = window.scrollY;
             const onScroll = () => {
@@ -3147,8 +3200,8 @@ try {
     }
     function EventModal({ onClose, onSave, onSaveSeries, mode = "add", eventKind = null, initial = null, defaultDate = null, events = [], txnCategories, setTxnCategories, onRenameCategory, onDeleteCategory, onDelete, onDeleteSeries }) {
         const [f, setF] = useState(initial
-            ? { title: initial.title || "", type: initial.type || "work", date: initial.date || defaultDate || TK, startTime: initial.startTime || "09:00", endTime: initial.endTime || "10:00", timeMode: initial.timeMode || (initial.durationHours ? "duration" : "end"), durationHours: initial.durationHours || hoursBetween(initial.startTime || "09:00", initial.endTime || "10:00") || 1, location: initial.location || "", note: initial.note || "", energyCost: initial.energyCost ?? 2, incomeEnabled: initial.incomeEnabled ?? ((Number(initial.income) || 0) > 0), income: initial.income || "", category: initial.category || (EVENT_TYPES[initial.type || "work"] || EVENT_TYPES.work).label, incomeSubtype: initial.incomeSubtype || "", customerName: initial.customerName || "", fitKind: initial.fitKind || "weight", fitParts: initial.fitParts || [], fitSport: initial.fitSport || "", fitRun: initial.fitRun || { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } }
-            : { title: "", type: "work", date: defaultDate || TK, startTime: "09:00", endTime: "10:00", timeMode: "duration", durationHours: 1, location: "", note: "", energyCost: 2, incomeEnabled: eventKind === "income", income: "", category: normalizeIncomeCategory((txnCategories?.income || EVENT_CATEGORY_DEFAULTS)[0] || EVENT_TYPES.work.label), incomeSubtype: "", customerName: "", fitKind: "weight", fitParts: [], fitSport: "", fitRun: { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } });
+            ? { remind: Array.isArray(initial.remind) ? initial.remind : [], title: initial.title || "", type: initial.type || "work", date: initial.date || defaultDate || TK, startTime: initial.startTime || "09:00", endTime: initial.endTime || "10:00", timeMode: initial.timeMode || (initial.durationHours ? "duration" : "end"), durationHours: initial.durationHours || hoursBetween(initial.startTime || "09:00", initial.endTime || "10:00") || 1, location: initial.location || "", note: initial.note || "", energyCost: initial.energyCost ?? 2, incomeEnabled: initial.incomeEnabled ?? ((Number(initial.income) || 0) > 0), income: initial.income || "", category: initial.category || (EVENT_TYPES[initial.type || "work"] || EVENT_TYPES.work).label, incomeSubtype: initial.incomeSubtype || "", customerName: initial.customerName || "", fitKind: initial.fitKind || "weight", fitParts: initial.fitParts || [], fitSport: initial.fitSport || "", fitRun: initial.fitRun || { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } }
+            : { remind: [0], title: "", type: "work", date: defaultDate || TK, startTime: "09:00", endTime: "10:00", timeMode: "duration", durationHours: 1, location: "", note: "", energyCost: 2, incomeEnabled: eventKind === "income", income: "", category: normalizeIncomeCategory((txnCategories?.income || EVENT_CATEGORY_DEFAULTS)[0] || EVENT_TYPES.work.label), incomeSubtype: "", customerName: "", fitKind: "weight", fitParts: [], fitSport: "", fitRun: { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } });
         const isEdit = mode === "edit";
         const [repeat, setRepeat] = useState(false);
         const [repeatFreq, setRepeatFreq] = useState("week");
@@ -3251,6 +3304,13 @@ try {
                             React.createElement(TxtBoxE, { value: f.fitRun.tTime, onChange: v => setRun("tTime", v), ph: "30:00" }),
                             React.createElement(TxtBoxE, { value: f.fitRun.aTime, onChange: v => setRun("aTime", v), ph: "30:00" })))))))),
             React.createElement(TimeRangePicker, { startTime: f.startTime, endTime: f.endTime, timeMode: f.timeMode, durationHours: f.durationHours, onChange: patch => setF({ ...f, ...patch }) }),
+            f.startTime && React.createElement("div", { className: "mb-3" },
+                React.createElement(Label, null, "แจ้งเตือนล่วงหน้า"),
+                React.createElement("div", { className: "flex flex-wrap", style: { gap: 6 } }, REMIND_CHOICES.map(([minutes, label]) => {
+                    const on = (f.remind || []).includes(minutes);
+                    return React.createElement("button", { key: minutes, type: "button", onClick: () => setF(current => ({ ...current, remind: on ? (current.remind || []).filter(m => m !== minutes) : [...(current.remind || []), minutes] })), className: "font-bold active:scale-95", style: { minHeight: 32, padding: "0 11px", borderRadius: 999, fontSize: 11, background: on ? T.purple : T.surf, color: on ? "#fff" : T.sub, border: `1px solid ${on ? T.purple : T.border}` } }, label);
+                })),
+                React.createElement("div", { style: { fontSize: 10, marginTop: 6, color: T.muted } }, (f.remind || []).length ? "เด้งเฉพาะตอนเปิดแอปอยู่ (ยังไม่มี push server)" : "ไม่แจ้งเตือน")),
             React.createElement(Input, { label: "\u0E2A\u0E16\u0E32\u0E19\u0E17\u0E35\u0E48 (optional)", value: f.location, onChange: v => setF({ ...f, location: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E15\u0E39\u0E14\u0E34\u0E42\u0E2D" }),
             React.createElement(Input, { label: "หมายเหตุ (ไม่บังคับ)", value: f.note, onChange: v => setF({ ...f, note: v }), placeholder: "เช่น รับเงินสดแล้ว / ลูกค้าขอเลื่อน" }),
             f.incomeEnabled && React.createElement(React.Fragment, null,
@@ -3284,6 +3344,11 @@ try {
             (() => {
                 const buildBase = () => {
                     const base = { ...f, incomeEnabled: !!f.incomeEnabled, income: f.incomeEnabled ? (Number(f.income) || 0) : 0, customerName: "", incomeSubtype: "" };
+                    const remind = f.startTime ? remindList(f) : [];
+                    if (remind.length)
+                        base.remind = remind;
+                    else
+                        delete base.remind;
                     if (base.type !== "fitness") {
                         delete base.fitKind;
                         delete base.fitParts;
@@ -3463,6 +3528,10 @@ try {
         catch (error) { return "unsupported"; } });
         const [restNotifyOn, setRestNotifyOn] = useState(() => { try {
             return localStorage.getItem("tr_notify_rest") !== "off";
+        }
+        catch (error) { return true; } });
+        const [eventNotifyOn, setEventNotifyOn] = useState(() => { try {
+            return localStorage.getItem("tr_notify_events") !== "off";
         }
         catch (error) { return true; } });
         const [countStyleSel, setCountStyleSel] = useState(() => { try {
@@ -3731,6 +3800,15 @@ try {
                         React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, notifyPerm === "granted" ? "\u0e2d\u0e19\u0e38\u0e0d\u0e32\u0e15\u0e41\u0e25\u0e49\u0e27 \u00b7 \u0e21\u0e35\u0e40\u0e2a\u0e35\u0e22\u0e07\u0e41\u0e25\u0e30\u0e2a\u0e31\u0e48\u0e19\u0e15\u0e2d\u0e19\u0e2b\u0e21\u0e14\u0e40\u0e27\u0e25\u0e32" : notifyPerm === "denied" ? "\u0e16\u0e39\u0e01\u0e1b\u0e34\u0e14 \u00b7 \u0e40\u0e1b\u0e34\u0e14\u0e43\u0e2b\u0e21\u0e48\u0e17\u0e35\u0e48\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32\u0e02\u0e2d\u0e07\u0e40\u0e04\u0e23\u0e37\u0e48\u0e2d\u0e07" : "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e2d\u0e19\u0e38\u0e0d\u0e32\u0e15")),
                     React.createElement("button", { type: "button", onClick: () => { try { localStorage.setItem("tr_notify_rest", restNotifyOn ? "off" : "on"); } catch (error) { } setRestNotifyOn(!restNotifyOn); }, className: "w-11 h-6 rounded-full shrink-0 relative", style: { background: restNotifyOn ? T.green : T.surf2, border: `1px solid ${restNotifyOn ? T.green : T.border}` } },
                         React.createElement("span", { style: { position: "absolute", top: 2, left: restNotifyOn ? 22 : 2, width: 18, height: 18, borderRadius: 999, background: "#fff", transition: "left .16s", boxShadow: "0 1px 3px rgba(0,0,0,.25)" } }))),
+                React.createElement("div", { className: "flex items-center gap-3 mb-2" },
+                    React.createElement("div", { className: "flex-1 min-w-0" },
+                        React.createElement("div", { className: "font-extrabold text-sm" }, "แจ้งเตือน Event"),
+                        React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "ตามเวลาที่ตั้งไว้ในแต่ละ Event · ทำงานเฉพาะตอนเปิดแอป")),
+                    React.createElement("button", { type: "button", onClick: () => { try {
+                        localStorage.setItem("tr_notify_events", eventNotifyOn ? "off" : "on");
+                    }
+                    catch (error) { } setEventNotifyOn(!eventNotifyOn); }, className: "w-11 h-6 rounded-full shrink-0 relative", style: { background: eventNotifyOn ? T.green : T.surf2, border: `1px solid ${eventNotifyOn ? T.green : T.border}` } },
+                        React.createElement("span", { style: { position: "absolute", top: 2, left: eventNotifyOn ? 22 : 2, width: 18, height: 18, borderRadius: 9, background: "#fff", transition: "left .16s ease" } }))),
                 notifyPerm !== "granted" && React.createElement("button", { type: "button", onClick: async () => { try {
                         const result = await Notification.requestPermission();
                         setNotifyPerm(result);
