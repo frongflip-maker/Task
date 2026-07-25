@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-preset-auto-108";
+window.__TASKROUTINE_BUILD__="2026-07-26-notif-bell-109";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2746,7 +2746,7 @@ try {
             workouts, updateWorkouts: setWorkouts,
             nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, taxTypeMap, setTaxTypeMap,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
-            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless };
+            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
         if (!authUser) {
             const waiting = cloudState === "checking";
@@ -2807,6 +2807,7 @@ try {
     function Today(props) {
         const { sel, setSel, events, todayEvents, addEvent, editEvent, shiftEventSeries, exportEventICS } = props;
         const d = parseK(sel);
+        const [notifOpen, setNotifOpen] = useState(false);
         const [editEv, setEditEv] = useState(null);
         const [showOverdue, setShowOverdue] = useState(false);
         const [rescheduleEv, setRescheduleEv] = useState(null);
@@ -2821,7 +2822,47 @@ try {
         const quickMove = (event, targetDate) => { if (event.bookingId)
             props.openStudioBooking(event.bookingId); else if (event.seriesId)
             setRescheduleEv({ event, targetDate }); else editEvent(event.id, { date: targetDate }); };
+        const notifications = (() => {
+            const list = [];
+            const nowMinutes = new Date(nowTick).getHours() * 60 + new Date(nowTick).getMinutes();
+            const soonIds = new Set();
+            if (sel === TK)
+                todayEvents.filter(e => e.status !== "done" && e.startTime).forEach(e => {
+                    const startsIn = toMin(e.startTime) - nowMinutes;
+                    if (startsIn >= 0 && startsIn <= 60) {
+                        soonIds.add(e.id);
+                        list.push({ id: `soon-${e.id}`, kind: "soon", icon: Clock, title: e.title || "Event", detail: startsIn === 0 ? "ถึงเวลาแล้ว" : `เริ่มในอีก ${startsIn} นาที`, act: () => { setNotifOpen(false); setEditEv(e); } });
+                    }
+                });
+            const running = (props.workouts || []).find(w => w.startedAt && !w.endedAt);
+            if (running)
+                list.push({ id: `run-${running.id}`, kind: "run", icon: Dumbbell, title: running.title || "เวิร์คเอาต์", detail: "กำลังบันทึกอยู่ · ยังไม่กดจบ", act: () => { setNotifOpen(false); props.goTab("fitness"); } });
+            todayEvents.filter(e => e.status !== "done" && !soonIds.has(e.id)).forEach(e => {
+                list.push({ id: `todo-${e.id}`, kind: "todo", icon: CalendarDays, title: e.title || "Event", detail: e.startTime ? `${e.startTime}${e.endTime ? `–${e.endTime}` : ""} · ยังไม่ติ๊กเสร็จ` : "ยังไม่ติ๊กเสร็จ", act: () => { setNotifOpen(false); setEditEv(e); } });
+            });
+            (props.incomeSources || []).forEach(source => {
+                const remaining = incomeSourceRemainingAmount(source, props.payments || []);
+                if (remaining > 0 && String(source.dueDate || "") < TK)
+                    list.push({ id: `due-${source.id}`, kind: "due", icon: Wallet, title: source.title || "งานค้างรับ", detail: `ค้าง ${fmtBaht(remaining)} · ครบกำหนด ${shortDate(source.dueDate)}`, act: () => { setNotifOpen(false); props.goTab("budget"); } });
+            });
+            if (["pending", "error", "conflict"].includes(props.cloudState))
+                list.push({ id: "sync", kind: "sync", icon: Cloud, title: props.cloudState === "error" ? "ซิงก์ไม่สำเร็จ" : props.cloudState === "conflict" ? "ข้อมูลชนกัน" : "ยังไม่ได้ซิงก์", detail: "แตะเพื่อไปหน้าตั้งค่า", act: () => { setNotifOpen(false); props.goTab("settings"); } });
+            return list;
+        })();
+        const NOTIF_TONE = { soon: T.orange, run: T.violet, todo: T.blue, due: T.green, sync: T.red };
         return (React.createElement("div", { className: "px-4 pb-8", style: { paddingTop: "calc(68px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "18px" } },
+            React.createElement("div", { className: "flex items-center justify-end" },
+                React.createElement("button", { onClick: () => setNotifOpen(true), "aria-label": `การแจ้งเตือน ${notifications.length} รายการ`, className: "flex items-center justify-center active:scale-90", style: { position: "relative", width: 38, height: 38, borderRadius: 999, background: T.surf, border: `1px solid ${T.border}` } },
+                    React.createElement(Bell, { size: 18, style: { color: notifications.length ? T.purple : T.muted } }),
+                    notifications.length > 0 && React.createElement("span", { className: "font-extrabold flex items-center justify-center", style: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, fontSize: 10, background: T.red, color: "#fff", border: `2px solid ${T.bg}` } }, notifications.length > 99 ? "99+" : notifications.length))),
+            notifOpen && React.createElement(Sheet, { title: "การแจ้งเตือน", onClose: () => setNotifOpen(false) }, notifications.length === 0
+                ? React.createElement("div", { className: "text-center text-sm", style: { padding: "24px 0", color: T.muted } }, "ไม่มีอะไรค้าง 🎉")
+                : React.createElement("div", { className: "space-y-2" }, notifications.map(item => React.createElement("button", { key: item.id, onClick: item.act, className: "w-full flex items-center gap-3 p-3 rounded-2xl text-left active:scale-[.99]", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                    React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 32, height: 32, borderRadius: 10, background: hex(NOTIF_TONE[item.kind] || T.sub, .14), color: NOTIF_TONE[item.kind] || T.sub } }, React.createElement(item.icon, { size: 16 })),
+                    React.createElement("span", { className: "flex-1 min-w-0" },
+                        React.createElement("span", { className: "text-sm font-extrabold truncate", style: { display: "block" } }, item.title),
+                        React.createElement("span", { className: "text-[11px] truncate", style: { display: "block", color: T.muted } }, item.detail)),
+                    React.createElement(ChevronRight, { size: 15, style: { color: T.muted, flexShrink: 0 } }))))),
             (() => {
                 const totI = todayEvents.length;
                 const doneI = todayEvents.filter(e => e.status === "done").length;
