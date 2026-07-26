@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-split-reimburse-135";
+window.__TASKROUTINE_BUILD__="2026-07-27-budget-compact-137";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -6038,6 +6038,41 @@ try {
               fmtBaht(amountNumber),
             ),
           ),
+          (() => {
+            /* Line-by-line breakdown so the split and the reimbursable part can be
+               checked against the receipt before saving. */
+            const lines = [];
+            if (f.splitExpense && (f.splits || []).length)
+              (f.splits || []).forEach(split => lines.push({
+                label: split.title?.trim() || "(ไม่มีชื่อ)",
+                sub: [split.category, split.reimbursable ? "จ่ายแทนคนอื่น" : ""].filter(Boolean).join(" · "),
+                amount: Number(split.amount) || 0,
+                muted: !!split.reimbursable,
+              }));
+            else if (f.kind === "in" && linkedIncomeSource && normalizedLinkedAllocations.length)
+              normalizedLinkedAllocations.forEach(allocation => lines.push({
+                label: allocation.role === "tip" ? "Tips" : allocation.role === "pass_through" ? `ส่งต่อ ${allocation.recipientName || "ผู้อื่น"}` : allocation.category || "ยอดหลัก",
+                sub: allocation.role === "pass_through" ? "เงินของผู้อื่น" : "",
+                amount: Number(allocation.amount) || 0,
+                muted: allocation.role === "pass_through",
+              }));
+            if (lines.length < 1)
+              return null;
+            const listed = lines.reduce((sum, line) => sum + line.amount, 0);
+            const mine = lines.reduce((sum, line) => sum + (line.muted ? 0 : line.amount), 0);
+            return React.createElement("div", { className: "mt-2.5", style: { paddingTop: 8, borderTop: `1px solid ${hex(txnColor, 0.3)}` } },
+              lines.map((line, index) => React.createElement("div", { key: index, className: "flex items-baseline gap-2", style: { padding: "3px 0", opacity: line.muted ? 0.6 : 1 } },
+                React.createElement("span", { className: "flex-1 min-w-0" },
+                  React.createElement("span", { className: "text-[11px] font-bold truncate", style: { display: "block" } }, line.label),
+                  line.sub && React.createElement("span", { style: { display: "block", fontSize: 9, color: T.muted } }, line.sub)),
+                React.createElement("span", { className: "text-[11px] font-extrabold tabular-nums shrink-0", style: { color: line.muted ? T.muted : T.text, textDecoration: line.muted ? "line-through" : "none" } }, fmtBaht(line.amount)))),
+              React.createElement("div", { className: "flex items-baseline justify-between mt-1.5", style: { paddingTop: 6, borderTop: `1px dashed ${hex(txnColor, 0.28)}` } },
+                React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.sub } }, mine === listed ? "รวมรายการย่อย" : "รวมที่เป็นของเรา"),
+                React.createElement("span", { className: "text-xs font-extrabold tabular-nums", style: { color: listed === amountNumber || mine === amountNumber ? txnColor : T.red } }, fmtBaht(mine))),
+              mine !== listed && React.createElement("div", { className: "flex items-baseline justify-between", style: { paddingTop: 2 } },
+                React.createElement("span", { style: { fontSize: 9, color: T.muted } }, "รอรับคืน / เงินผู้อื่น"),
+                React.createElement("span", { className: "font-extrabold tabular-nums", style: { fontSize: 11, color: T.orange } }, fmtBaht(listed - mine))));
+          })(),
           !splitValid &&
             React.createElement(
               "div",
@@ -8377,20 +8412,24 @@ try {
                     sub === "summary" && React.createElement("div", { className: "mt-3 rounded-xl overflow-hidden", style: { order: 3, background: T.surf2, border: `1px solid ${T.border}` } },
                         React.createElement("button", { onClick: () => setShowCategoryTargets(value => !value), className: "w-full p-3.5 flex items-center gap-2.5 text-left" },
                             React.createElement(BarChart3, { size: 18, style: { color: T.blue } }),
-                            React.createElement("div", { className: "flex-1 min-w-0 flex items-baseline gap-2 flex-wrap" }, React.createElement("div", { className: "text-sm font-extrabold" }, "งบรายจ่ายตามหมวด"), React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, `${monthLabel(targetMonth)} · ใช้แล้ว ${fmtBaht(expenseCategoryRows.reduce((sum, row) => sum + row.spent, 0))}`)),
+                            React.createElement("div", { className: "flex-1 min-w-0 flex items-baseline gap-2 flex-wrap" }, React.createElement("div", { className: "text-sm font-extrabold" }, "งบรายจ่ายตามหมวด"), React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, `${monthLabel(targetMonth)} · ใช้แล้ว ${fmtBaht(expenseCategoryRows.reduce((sum, row) => sum + row.spent, 0))} / เป้า ${fmtBaht(expenseCategoryRows.reduce((sum, row) => sum + row.target, 0))}`)),
                             React.createElement(ChevronDown, { size: 16, style: { color: T.muted, transform: showCategoryTargets ? "rotate(180deg)" : "none", transition: "transform .2s" } })),
-                        showCategoryTargets && React.createElement("div", { className: "px-3 pb-3 space-y-2.5", style: { borderTop: `1px solid ${T.border}` } },
+                        showCategoryTargets && React.createElement("div", { className: "px-3 pb-3", style: { borderTop: `1px solid ${T.border}` } },
                             React.createElement("div", { className: "text-[11px] pt-2.5 leading-relaxed", style: { color: T.muted } }, "Target เป็นงบต่อเดือน · ยอดใช้จริงรวมรายการจ่ายและรายการย่อยตามหมวด"),
-                            expenseCategoryRows.length === 0 ? React.createElement(Empty, { text: "ยังไม่มีหมวดรายจ่าย — เพิ่มหมวดตอนบันทึกรายจ่าย" }) : expenseCategoryRows.map(row => {
+                            expenseCategoryRows.length === 0 ? React.createElement(Empty, { text: "ยังไม่มีหมวดรายจ่าย — เพิ่มหมวดตอนบันทึกรายจ่าย" }) : expenseCategoryRows.map((row, index) => {
                                 const percent = row.target > 0 ? Math.round((row.spent / row.target) * 100) : 0;
                                 const color = row.target <= 0 ? T.muted : percent > 100 ? T.red : percent >= 80 ? T.gold : T.green;
-                                return React.createElement("div", { key: row.category, className: "p-3 rounded-xl", style: { background: T.surf, border: `1px solid ${row.target > 0 ? hex(color, .42) : T.border}` } },
-                                    React.createElement("div", { className: "flex items-center gap-2 mb-2" }, React.createElement("span", { className: "flex-1 text-sm font-extrabold truncate" }, row.category), React.createElement("span", { className: "text-xs font-extrabold", style: { color } }, row.target > 0 ? `${percent}%` : "ยังไม่ตั้งเป้า")),
-                                    React.createElement("div", { className: "h-2 rounded-full overflow-hidden mb-2.5", style: { background: T.border } }, React.createElement("div", { style: { height: "100%", width: `${row.target > 0 ? Math.min(100, percent) : 0}%`, background: color, transition: "width .25s ease" } })),
-                                    React.createElement("div", { className: "flex items-center gap-3" },
-                                        React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, "ใช้แล้ว"), React.createElement("div", { className: "text-lg font-extrabold", style: { lineHeight: 1.25, color: row.spent > 0 ? T.red : T.muted } }, fmtBaht(row.spent))),
-                                        React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, React.createElement("span", { className: "text-[11px] font-bold", style: { color: T.sub } }, "Target ฿"), React.createElement("input", { type: "number", min: "0", value: row.target || "", onChange: event => { const value = Math.max(0, Number(event.target.value) || 0); setExpenseTargets(targets => ({ ...targets, [row.category]: value })); }, placeholder: "0", className: "px-2.5 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 112, background: T.surf2, color: T.text, border: `1px solid ${T.border}` } }))),
-                                    row.target > 0 && React.createElement("div", { className: "text-[11px] font-semibold mt-2", style: { color } }, row.spent > row.target ? `เกิน Target ${fmtBaht(row.spent - row.target)}` : `เหลือใช้ได้ ${fmtBaht(row.target - row.spent)}`));
+                                return React.createElement("div", { key: row.category, style: { padding: "9px 2px", borderTop: index ? `1px solid ${T.border}` : "none" } },
+                                    React.createElement("div", { className: "flex items-center gap-2" },
+                                        React.createElement("span", { className: "flex-1 min-w-0 text-[13px] font-extrabold truncate" }, row.category),
+                                        React.createElement("span", { className: "text-[13px] font-extrabold tabular-nums shrink-0" }, fmtBaht(row.spent)),
+                                        React.createElement("span", { className: "text-[11px] shrink-0", style: { color: T.muted } }, "/"),
+                                        React.createElement("input", { type: "number", min: "0", value: row.target || "", onChange: event => { const value = Math.max(0, Number(event.target.value) || 0); setExpenseTargets(targets => ({ ...targets, [row.category]: value })); }, placeholder: "เป้า", className: "shrink-0 px-2 py-1 rounded-lg text-[13px] font-extrabold text-right outline-none tabular-nums", style: { width: 74, background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+                                        React.createElement("span", { className: "text-[11px] font-extrabold shrink-0 text-right tabular-nums", style: { width: 38, color } }, row.target > 0 ? `${percent}%` : "—")),
+                                    React.createElement("div", { className: "flex items-center gap-2", style: { marginTop: 5 } },
+                                        React.createElement("div", { className: "flex-1 rounded-full overflow-hidden", style: { height: 4, background: T.border } },
+                                            React.createElement("div", { style: { height: "100%", width: `${row.target > 0 ? Math.min(100, percent) : 0}%`, background: color, transition: "width .25s" } })),
+                                        React.createElement("span", { className: "text-[10px] font-semibold shrink-0", style: { color: row.target > 0 ? color : T.muted } }, row.target <= 0 ? "ยังไม่ตั้งเป้า" : row.spent > row.target ? `เกิน ${fmtBaht(row.spent - row.target)}` : `เหลือ ${fmtBaht(row.target - row.spent)}`)));
                             }))),
                     sub === "summary" && React.createElement("div", { className: "mt-1.5 rounded-xl overflow-hidden", style: { order: 4, background: T.surf2, border: `1px solid ${T.border}` } },
                         React.createElement("button", { onClick: () => setShowIncomeBreakdown(value => !value), className: "w-full p-3.5 flex items-center gap-2.5 text-left" },
