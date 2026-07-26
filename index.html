@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-goals-116";
+window.__TASKROUTINE_BUILD__="2026-07-26-tasklib-manage-119";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -571,6 +571,211 @@ try {
         other: { label: "Other", Icon: Circle, color: T.gray },
     };
     const EVENT_CATEGORY_DEFAULTS = Object.values(EVENT_TYPES).map(x => x.label);
+    /* ── Task Library ────────────────────────────────────────────────────────────
+       Seed catalogue lives in code (never written to the synced snapshot, so it
+       costs nothing per save). Anything the user adds or hides is kept separately
+       in `taskLibraryEdits` and merged by resolveTaskLibrary().
+       Task tuple: [id, title, desc, freq, difficulty]                            */
+    const TASK_FREQ = {
+        daily: { label: "ทุกวัน", repeat: { freq: "day", count: 7 } },
+        x3: { label: "3 วัน/สัปดาห์", repeat: { freq: "days", days: [1, 3, 5], count: 4 } },
+        weekly: { label: "ทุกสัปดาห์", repeat: { freq: "week", count: 4 } },
+        monthly: { label: "ทุกเดือน", repeat: { freq: "month", count: 3 } }
+    };
+    const TASK_DIFF = { easy: "ง่าย", med: "ปานกลาง", hard: "ยาก" };
+    const TASK_LIBRARY = [
+        { id: "mind", label: "สมาธิและจิตใจ", icon: Sparkles, color: T.cyan, type: "recovery", subs: [
+            { id: "calm", label: "สมาธิ", tasks: [
+                ["meditate", "นั่งสมาธิ", "นั่งเงียบ ๆ โฟกัสที่ลมหายใจ", "daily", "easy"],
+                ["box", "หายใจแบบ Box Breathing", "เข้า-กลั้น-ออก-กลั้น อย่างละ 4 วินาที", "daily", "easy"],
+                ["478", "หายใจแบบ 4-7-8", "เข้า 4 กลั้น 7 ออก 8 ช่วยให้ใจสงบเร็ว", "daily", "easy"],
+                ["mindful", "ฝึก Mindfulness", "รับรู้สิ่งที่กำลังทำโดยไม่ตัดสิน", "daily", "med"],
+                ["present", "อยู่กับปัจจุบัน 5 นาที", "หยุดทุกอย่าง แล้วรับรู้รอบตัว 5 นาที", "daily", "easy"]
+            ]},
+            { id: "stress", label: "ลดความเครียด", tasks: [
+                ["vent", "เขียนระบายความรู้สึก", "เขียนสิ่งที่อึดอัดออกมาโดยไม่ต้องเรียบเรียง", "weekly", "easy"],
+                ["journal", "เขียน Journal", "บันทึกสิ่งที่เกิดขึ้นและสิ่งที่คิดในวันนี้", "daily", "easy"],
+                ["nature", "ฟังเสียงธรรมชาติ", "ฟังเสียงฝนหรือคลื่นเพื่อผ่อนคลาย", "daily", "easy"],
+                ["walk", "เดินเงียบ ๆ", "เดินโดยไม่ฟังอะไร ปล่อยให้ความคิดไหล", "x3", "easy"],
+                ["nophone", "งดมือถือหลังตื่น", "ไม่แตะมือถือ 30 นาทีแรกของวัน", "daily", "med"],
+                ["eyes", "พักสายตา", "มองไกล 20 วินาทีทุก 20 นาที", "daily", "easy"]
+            ]},
+            { id: "focus", label: "สมาธิในการทำงาน", tasks: [
+                ["deep", "Deep Work", "ทำงานยาก ๆ ต่อเนื่องโดยไม่ถูกขัดจังหวะ", "x3", "hard"],
+                ["pomodoro", "Pomodoro", "ทำ 25 นาที พัก 5 นาที วนไป", "daily", "easy"],
+                ["notif", "ปิด Notification", "ปิดแจ้งเตือนทั้งหมดระหว่างโฟกัส", "daily", "easy"],
+                ["single", "Single Task", "ทำทีละอย่างจนจบ ไม่สลับไปมา", "daily", "med"],
+                ["mit", "เคลียร์งานสำคัญก่อน", "จัดการงานที่สำคัญที่สุดเป็นอย่างแรกของวัน", "daily", "med"]
+            ]}
+        ]},
+        { id: "learn", label: "การเรียนรู้", icon: FileText, color: T.blue, type: "personal", subs: [
+            { id: "read", label: "อ่าน", tasks: [
+                ["book", "อ่านหนังสือ", "อ่านหนังสืออย่างน้อยวันละไม่กี่หน้า", "daily", "easy"],
+                ["article", "อ่านบทความ", "อ่านบทความในเรื่องที่สนใจ", "x3", "easy"],
+                ["news", "อ่านข่าว", "ตามข่าวที่เกี่ยวกับงานหรือชีวิต", "daily", "easy"],
+                ["paper", "อ่านงานวิจัย", "อ่านเปเปอร์หรือรายงานเชิงลึก", "weekly", "hard"]
+            ]},
+            { id: "skill", label: "ทักษะใหม่", tasks: [
+                ["course", "เรียนออนไลน์", "เรียนคอร์สที่ลงไว้ให้คืบหน้า", "x3", "med"],
+                ["english", "ฝึกภาษาอังกฤษ", "ฝึกฟัง พูด อ่าน หรือเขียน", "daily", "med"],
+                ["code", "ฝึก Coding", "เขียนโค้ดหรือแก้โจทย์", "x3", "med"],
+                ["ai", "ศึกษา AI", "ตามเครื่องมือและแนวคิดใหม่ ๆ", "weekly", "med"],
+                ["biz", "ศึกษาธุรกิจ", "เรียนรู้เรื่องธุรกิจและการตลาด", "weekly", "med"],
+                ["invest", "ศึกษาการลงทุน", "เรียนรู้เรื่องการลงทุนและสินทรัพย์", "weekly", "med"]
+            ]},
+            { id: "review", label: "ทบทวน", tasks: [
+                ["summary", "สรุปสิ่งที่เรียน", "เขียนสรุปด้วยคำพูดตัวเอง", "weekly", "med"],
+                ["flash", "ทำ Flashcards", "ทำการ์ดคำถาม-คำตอบไว้ทบทวน", "weekly", "easy"],
+                ["revise", "ทบทวนบทเรียน", "อ่านทวนสิ่งที่เรียนไปแล้ว", "x3", "easy"],
+                ["exercise", "ทำแบบฝึกหัด", "ลงมือทำโจทย์เพื่อวัดความเข้าใจ", "x3", "med"],
+                ["note", "จดโน้ต", "จดสิ่งที่ได้เรียนรู้ระหว่างวัน", "daily", "easy"]
+            ]}
+        ]},
+        { id: "prod", label: "การทำงาน", icon: Briefcase, color: T.slate, type: "admin", subs: [
+            { id: "manage", label: "จัดการงาน", tasks: [
+                ["todo", "เคลียร์ To-do", "ปิดงานค้างในลิสต์ให้หมด", "daily", "med"],
+                ["plantoday", "วางแผนวันนี้", "ลิสต์งานที่จะทำก่อนเริ่มวัน", "daily", "easy"],
+                ["plantmr", "วางแผนพรุ่งนี้", "เขียนแผนของพรุ่งนี้ก่อนเลิกงาน", "daily", "easy"],
+                ["priority", "จัดลำดับความสำคัญ", "เรียงงานตามผลกระทบ ไม่ใช่ความเร่งด่วน", "daily", "med"],
+                ["one", "ทำงานให้เสร็จ 1 งาน", "ปิดงานให้จบสมบูรณ์อย่างน้อยหนึ่งชิ้น", "daily", "med"]
+            ]},
+            { id: "eff", label: "เพิ่มประสิทธิภาพ", tasks: [
+                ["inbox", "Inbox Zero", "เคลียร์กล่องข้อความให้ว่าง", "weekly", "med"],
+                ["email", "เคลียร์อีเมล", "ตอบและจัดเก็บอีเมลค้าง", "x3", "easy"],
+                ["files", "จัดไฟล์", "จัดระเบียบไฟล์และโฟลเดอร์", "weekly", "easy"],
+                ["reviewwork", "Review งาน", "ทบทวนงานที่ทำไปว่าดีขึ้นได้ตรงไหน", "weekly", "med"]
+            ]},
+            { id: "project", label: "โปรเจกต์", tasks: [
+                ["side", "ทำ Side Project", "ดันโปรเจกต์ส่วนตัวให้คืบ", "x3", "med"],
+                ["portfolio", "พัฒนา Portfolio", "อัปเดตผลงานให้เป็นปัจจุบัน", "monthly", "med"],
+                ["doc", "เขียนเอกสาร", "บันทึกวิธีทำงานหรือคู่มือ", "weekly", "med"],
+                ["resume", "อัปเดต Resume", "เพิ่มผลงานและทักษะใหม่", "monthly", "easy"],
+                ["app", "พัฒนาแอป", "เขียนหรือปรับปรุงแอปของตัวเอง", "x3", "hard"]
+            ]}
+        ]},
+        { id: "money", label: "การเงิน", icon: Wallet, color: T.green, type: "admin", subs: [
+            { id: "save", label: "การออม", tasks: [
+                ["saving", "ออมเงิน", "กันเงินส่วนหนึ่งไว้ก่อนใช้", "monthly", "med"],
+                ["transfer", "โอนเข้าบัญชีออม", "โอนตามจำนวนที่ตั้งไว้", "monthly", "easy"],
+                ["balance", "ตรวจยอดเงิน", "ดูยอดคงเหลือทุกบัญชี", "weekly", "easy"],
+                ["budget", "ตั้งงบประมาณ", "กำหนดงบใช้จ่ายของเดือน", "monthly", "med"]
+            ]},
+            { id: "invest", label: "การลงทุน", tasks: [
+                ["dca", "ลงทุนตามแผน DCA", "ซื้อตามแผนสม่ำเสมอ ไม่จับจังหวะ", "monthly", "easy"],
+                ["stock", "วิเคราะห์หุ้น", "ดูพื้นฐานและราคาของตัวที่สนใจ", "weekly", "hard"],
+                ["fin", "อ่านงบการเงิน", "อ่านงบของบริษัทที่ถืออยู่", "monthly", "hard"],
+                ["econ", "อ่านข่าวเศรษฐกิจ", "ตามภาพรวมตลาดและดอกเบี้ย", "weekly", "med"],
+                ["port", "ทบทวน Portfolio", "ดูสัดส่วนและปรับให้เข้าแผน", "monthly", "med"]
+            ]},
+            { id: "manage", label: "บริหารการเงิน", tasks: [
+                ["record", "บันทึกรายรับรายจ่าย", "ลงทุกรายการของวันให้ครบ", "daily", "easy"],
+                ["statement", "ตรวจ Statement", "กระทบยอดกับบัญชีจริง", "monthly", "med"],
+                ["bill", "ตรวจบิล", "เช็กบิลและกำหนดชำระ", "monthly", "easy"],
+                ["planspend", "วางแผนการใช้เงิน", "วางแผนรายจ่ายก้อนใหญ่ล่วงหน้า", "monthly", "med"]
+            ]}
+        ]},
+        { id: "growth", label: "เติบโตส่วนตัว", icon: TrendingUp, color: T.violet, type: "personal", subs: [
+            { id: "self", label: "พัฒนาตัวเอง", tasks: [
+                ["goal", "เขียนเป้าหมาย", "เขียนเป้าหมายให้ชัดและวัดผลได้", "monthly", "med"],
+                ["goalreview", "ทบทวนเป้าหมาย", "เช็กว่าคืบหน้าตามแผนไหม", "weekly", "med"],
+                ["comfort", "ออกจาก Comfort Zone", "ทำสิ่งที่ไม่คุ้นเคยสักอย่าง", "weekly", "hard"],
+                ["discipline", "ฝึกวินัย", "ทำสิ่งที่ตั้งใจไว้แม้ไม่อยากทำ", "daily", "hard"],
+                ["habit", "สร้างนิสัยใหม่", "ทำนิสัยที่กำลังสร้างให้ต่อเนื่อง", "daily", "med"]
+            ]},
+            { id: "mindset", label: "Mindset", tasks: [
+                ["gratitude", "เขียน Gratitude", "เขียนสิ่งที่รู้สึกขอบคุณ 3 อย่าง", "daily", "easy"],
+                ["podcast", "ฟัง Podcast", "ฟังรายการที่ให้มุมมองใหม่", "x3", "easy"],
+                ["inspire", "อ่านบทความสร้างแรงบันดาลใจ", "อ่านเรื่องที่จุดไฟให้ตัวเอง", "weekly", "easy"],
+                ["reflect", "Reflection", "ทบทวนว่าวันนี้ได้เรียนรู้อะไร", "daily", "med"],
+                ["mistake", "ทบทวนข้อผิดพลาด", "ดูว่าพลาดตรงไหนและจะแก้ยังไง", "weekly", "med"]
+            ]}
+        ]},
+        { id: "digital", label: "Digital Wellbeing", icon: Zap, color: T.orange, type: "recovery", subs: [
+            { id: "limit", label: "จำกัดหน้าจอ", tasks: [
+                ["social", "จำกัด Social Media", "ตั้งเวลาเล่นและหยุดตามนั้น", "daily", "hard"],
+                ["youtube", "จำกัด YouTube", "ดูเท่าที่ตั้งใจ ไม่ไหลไปเรื่อย", "daily", "med"],
+                ["shorts", "จำกัดคลิปสั้น", "เลี่ยงฟีดคลิปสั้นที่ดูดเวลา", "daily", "hard"]
+            ]},
+            { id: "detox", label: "Digital Detox", tasks: [
+                ["notif", "ปิด Notification", "ปิดแจ้งเตือนที่ไม่จำเป็นทิ้ง", "weekly", "easy"],
+                ["offline", "Offline 1 ชั่วโมง", "วางมือถือหนึ่งชั่วโมงเต็ม", "daily", "med"],
+                ["noscreen", "No Screen Time", "เว้นช่วงที่ไม่แตะจอเลย", "x3", "hard"]
+            ]}
+        ]},
+        { id: "create", label: "ความคิดสร้างสรรค์", icon: Video, color: T.pink, type: "content", subs: [
+            { id: "make", label: "งานสร้างสรรค์", tasks: [
+                ["draw", "วาดรูป", "วาดอะไรก็ได้ ไม่ต้องสวย", "x3", "easy"],
+                ["write", "เขียนบทความ", "เขียนสิ่งที่คิดออกมาเป็นเรื่อง", "weekly", "med"],
+                ["story", "แต่งเรื่อง", "ลองเขียนเรื่องสั้นหรือพล็อต", "weekly", "med"],
+                ["photo", "ถ่ายภาพ", "ออกไปถ่ายภาพที่ชอบ", "weekly", "easy"],
+                ["edit", "ตัดต่อวิดีโอ", "ตัดต่อคลิปที่ถ่ายไว้", "weekly", "med"]
+            ]},
+            { id: "music", label: "ดนตรี", tasks: [
+                ["practice", "ฝึกเครื่องดนตรี", "ซ้อมตามที่วางไว้", "daily", "med"],
+                ["compose", "แต่งเพลง", "แต่งท่อนใหม่หรือพัฒนาไอเดียเดิม", "x3", "hard"],
+                ["technique", "ฝึกเทคนิคใหม่", "ฝึกเทคนิคที่ยังไม่คล่อง", "x3", "hard"],
+                ["listen", "ฟังเพลงเพื่อเรียนรู้", "ฟังแบบแกะโครงสร้างและซาวด์", "weekly", "easy"]
+            ]}
+        ]},
+        { id: "life", label: "ไลฟ์สไตล์", icon: Sunrise, color: T.gold, type: "personal", subs: [
+            { id: "quality", label: "คุณภาพชีวิต", tasks: [
+                ["sun", "ออกไปรับแดด", "รับแดดตอนเช้าสัก 10 นาที", "daily", "easy"],
+                ["stroll", "เดินเล่น", "ออกไปเดินเปลี่ยนบรรยากาศ", "x3", "easy"],
+                ["air", "เปิดหน้าต่างรับอากาศ", "ระบายอากาศในห้อง", "daily", "easy"],
+                ["tea", "ดื่มชาอย่างมีสติ", "ดื่มช้า ๆ โดยไม่ทำอย่างอื่นไปด้วย", "daily", "easy"],
+                ["restnoscreen", "พักโดยไม่ใช้หน้าจอ", "พักจริง ๆ ไม่ใช่เปลี่ยนไปดูจออื่น", "daily", "med"]
+            ]},
+            { id: "hobby", label: "งานอดิเรก", tasks: [
+                ["plant", "ดูแลต้นไม้", "รดน้ำและเช็กสภาพต้นไม้", "x3", "easy"],
+                ["cook", "ทำอาหาร", "ทำกับข้าวกินเองสักมื้อ", "x3", "med"],
+                ["boardgame", "เล่นบอร์ดเกม", "เล่นกับคนอื่นเพื่อผ่อนคลาย", "weekly", "easy"],
+                ["model", "ต่อโมเดล", "ทำงานอดิเรกที่ใช้มือ", "weekly", "easy"]
+            ]}
+        ]},
+        { id: "sleep", label: "การนอน", icon: Moon, color: T.purple, type: "recovery", subs: [
+            { id: "routine", label: "Sleep Routine", tasks: [
+                ["bedtime", "เข้านอนตรงเวลา", "เข้านอนเวลาเดิมทุกคืน", "daily", "hard"],
+                ["waketime", "ตื่นตรงเวลา", "ตื่นเวลาเดิมแม้เป็นวันหยุด", "daily", "hard"],
+                ["caffeine", "งดคาเฟอีนช่วงเย็น", "ไม่ดื่มกาแฟหลังบ่าย", "daily", "med"],
+                ["nophonebed", "งดมือถือก่อนนอน", "วางมือถือ 30 นาทีก่อนนอน", "daily", "hard"],
+                ["readbed", "อ่านหนังสือก่อนนอน", "อ่านเบา ๆ ให้ง่วงตามธรรมชาติ", "daily", "easy"],
+                ["relaxmusic", "ฟังเพลงผ่อนคลาย", "ฟังเพลงช้า ๆ ก่อนเข้านอน", "daily", "easy"]
+            ]}
+        ]}
+    ];
+    /* Merges the seed catalogue with the user's own additions/removals. Every
+       consumer reads through this so there is a single source of truth. */
+    const resolveTaskLibrary = (edits, includeHidden = false) => {
+        const hidden = new Set((edits && edits.hidden) || []);
+        const custom = (edits && edits.custom) || [];
+        const out = [];
+        const push = (cat, sub, task, isCustom) => {
+            const id = task.id || `${cat.id}.${sub.id}.${task.tid}`;
+            const isHidden = hidden.has(id);
+            if (isHidden && !includeHidden)
+                return;
+            out.push({
+                hidden: isHidden,
+                id, catId: cat.id, catLabel: cat.label, icon: cat.icon, color: cat.color,
+                subId: sub.id, subLabel: sub.label,
+                title: task.title, desc: task.desc || "",
+                freq: task.freq || "weekly", diff: task.diff || "easy",
+                type: task.type || cat.type || "personal",
+                tags: [cat.label, sub.label, ...(task.tags || [])],
+                custom: !!isCustom
+            });
+        };
+        TASK_LIBRARY.forEach(cat => cat.subs.forEach(sub => sub.tasks.forEach(([tid, title, desc, freq, diff]) =>
+            push(cat, sub, { tid, title, desc, freq, diff }, false))));
+        custom.forEach(task => {
+            const cat = TASK_LIBRARY.find(c => c.id === task.catId) || ((edits && edits.customCats) || []).find(c => c.id === task.catId) || { id: task.catId || "custom", label: task.catLabel || "ของฉัน", icon: Target, color: T.purple, type: "personal" };
+            const sub = (cat.subs || []).find(sc => sc.id === task.subId) || { id: task.subId || "custom", label: task.subLabel || "ของฉัน" };
+            push(cat, sub, task, true);
+        });
+        return out;
+    };
+    const taskSearchIndex = (task) => `${task.title} ${task.desc} ${task.tags.join(" ")}`.toLowerCase();
+
     const CORE_INCOME_CATEGORIES = ["Work", "Studio", "Event", "Tips"];
     const TAX_TYPES = [
         ["unset", "ยังไม่ระบุ", "#8A8073"],
@@ -659,7 +864,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 12;
+    const SCHEMA_VERSION = 13;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -809,6 +1014,7 @@ try {
             s.financeQualityVersion = 1;
             s.financeQualityAt = new Date().toISOString();
         }
+        s.taskLibraryEdits ?? (s.taskLibraryEdits = { hidden: [], custom: [], customCats: [] });
         s.workouts ?? (s.workouts = []);
         if (sourceVersion < 10) {
             const liftSets = (sets) => (sets || []).map(set => {
@@ -1121,8 +1327,8 @@ try {
     const APP_TABS = ["today", "calendar", "studio", "budget", "fitness", "settings"];
     const EVENT_ADD_MENU = [["income", "Income Event", Briefcase], ["no-income", "No-Income Event", CalendarDays], ["booking", "Studio Booking", Music]];
     const ADD_MENUS = {
-        today: EVENT_ADD_MENU,
-        calendar: EVENT_ADD_MENU,
+        today: [...EVENT_ADD_MENU, ["task-library", "เลือกจากคลังงาน", Target]],
+        calendar: [...EVENT_ADD_MENU, ["task-library", "เลือกจากคลังงาน", Target]],
         budget: [["txn-in", "เพิ่มรายรับ", TrendingUp], ["txn-out", "เพิ่มรายจ่าย", TrendingDown], ["txn-transfer", "โอนย้าย", Repeat]],
         fitness: [["fit-session", "เริ่มบันทึกเวิร์คเอาต์", Dumbbell], ["fit-preset-pick", "เลือกจาก Preset", LayersIcon], ["food-add", "เพิ่มอาหาร", Utensils], ["food-manage", "จัดการรายการอาหาร", Cookie], ["fit-preset-new", "สร้าง Preset ชุดท่า", Plus]]
     };
@@ -1270,6 +1476,7 @@ try {
         const [transactions, setTransactions] = useState([]);
         const [capital, setCapital] = useState(0);
         const [workouts, setWorkouts] = useState([]);
+        const [taskLibraryEdits, setTaskLibraryEdits] = useState({ hidden: [], custom: [], customCats: [] });
         const [nutrition, setNutrition] = useState({});
         const [nutriTargets, setNutriTargets] = useState({ cal: 2200, protein: 140, carb: 220, fat: 70, sugar: 40, sodium: 2000, chol: 300 });
         const [foodLibrary, setFoodLibrary] = useState([]);
@@ -1321,6 +1528,7 @@ try {
         const [dataMsg, setDataMsg] = useState("");
         const [fabOpen, setFabOpen] = useState(false);
         const [addSheet, setAddSheet] = useState(null);
+        const [libraryPick, setLibraryPick] = useState(null);
         const [navCompact, setNavCompact] = useState(false);
         const [pressedAdd, setPressedAdd] = useState(null);
         const [chromeless, setChromeless] = useState(false);
@@ -1365,7 +1573,7 @@ try {
                 return changed ? next : imports;
             });
         };
-        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
+        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
         const reportLocalSaveError = (label, error) => {
             const message = `${label}: ${error?.message || "พื้นที่จัดเก็บอาจเต็มหรือ Safari ปฏิเสธการบันทึก"}`;
             setLocalSaveError(message);
@@ -1580,6 +1788,8 @@ try {
                 setCapital(s.capital);
             if (s.workouts)
                 setWorkouts(s.workouts);
+            if (s.taskLibraryEdits)
+                setTaskLibraryEdits(s.taskLibraryEdits);
             if (s.nutrition)
                 setNutrition(s.nutrition);
             if (s.nutriTargets)
@@ -1906,7 +2116,7 @@ try {
                 setLocalSaveError(current => current.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ") ? "" : current);
                 localErrorShown.current = false;
             }
-        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             if (!loaded || !authUser || !sb)
                 return;
@@ -2027,7 +2237,7 @@ try {
             cloudTimer.current = setTimeout(() => cloudSyncFn.current?.(), 2500);
             return () => { if (cloudTimer.current)
                 clearTimeout(cloudTimer.current); };
-        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             const flush = () => { if (cloudDirty.current) cloudSyncFn.current?.(); };
             const pull = () => { cloudPullFn.current?.(); };
@@ -2900,6 +3110,8 @@ try {
                                 React.createElement(Plus, { size: 24 }))))),
                 addSheet === "booking" && React.createElement(BookingModal, { bookings: bookings, events: events, defaultDate: sel, onClose: () => setAddSheet(null), onSave: booking => { if (addBooking(booking) !== false)
                         setAddSheet(null); } }),
+                addSheet === "task-library" && React.createElement(TaskLibrarySheet, { edits: taskLibraryEdits, onClose: () => setAddSheet(null), onEdits: setTaskLibraryEdits, onPick: task => { setAddSheet(null); setLibraryPick(task); } }),
+                libraryPick && React.createElement(EventModal, { events: events, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, mode: "add", defaultDate: sel, initial: taskToEventDraft(libraryPick, sel), onClose: () => setLibraryPick(null), onSave: evs => { evs.forEach(addEvent); setLibraryPick(null); }, onSaveSeries: evs => { evs.forEach(addEvent); setLibraryPick(null); } }),
                 ["income", "no-income"].includes(addSheet) && React.createElement(EventModal, { events: events, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, mode: "add", eventKind: addSheet, defaultDate: sel, onClose: () => setAddSheet(null), onSave: evs => { evs.forEach(addEvent); setAddSheet(null); } }),
                 React.createElement("nav", { className: "fixed bottom-0 left-0 right-0 flex justify-center z-30", style: { paddingBottom: "env(safe-area-inset-bottom)" } },
                     React.createElement("div", { className: "app-shell", style: { padding: navCompact ? "6px 22px 10px" : "8px 22px 12px", background: `linear-gradient(to top, ${T.bg}, ${hex(T.bg, .85)} 70%, transparent)`, transition: "padding .18s ease" } },
@@ -2941,12 +3153,141 @@ try {
         return list;
     };
     const ALERT_ICONS = { soon: Clock, run: Dumbbell, todo: CalendarDays, due: Wallet, sync: Cloud };
+    /* A library task becomes an ordinary Event — no special kind, so Timeline,
+       the bell, reports and .ics all keep working untouched. */
+    const taskToEventDraft = (task, date) => ({
+        title: task.title, note: task.desc, type: task.type, category: "",
+        date, isGoal: true, startTime: "", endTime: "", timeMode: "duration", durationHours: 1,
+        location: "", incomeEnabled: false, income: 0, remind: [],
+        libFreq: task.freq, libId: task.id
+    });
+    function TaskLibrarySheet({ edits, onClose, onPick, onEdits }) {
+        const [query, setQuery] = useState("");
+        const [openCat, setOpenCat] = useState(null);
+        const [manage, setManage] = useState(false);
+        const [draft, setDraft] = useState(null);
+        const [catDraft, setCatDraft] = useState("");
+        const safe = edits || { hidden: [], custom: [], customCats: [] };
+        const write = (patch) => onEdits({ hidden: [], custom: [], customCats: [], ...safe, ...patch });
+        const toggleHide = (task) => write({ hidden: task.hidden ? (safe.hidden || []).filter(id => id !== task.id) : [...(safe.hidden || []), task.id] });
+        const removeCustom = (task) => write({ custom: (safe.custom || []).filter(t => t.id !== task.id) });
+        const removeCat = (catId) => write({ customCats: (safe.customCats || []).filter(c => c.id !== catId), custom: (safe.custom || []).filter(t => t.catId !== catId) });
+        const all = useMemo(() => resolveTaskLibrary(edits, manage), [edits, manage]);
+        const q = query.trim().toLowerCase();
+        const matches = q ? all.filter(task => taskSearchIndex(task).includes(q)) : [];
+        const cats = useMemo(() => {
+            const map = new globalThis.Map();
+            all.forEach(task => {
+                if (!map.has(task.catId))
+                    map.set(task.catId, { id: task.catId, label: task.catLabel, icon: task.icon, color: task.color, subs: new globalThis.Map() });
+                const cat = map.get(task.catId);
+                if (!cat.subs.has(task.subId))
+                    cat.subs.set(task.subId, { id: task.subId, label: task.subLabel, tasks: [] });
+                cat.subs.get(task.subId).tasks.push(task);
+            });
+            ((safe.customCats) || []).forEach(cat => {
+                if (!map.has(cat.id))
+                    map.set(cat.id, { id: cat.id, label: cat.label, icon: Target, color: T.purple, type: "personal", subs: new globalThis.Map(), custom: true });
+                else
+                    map.get(cat.id).custom = true;
+            });
+            return [...map.values()];
+        }, [all, safe.customCats]);
+        const row = (task) => React.createElement("div", { key: task.id, className: "w-full flex items-center gap-2.5", style: { padding: "9px 2px", opacity: task.hidden ? .45 : 1 } },
+            React.createElement("span", { className: "shrink-0", style: { width: 7, height: 7, borderRadius: 999, background: task.color } }),
+            React.createElement("button", { onClick: () => manage ? null : onPick(task), disabled: manage, className: "flex-1 min-w-0 text-left" },
+                React.createElement("span", { className: "text-sm font-bold truncate", style: { display: "block", textDecoration: task.hidden ? "line-through" : "none" } }, task.title),
+                React.createElement("span", { className: "text-[10px] truncate", style: { display: "block", color: T.muted } }, task.desc)),
+            !manage && React.createElement("span", { className: "shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: T.surf2, color: T.sub } }, (TASK_FREQ[task.freq] || {}).label || ""),
+            manage && React.createElement("button", { onClick: () => task.custom ? removeCustom(task) : toggleHide(task), "aria-label": task.custom ? "ลบงานนี้" : (task.hidden ? "คืนค่า" : "ซ่อนงานนี้"), className: "shrink-0 flex items-center justify-center active:scale-90", style: { width: 30, height: 30, borderRadius: 9, background: T.surf2, color: task.custom ? T.red : T.sub } },
+                React.createElement(task.custom ? X : (task.hidden ? RotateCcw : Minus), { size: 14 })));
+        const fieldStyle = { background: T.surf, color: T.text, border: `1px solid ${T.border}` };
+        const catOptions = cats.map(c => [c.id, c.label]);
+        const saveDraft = () => {
+            const title = String(draft.title || "").trim();
+            if (!title)
+                return;
+            const cat = cats.find(c => c.id === draft.catId) || cats[0];
+            const subId = draft.subId || [...(cat.subs || new globalThis.Map()).keys()][0] || "custom";
+            write({ custom: [...(safe.custom || []), { id: `u.${uid()}`, catId: cat.id, catLabel: cat.label, subId, subLabel: (cat.subs.get(subId) || {}).label || "ของฉัน", title, desc: String(draft.desc || "").trim(), freq: draft.freq || "weekly", diff: draft.diff || "easy" }] });
+            setDraft(null);
+        };
+        const saveCat = () => {
+            const label = catDraft.trim();
+            if (!label)
+                return;
+            write({ customCats: [...(safe.customCats || []), { id: `c.${uid()}`, label, type: "personal", subs: [] }] });
+            setCatDraft("");
+        };
+        return React.createElement(Sheet, { title: "คลังงาน", onClose },
+            React.createElement("div", { className: "flex items-center gap-2 mb-3" },
+                React.createElement("input", { value: query, onChange: e => setQuery(e.target.value), placeholder: "ค้นหางาน เช่น สมาธิ, อ่าน, ออม", className: "flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm outline-none", style: fieldStyle }),
+                React.createElement("button", { onClick: () => { setManage(!manage); setDraft(null); setCatDraft(""); }, className: "shrink-0 px-3 rounded-xl text-xs font-bold active:scale-95", style: { minHeight: 42, background: manage ? T.purple : T.surf2, color: manage ? "#fff" : T.sub, border: `1px solid ${manage ? T.purple : T.border}` } }, manage ? "เสร็จ" : "จัดการ")),
+            manage && React.createElement("div", { className: "mb-3", style: { display: "flex", flexDirection: "column", gap: 8 } },
+                draft
+                    ? React.createElement("div", { className: "p-3 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 6 } },
+                        React.createElement("input", { value: draft.title, onChange: e => setDraft({ ...draft, title: e.target.value }), placeholder: "ชื่องาน", className: "w-full px-3 py-2 rounded-xl text-sm outline-none", style: fieldStyle }),
+                        React.createElement("input", { value: draft.desc, onChange: e => setDraft({ ...draft, desc: e.target.value }), placeholder: "คำอธิบายสั้น ๆ", className: "w-full px-3 py-2 rounded-xl text-sm outline-none", style: fieldStyle }),
+                        React.createElement("select", { value: draft.catId, onChange: e => setDraft({ ...draft, catId: e.target.value, subId: "" }), className: "w-full px-3 rounded-xl text-sm outline-none", style: { ...fieldStyle, minHeight: 40, colorScheme: "light" } }, catOptions.map(([id, label]) => React.createElement("option", { key: id, value: id }, label))),
+                        React.createElement("select", { value: draft.freq, onChange: e => setDraft({ ...draft, freq: e.target.value }), className: "w-full px-3 rounded-xl text-sm outline-none", style: { ...fieldStyle, minHeight: 40, colorScheme: "light" } }, Object.keys(TASK_FREQ).map(k => React.createElement("option", { key: k, value: k }, TASK_FREQ[k].label))),
+                        React.createElement("div", { className: "flex gap-2" },
+                            React.createElement("button", { onClick: () => setDraft(null), className: "flex-1 py-2.5 rounded-xl text-sm font-bold", style: { background: T.surf, color: T.sub, border: `1px solid ${T.border}` } }, "ยกเลิก"),
+                            React.createElement("button", { onClick: saveDraft, disabled: !String(draft.title || "").trim(), className: "flex-1 py-2.5 rounded-xl text-sm font-bold", style: { background: T.green, color: "#16200f", opacity: String(draft.title || "").trim() ? 1 : .4 } }, "เพิ่มงาน")))
+                    : React.createElement("button", { onClick: () => setDraft({ title: "", desc: "", catId: (cats[0] || {}).id, subId: "", freq: "weekly", diff: "easy" }), className: "w-full py-2.5 rounded-xl text-xs font-bold active:scale-95", style: { background: T.surf2, color: T.sub, border: `1px dashed ${T.border}` } }, "+ เพิ่มงานใหม่"),
+                React.createElement("div", { className: "flex gap-2" },
+                    React.createElement("input", { value: catDraft, onChange: e => setCatDraft(e.target.value), placeholder: "ชื่อหมวดใหม่", className: "flex-1 min-w-0 px-3 py-2 rounded-xl text-sm outline-none", style: fieldStyle }),
+                    React.createElement("button", { onClick: saveCat, disabled: !catDraft.trim(), className: "shrink-0 px-3 rounded-xl text-xs font-bold", style: { minHeight: 40, background: T.surf2, color: T.sub, border: `1px solid ${T.border}`, opacity: catDraft.trim() ? 1 : .4 } }, "+ หมวด"))),
+            q
+                ? (matches.length
+                    ? React.createElement("div", null, React.createElement("div", { className: "text-[10px] font-bold mb-1", style: { color: T.muted } }, `พบ ${matches.length} รายการ`), matches.slice(0, 40).map(row))
+                    : React.createElement("div", { className: "text-center text-sm", style: { padding: "24px 0", color: T.muted } }, "ไม่พบงานที่ค้นหา"))
+                : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, cats.map(cat => {
+                    const open = openCat === cat.id;
+                    const count = [...cat.subs.values()].reduce((n, sub) => n + sub.tasks.length, 0);
+                    return React.createElement("div", { key: cat.id, className: "rounded-2xl overflow-hidden", style: { border: `1px solid ${T.border}` } },
+                        React.createElement("button", { onClick: () => setOpenCat(open ? null : cat.id), className: "w-full flex items-center gap-2.5 px-3", style: { minHeight: 52, background: T.surf2 } },
+                            React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 30, height: 30, borderRadius: 9, background: hex(cat.color, .15), color: cat.color } }, React.createElement(cat.icon, { size: 15 })),
+                            React.createElement("span", { className: "flex-1 min-w-0 text-left" },
+                                React.createElement("span", { className: "text-sm font-extrabold truncate", style: { display: "block" } }, cat.label),
+                                React.createElement("span", { className: "text-[10px]", style: { display: "block", color: T.muted } }, `${count} งาน`)),
+                            manage && cat.custom && React.createElement("span", { onClick: event => { event.stopPropagation(); removeCat(cat.id); }, "aria-label": "ลบหมวดนี้", className: "shrink-0 flex items-center justify-center", style: { width: 28, height: 28, borderRadius: 8, background: T.surf, color: T.red } }, React.createElement(X, { size: 13 })),
+                            React.createElement(ChevronDown, { size: 15, style: { color: T.muted, transform: open ? "rotate(180deg)" : "none", transition: "transform .18s" } })),
+                        open && React.createElement("div", { className: "px-3 pb-2", style: { background: T.surf } }, cat.subs.size === 0
+                            ? React.createElement("div", { className: "text-[11px] text-center", style: { padding: "14px 0", color: T.muted } }, "ยังไม่มีงานในหมวดนี้ — กด “+ เพิ่มงานใหม่”")
+                            : [...cat.subs.values()].map(sub => React.createElement("div", { key: sub.id },
+                            React.createElement("div", { className: "text-[10px] font-bold", style: { color: T.muted, padding: "8px 2px 2px" } }, sub.label),
+                            sub.tasks.map(row)))));
+                })));
+    }
     function Today(props) {
         const { sel, setSel, events, todayEvents, addEvent, editEvent, shiftEventSeries, exportEventICS } = props;
         const d = parseK(sel);
         const [notifOpen, setNotifOpen] = useState(false);
+        const [wrapOpen, setWrapOpen] = useState(false);
         const goalEvents = todayEvents.filter(e => e.isGoal);
         const timedEvents = todayEvents.filter(e => !e.isGoal);
+        /* End-of-day report. Everything here is derived from data the app already
+           holds — nothing is stored, so it always reflects the current state. */
+        const dayReport = (() => {
+            const doneOf = list => list.filter(e => e.status === "done");
+            const linkedSources = (props.incomeSources || []).filter(source => source.sourceType === "event" && todayEvents.some(e => e.id === source.sourceId));
+            const expected = linkedSources.reduce((sum, source) => sum + (Number(source.expectedAmount) || 0), 0);
+            const unpaid = linkedSources.reduce((sum, source) => sum + incomeSourceRemainingAmount(source, props.payments || []), 0);
+            const cashIn = (props.transactions || []).filter(t => t.date === sel && t.kind === "in" && t.moneyType === "work_income").reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+            const session = (props.workouts || []).find(w => w.date === sel);
+            const sets = session ? (session.exercises || []).reduce((n, ex) => n + (ex.sets || []).length, 0) : 0;
+            const nutri = effNutri((props.nutrition || {})[sel]);
+            const calTarget = Number((props.nutriTargets || {}).cal) || 0;
+            return {
+                tasksDone: doneOf(timedEvents).length, tasksTotal: timedEvents.length,
+                goalsDone: doneOf(goalEvents).length, goalsTotal: goalEvents.length,
+                left: [...timedEvents, ...goalEvents].filter(e => e.status !== "done"),
+                expected, unpaid, cashIn,
+                sets, sessionTitle: session ? (session.title || "เวิร์คเอาต์") : "",
+                sessionOpen: !!(session && session.startedAt && !session.endedAt),
+                cal: Number(nutri.cal) || 0, calTarget
+            };
+        })();
         const [editEv, setEditEv] = useState(null);
         const [showOverdue, setShowOverdue] = useState(false);
         const [rescheduleEv, setRescheduleEv] = useState(null);
@@ -3104,6 +3445,34 @@ try {
                                     React.createElement("button", { onClick: () => e.bookingId ? props.openStudioBooking(e.bookingId) : setEditEv(e), "aria-label": e.bookingId ? "แก้ไขที่ Studio" : "แก้ไข event", className: "w-8 h-8 rounded-lg flex items-center justify-center active:scale-90", style: { background: T.surf2, color: e.bookingId ? T.purple : T.sub, border: `1px solid ${T.border}` } },
                                         React.createElement(Pencil, { size: 13 })))))));
                 }))),
+            React.createElement("button", { onClick: () => setWrapOpen(true), className: "w-full font-extrabold flex items-center justify-center gap-2 active:scale-[.98]", style: { minHeight: 48, borderRadius: 14, background: T.surf, color: T.text, border: `1px solid ${T.border}`, boxShadow: "0 6px 18px rgba(83,67,43,.06)" } },
+                React.createElement(Moon, { size: 16, style: { color: T.purple } }),
+                "จบวัน · ดูสรุป"),
+            wrapOpen && React.createElement(Sheet, { title: `สรุปวันที่ ${shortDate(sel)}`, onClose: () => setWrapOpen(false) }, (() => {
+                const r = dayReport;
+                const pct = (done, total) => total ? Math.round(done / total * 100) : 100;
+                const statCard = (label, value, sub, tone) => React.createElement("div", { key: label, className: "p-3 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                    React.createElement("div", { className: "text-[10px] font-bold", style: { color: T.muted } }, label),
+                    React.createElement("div", { className: "font-extrabold", style: { fontSize: 19, marginTop: 2, color: tone || T.text } }, value),
+                    sub && React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, sub));
+                return React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" },
+                        statCard("งานตามเวลา", `${r.tasksDone}/${r.tasksTotal}`, `${pct(r.tasksDone, r.tasksTotal)}%`, r.tasksTotal && r.tasksDone === r.tasksTotal ? T.green : T.text),
+                        statCard("เป้าหมายวันนี้", `${r.goalsDone}/${r.goalsTotal}`, r.goalsTotal ? (r.goalsDone === r.goalsTotal ? "ครบตามเป้า 🎉" : `ขาดอีก ${r.goalsTotal - r.goalsDone} อย่าง`) : "ไม่ได้ตั้งเป้า", r.goalsTotal && r.goalsDone === r.goalsTotal ? T.green : r.goalsTotal ? T.orange : T.muted)),
+                    React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" },
+                        statCard("รับเงินเข้าวันนี้", fmtBaht(r.cashIn), "ที่บันทึกจริง", T.green),
+                        statCard("ค่าตัวยังไม่ได้", fmtBaht(r.unpaid), r.expected ? `จากงานวันนี้ ${fmtBaht(r.expected)}` : "ไม่มีงานมีค่าตัว", r.unpaid > 0 ? T.red : T.muted)),
+                    React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" },
+                        statCard("ฟิตเนส", r.sets ? `${r.sets} เซ็ต` : "ยังไม่ได้เล่น", r.sessionOpen ? "ยังไม่กดจบ" : r.sessionTitle, r.sets ? T.violet : T.muted),
+                        statCard("แคลอรี", r.cal ? `${Math.round(r.cal)}` : "ยังไม่บันทึก", r.calTarget ? `เป้า ${r.calTarget}` : "", r.cal ? T.gold : T.muted)),
+                    r.left.length > 0 && React.createElement("div", null,
+                        React.createElement("div", { className: "text-xs font-extrabold mb-2" }, `ยังไม่เสร็จ ${r.left.length} รายการ`),
+                        React.createElement("div", null, r.left.map(e => React.createElement("div", { key: e.id, className: "flex items-center gap-2", style: { padding: "8px 2px" } },
+                            React.createElement("span", { className: "shrink-0", style: { width: 6, height: 6, borderRadius: 999, background: e.isGoal ? T.gold : EVENT_TYPES[e.type]?.color || T.sub } }),
+                            React.createElement("span", { className: "flex-1 min-w-0 text-sm truncate" }, e.title || "(ไม่มีชื่อ)"),
+                            React.createElement("span", { className: "shrink-0 text-[10px]", style: { color: T.muted } }, e.isGoal ? "เป้าหมาย" : (e.startTime || "—")))))),
+                    r.left.length === 0 && React.createElement("div", { className: "text-center text-sm", style: { padding: "18px 0", color: T.green } }, "เคลียร์ครบทุกอย่างแล้ว 🎉"));
+            })()),
             rescheduleEv && React.createElement(RescheduleModal, { item: rescheduleEv.event, initialDate: rescheduleEv.targetDate, events, onClose: () => setRescheduleEv(null), onSaveOne: targetDate => { editEvent(rescheduleEv.event.id, { date: targetDate }); setRescheduleEv(null); }, onSaveSeries: rescheduleEv.event.seriesId ? targetDate => { shiftEventSeries(rescheduleEv.event, targetDate); setRescheduleEv(null); } : null }),
             editEv && React.createElement(EventModal, { events: events, txnCategories: props.txnCategories, setTxnCategories: props.setTxnCategories, onRenameCategory: props.renameTxnCategory, onDeleteCategory: props.deleteTxnCategory, mode: "edit", initial: editEv, onClose: () => setEditEv(null), onSave: (patch) => { editEvent(editEv.id, patch); setEditEv(null); }, onSaveSeries: editEv.seriesId ? (patch) => { props.editEventSeries(editEv, patch); setEditEv(null); } : null, onDelete: () => { if (props.delEvent(editEv.id) !== false) setEditEv(null); }, onDeleteSeries: editEv.seriesId ? () => { if (props.delEventSeries(editEv) !== false) setEditEv(null); } : null })));
     }
@@ -3279,10 +3648,13 @@ try {
             ? { isGoal: !!initial.isGoal, remind: Array.isArray(initial.remind) ? initial.remind : [], title: initial.title || "", type: initial.type || "work", date: initial.date || defaultDate || TK, startTime: initial.startTime || "09:00", endTime: initial.endTime || "10:00", timeMode: initial.timeMode || (initial.durationHours ? "duration" : "end"), durationHours: initial.durationHours || hoursBetween(initial.startTime || "09:00", initial.endTime || "10:00") || 1, location: initial.location || "", note: initial.note || "", energyCost: initial.energyCost ?? 2, incomeEnabled: initial.incomeEnabled ?? ((Number(initial.income) || 0) > 0), income: initial.income || "", category: initial.category || (EVENT_TYPES[initial.type || "work"] || EVENT_TYPES.work).label, incomeSubtype: initial.incomeSubtype || "", customerName: initial.customerName || "", fitKind: initial.fitKind || "weight", fitParts: initial.fitParts || [], fitSport: initial.fitSport || "", fitRun: initial.fitRun || { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } }
             : { isGoal: false, remind: [0], title: "", type: "work", date: defaultDate || TK, startTime: "09:00", endTime: "10:00", timeMode: "duration", durationHours: 1, location: "", note: "", energyCost: 2, incomeEnabled: eventKind === "income", income: "", category: normalizeIncomeCategory((txnCategories?.income || EVENT_CATEGORY_DEFAULTS)[0] || EVENT_TYPES.work.label), incomeSubtype: "", customerName: "", fitKind: "weight", fitParts: [], fitSport: "", fitRun: { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } });
         const isEdit = mode === "edit";
-        const [repeat, setRepeat] = useState(false);
-        const [repeatFreq, setRepeatFreq] = useState("week");
-        const [repeatCount, setRepeatCount] = useState(4);
-        const [repeatDays, setRepeatDays] = useState([]);
+        const [repeat, setRepeat] = useState(!!TASK_FREQ[initial?.libFreq]);
+        const [repeatFreq, setRepeatFreq] = useState(() => (TASK_FREQ[initial?.libFreq] || {}).repeat?.freq || "week");
+        const [repeatCount, setRepeatCount] = useState(() => (TASK_FREQ[initial?.libFreq] || {}).repeat?.count || 4);
+        const [repeatDays, setRepeatDays] = useState(() => {
+            const preset = TASK_FREQ[initial?.libFreq];
+            return preset && preset.repeat.days ? preset.repeat.days : [];
+        });
         const [delConfirm, setDelConfirm] = useState(null);
         const [allowConflict, setAllowConflict] = useState(false);
         const togglerPart = (p) => setF(s => ({ ...s, fitParts: s.fitParts.includes(p) ? s.fitParts.filter(x => x !== p) : [...s.fitParts, p] }));
@@ -3458,6 +3830,8 @@ try {
             (() => {
                 const buildBase = () => {
                     const base = { ...f, incomeEnabled: !!f.incomeEnabled, income: f.incomeEnabled ? (Number(f.income) || 0) : 0, customerName: "", incomeSubtype: "" };
+                    delete base.libFreq;
+                    delete base.libId;
                     base.isGoal = !!f.isGoal;
                     if (base.isGoal) {
                         base.startTime = "";
