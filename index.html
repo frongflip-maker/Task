@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-csv-trim-132";
+window.__TASKROUTINE_BUILD__="2026-07-27-bankline-133";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3926,6 +3926,48 @@ try {
     const monthLabel = (mk) => { const [y, m] = mk.split("-").map(Number); return `${TH_M[m - 1]} ${y}`; };
     /* Rounds to 2dp first so float noise (1199.9999997) never leaks into the UI,
        then shows decimals only when there actually are any. */
+    /* ── One bank line ────────────────────────────────────────────────────────────
+       Some things are stored as several records but hit the bank as a single
+       movement: money received for several jobs in one transfer (shared batchId),
+       and one payment split into categories afterwards (t.splits). Reports and
+       statement matching must show them the way the bank does — one line — while
+       the underlying records stay separate so category maths keeps working.      */
+    const bankLineKey = (row) => {
+        if (row?.batchId)
+            return `batch:${row.batchId}`;
+        if (row?.splitParentId)
+            return `split:${row.splitParentId}`;
+        return null;
+    };
+    const mergeBankLines = (rows, { amountFields = ["amount"], titleOf = r => r.title, labelOf = null } = {}) => {
+        const heads = new globalThis.Map();
+        const out = [];
+        rows.forEach(row => {
+            const key = bankLineKey(row);
+            if (!key) {
+                out.push(row);
+                return;
+            }
+            const head = heads.get(key);
+            if (!head) {
+                const seed = { ...row, bankLineParts: [titleOf(row)], bankLineDetails: [labelOf ? labelOf(row) : titleOf(row)] };
+                heads.set(key, seed);
+                out.push(seed);
+                return;
+            }
+            amountFields.forEach(field => { head[field] = (Number(head[field]) || 0) + (Number(row[field]) || 0); });
+            head.bankLineParts.push(titleOf(row));
+            head.bankLineDetails.push(labelOf ? labelOf(row) : titleOf(row));
+        });
+        heads.forEach(head => {
+            if (head.bankLineParts.length < 2)
+                return;
+            head.title = head.splitParentId ? head.parentTitle || head.title : `รับรวม ${head.bankLineParts.length} งาน`;
+            head.allocationSummary = head.bankLineDetails.join(" · ");
+            head.note = [head.note, `${head.bankLineParts.length} รายการในยอดเดียว`].filter(Boolean).join(" · ");
+        });
+        return out;
+    };
     const bahtNumber = (n) => {
         const value = Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
         return value.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 });
@@ -4119,6 +4161,7 @@ try {
                 const sourceLabel = source.sourceType === "studio" ? `Studio · ${studioServiceLabel(source.subtype)}` : `Event · ${fallbackCategory}`;
                 const linkedRecord = source.sourceType === "studio" ? bookings.find(booking => booking.id === source.sourceId) : events.find(event => event.id === source.sourceId);
                 rows.push({
+                    batchId: payment.batchId || null,
                     date: payment.date || source.dueDate, source: sourceLabel, title: source.title,
                     category: allocationCategories.join(" + ") || fallbackCategory, allocationCategories, allocationTotals,
                     allocationSummary: paymentAllocationSummary(payment, fallbackCategory), paymentType: payment.paymentType || "full",
@@ -4141,7 +4184,7 @@ try {
                     rows.push({ date: t.date, source: "Budget · โอนย้ายบัญชี", title: t.title, category: "โอนย้าย", accountId: t.fromAccountId, relatedAccountIds: [t.fromAccountId, t.toAccountId], accountName: `${accName(t.fromAccountId)} → ${accName(t.toAccountId)}`, fromAccountName: accName(t.fromAccountId), toAccountName: accName(t.toAccountId), direction: "transfer", taxable: false, gross: Number(t.amount) || 0, deduction: 0, amount: Number(t.amount) || 0, note: t.note || "" });
                 } else if (t.kind === "out" && Array.isArray(t.splits) && t.splits.length) {
                     const ratio = Number(t.amount) > 0 ? actualPersonalExpenseAmount(t, transactions) / Number(t.amount) : 1;
-                    t.splits.forEach((split, index) => rows.push({ date: t.date, source: "Budget · รายการย่อย", title: split.title, parentTitle: t.title, category: split.category || t.category || "อื่นๆ", accountId: t.accountId, accountName: accName(t.accountId), direction: "out", taxable: false, gross: Number(split.amount) || 0, deduction: 0, amount: Number(split.amount) || 0, personalAmount: Math.round((Number(split.amount) || 0) * ratio * 100) / 100, reimbursableAmount: Math.round((Number(split.amount) || 0) * (1 - ratio) * 100) / 100, splitIndex: index + 1, splitCount: t.splits.length, note: [t.note, `รายการย่อยจาก ${t.title}`].filter(Boolean).join(" · ") }));
+                    t.splits.forEach((split, index) => rows.push({ splitParentId: t.id, date: t.date, source: "Budget · รายการย่อย", title: split.title, parentTitle: t.title, category: split.category || t.category || "อื่นๆ", accountId: t.accountId, accountName: accName(t.accountId), direction: "out", taxable: false, gross: Number(split.amount) || 0, deduction: 0, amount: Number(split.amount) || 0, personalAmount: Math.round((Number(split.amount) || 0) * ratio * 100) / 100, reimbursableAmount: Math.round((Number(split.amount) || 0) * (1 - ratio) * 100) / 100, splitIndex: index + 1, splitCount: t.splits.length, note: [t.note, `รายการย่อยจาก ${t.title}`].filter(Boolean).join(" · ") }));
                 } else {
                     const actualPersonal = t.kind === "out" ? actualPersonalExpenseAmount(t, transactions) : undefined;
                     const sharedTotal = t.kind === "in" ? passThroughTotal(t) : 0;
@@ -4194,7 +4237,10 @@ try {
         const reconcileRows = accountRows.filter(r => reconcileFilter === "all" || (r.direction === "in" && (r.reconcileStatus || "unchecked") === reconcileFilter));
         const categories = [...new Set(reconcileRows.flatMap(row => row.allocationCategories?.length ? row.allocationCategories : [row.category]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th"));
         const activeCategory = categories.includes(category) ? category : "all";
-        const finalRows = reconcileRows.filter(row => activeCategory === "all" || (row.allocationCategories?.length ? row.allocationCategories.includes(activeCategory) : row.category === activeCategory)).sort((a, b) => a.date.localeCompare(b.date));
+        const finalRows = mergeBankLines(
+            reconcileRows.filter(row => activeCategory === "all" || (row.allocationCategories?.length ? row.allocationCategories.includes(activeCategory) : row.category === activeCategory)),
+            { amountFields: ["gross", "amount", "principalAmount", "tipAmount", "deduction", "personalAmount", "reimbursableAmount"], labelOf: r => `${r.title} ฿${bahtNumber(r.amount)}` }
+        ).sort((a, b) => a.date.localeCompare(b.date));
         const totalIn = finalRows.filter(r => r.direction === "in" || r.direction === "paid").reduce((sum, row) => sum + (activeCategory !== "all" && row.allocationTotals ? (row.allocationTotals[activeCategory] || 0) : row.amount), 0);
         const totalOut = finalRows.filter(r => r.direction === "out").reduce((s, r) => s + r.amount, 0);
         const inRows = finalRows.filter(r => r.direction === "in");
@@ -7758,28 +7804,8 @@ try {
             /* Money received in one transfer that settles several jobs is stored as one
                payment per job (so each balance stays right) but the bank shows a single
                line — collapse those back into one row so statement matching lines up. */
-            const merged = [];
-            const batches = new globalThis.Map();
-            sourceRows.forEach(row => {
-                const batchId = row.paymentId ? row.batchId : null;
-                if (!batchId) {
-                    merged.push(row);
-                    return;
-                }
-                const head = batches.get(batchId);
-                if (!head) {
-                    const seed = { ...row, key: "ib" + batchId, batchId, parts: [row] };
-                    batches.set(batchId, seed);
-                    merged.push(seed);
-                    return;
-                }
-                head.parts.push(row);
-                head.amount = (Number(head.amount) || 0) + (Number(row.amount) || 0);
-                head.statementAmount = (Number(head.statementAmount) || 0) + (Number(row.statementAmount) || 0);
-                head.principalAmount = (Number(head.principalAmount) || 0) + (Number(row.principalAmount) || 0);
-                head.tipAmount = (Number(head.tipAmount) || 0) + (Number(row.tipAmount) || 0);
-                head.title = `รับรวม ${head.parts.length} งาน${head.raw?.customerName ? ` · ${head.raw.customerName}` : ""}`;
-            });
+            const merged = mergeBankLines(sourceRows, { amountFields: ["amount", "statementAmount", "principalAmount", "tipAmount"] })
+                .map(row => row.bankLineParts?.length > 1 ? { ...row, key: "ib" + row.batchId } : row);
             return [...merged, ...txs, ...reimbursements];
         }, [events, bookings, incomeSources, paymentsBySourceId, transactions]);
         const reconciliationItems = useMemo(() => {
@@ -8412,24 +8438,8 @@ try {
                             /* Payments taken together in one transfer share a batchId.
                                The bank shows one line, so show one line here too — the
                                underlying payments stay separate per job. */
-                            const batchHeads = new globalThis.Map();
-                            ledger = ledger.filter(row => {
-                                const batchId = row.paymentRaw?.batchId;
-                                if (!batchId)
-                                    return true;
-                                const head = batchHeads.get(batchId);
-                                if (!head) {
-                                    row.batchId = batchId;
-                                    row.batchParts = [row.title];
-                                    batchHeads.set(batchId, row);
-                                    return true;
-                                }
-                                head.amount = (Number(head.amount) || 0) + (Number(row.amount) || 0);
-                                head.batchParts.push(row.title);
-                                head.title = `รับรวม ${head.batchParts.length} งาน`;
-                                head.detailSummary = head.batchParts.join(" · ");
-                                return false;
-                            });
+                            ledger = mergeBankLines(ledger.map(row => (row.paymentRaw?.batchId ? { ...row, batchId: row.paymentRaw.batchId } : row)), { amountFields: ["amount"], labelOf: row => `${row.title} ${fmtBaht(row.amount)}` })
+                                .map(row => row.bankLineDetails?.length > 1 ? { ...row, detailSummary: row.bankLineDetails.join(" · ") } : row);
                             const filtered = ledger.filter(l => txFilter === "all" || l.accountId === txFilter)
                                 .filter(l => txKind === "all" || (l.raw?.kind === "transfer" ? "transfer" : l.dir) === txKind)
                                 .filter(l => txCategory === "all" || (l.allocationCategories?.length ? l.allocationCategories.includes(txCategory) : l.tag === txCategory))
