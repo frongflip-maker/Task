@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-card-height-121";
+window.__TASKROUTINE_BUILD__="2026-07-26-notif-group-122";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3311,6 +3311,7 @@ try {
                 props.goTab("settings");
             } }));
         const NOTIF_TONE = { soon: T.orange, run: T.violet, todo: T.blue, due: T.green, sync: T.red };
+        const NOTIF_GROUP = { soon: "ใกล้ถึงเวลา", run: "กำลังทำอยู่", todo: "ยังไม่เสร็จ", due: "เงินค้างรับ", sync: "ระบบ" };
         return (React.createElement("div", { className: "px-4 pb-8", style: { paddingTop: "calc(10px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "14px" } },
             React.createElement("div", { className: "flex items-center justify-end" },
                 React.createElement("button", { onClick: () => setNotifOpen(true), "aria-label": `การแจ้งเตือน ${notifications.length} รายการ`, className: "flex items-center justify-center active:scale-90", style: { position: "relative", width: 38, height: 38, borderRadius: 999, background: T.surf, border: `1px solid ${T.border}` } },
@@ -3318,12 +3319,14 @@ try {
                     notifications.length > 0 && React.createElement("span", { className: "font-extrabold flex items-center justify-center", style: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, fontSize: 10, background: T.red, color: "#fff", border: `2px solid ${T.bg}` } }, notifications.length > 99 ? "99+" : notifications.length))),
             notifOpen && React.createElement(Sheet, { title: "การแจ้งเตือน", onClose: () => setNotifOpen(false) }, notifications.length === 0
                 ? React.createElement("div", { className: "text-center text-sm", style: { padding: "24px 0", color: T.muted } }, "ไม่มีอะไรค้าง 🎉")
-                : React.createElement("div", null, notifications.map(item => React.createElement("button", { key: item.id, onClick: item.act, className: "w-full flex items-center gap-3 text-left active:scale-[.99]", style: { padding: "11px 2px", background: "transparent" } },
+                : React.createElement("div", null, notifications.map((item, idx) => React.createElement(React.Fragment, { key: item.id },
+                    (idx === 0 || notifications[idx - 1].kind !== item.kind) && React.createElement("div", { className: "text-[10px] font-extrabold", style: { color: T.muted, padding: idx === 0 ? "0 2px 4px" : "14px 2px 4px" } }, `${NOTIF_GROUP[item.kind] || ""} · ${notifications.filter(n => n.kind === item.kind).length}`),
+                    React.createElement("button", { onClick: item.act, className: "w-full flex items-center gap-3 text-left active:scale-[.99]", style: { padding: "11px 2px", background: "transparent" } },
                     React.createElement("span", { className: "shrink-0 flex items-center justify-center", style: { width: 32, height: 32, borderRadius: 10, background: hex(NOTIF_TONE[item.kind] || T.sub, .14), color: NOTIF_TONE[item.kind] || T.sub } }, React.createElement(item.icon, { size: 16 })),
                     React.createElement("span", { className: "flex-1 min-w-0" },
                         React.createElement("span", { className: "text-sm font-extrabold truncate", style: { display: "block" } }, item.title),
                         React.createElement("span", { className: "text-[11px] truncate", style: { display: "block", color: T.muted } }, item.detail)),
-                    React.createElement(ChevronRight, { size: 15, style: { color: T.muted, flexShrink: 0 } }))))),
+                    React.createElement(ChevronRight, { size: 15, style: { color: T.muted, flexShrink: 0 } })))))),
             (() => {
                 const totI = todayEvents.length;
                 const doneI = todayEvents.filter(e => e.status === "done").length;
