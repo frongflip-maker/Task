@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-ledger-merge-131";
+window.__TASKROUTINE_BUILD__="2026-07-27-csv-trim-132";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -4226,7 +4226,7 @@ try {
                 rows = [["วันที่", "รายการ", "จากบัญชี", "ไปบัญชี", "จำนวนโอน", "หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.fromAccountName || "—", r.toAccountName || "—", r.amount, r.note || ""])];
             }
             else if (type === "in" || type === "tax") {
-                rows = [["วันที่รับเงิน", "งานต้นทาง", "ชื่อรายการ", "ประเภทรายรับ", "รูปแบบรับเงิน", "ผู้จ่าย/ผู้โอน", "บัญชี", "ยอดเข้าบัญชี", "เงินต้น", "Tips", "Allocation", "สถานะ Statement", "รายละเอียด/หมายเหตุ"], ...finalRows.map(r => [r.date, r.source || "", r.title, r.category, r.paymentType === "manual" ? "กรอกเอง" : incomeSourcePaymentTypeLabel(r.paymentType), r.payer || "", r.accountName, r.gross, r.principalAmount ?? r.amount, r.tipAmount || "", r.allocationSummary || "", r.reconcileStatus || "unchecked", r.note || ""])];
+                rows = [["วันที่รับเงิน", "ชื่อรายการ", "ประเภทรายรับ", "ผู้จ่าย/ผู้โอน", "บัญชี", "ยอดเข้าบัญชี", "เงินต้น", "Allocation", "รายละเอียด/หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.category, r.payer || "", r.accountName, r.gross, r.principalAmount ?? r.amount, r.allocationSummary || "", r.note || ""])];
             }
             else if (type === "out") {
                 rows = [["วันที่จ่าย", "ชื่อรายการ", "หมวด", "จ่ายจากบัญชี", "เงินออกจริง", "เงินคืนจริง", "รายจ่ายสุทธิของฉัน", "หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.category, r.accountName, r.amount, r.reimbursableAmount || "", r.personalAmount ?? r.amount, r.note || ""])];
