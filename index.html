@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-classes-clean-126";
+window.__TASKROUTINE_BUILD__="2026-07-27-bulkpay-tip-128";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3446,7 +3446,7 @@ try {
                                             ET.label),
                                         e.income > 0 && React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.gold } },
                                             "\u0E3F",
-                                            Number(e.income).toLocaleString()),
+                                            bahtNumber(e.income)),
                                         e.location && React.createElement("button", { onClick: () => openMaps(e.location), className: "inline-flex items-center gap-0.5 text-[10px] font-semibold", style: { color: T.blue } },
                                             React.createElement(MapPin, { size: 11 }),
                                             e.location))),
@@ -3920,7 +3920,13 @@ try {
     const monthKey = (dk) => (dk || "").slice(0, 7);
     const addMonthKey = (mk, delta) => { const [y, m] = mk.split("-").map(Number); const d = new Date(y, m - 1 + delta, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
     const monthLabel = (mk) => { const [y, m] = mk.split("-").map(Number); return `${TH_M[m - 1]} ${y}`; };
-    const fmtBaht = (n) => `฿${Math.round(n).toLocaleString()}`;
+    /* Rounds to 2dp first so float noise (1199.9999997) never leaks into the UI,
+       then shows decimals only when there actually are any. */
+    const bahtNumber = (n) => {
+        const value = Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+        return value.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 });
+    };
+    const fmtBaht = (n) => `฿${bahtNumber(n)}`;
     const fmtBaht2 = (n) => `฿${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     function toCSV(rows) {
         const esc = (v) => { const raw = String(v ?? ""); const s = typeof v === "string" && /^[=+@-]/.test(raw) ? `'${raw}` : raw; return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
@@ -4159,7 +4165,7 @@ try {
                 if (!completed && !isReceivableReady(linked?.date || source.dueDate, linked?.endTime))
                     return;
                 const received = incomeSourceReceivedAmount(source.id, payments);
-                rows.push({ date: linked?.date || source.dueDate, source: source.sourceType === "studio" ? `Studio · ${studioServiceLabel(source.subtype)}` : `Event · ${normalizeIncomeCategory(source.category || "Work")}`, title: source.title, category: normalizeIncomeCategory(source.category || "Work"), accountId: null, accountName: "ยังไม่รับ", direction: "due", taxable: true, gross: Number(source.expectedAmount) || 0, deduction: 0, amount, note: [source.customerName || "", received > 0 ? `รับแล้ว ${fmtBaht(received)}` : ""].filter(Boolean).join(" · ") });
+                rows.push({ incomeSourceId: source.id, date: linked?.date || source.dueDate, source: source.sourceType === "studio" ? `Studio · ${studioServiceLabel(source.subtype)}` : `Event · ${normalizeIncomeCategory(source.category || "Work")}`, title: source.title, category: normalizeIncomeCategory(source.category || "Work"), accountId: null, accountName: "ยังไม่รับ", direction: "due", taxable: true, gross: Number(source.expectedAmount) || 0, deduction: 0, amount, note: [source.customerName || "", received > 0 ? `รับแล้ว ${fmtBaht(received)}` : ""].filter(Boolean).join(" · ") });
             });
             transactions.filter(transaction => transaction.kind === "out" && Number(transaction.reimbursableAmount) > 0).forEach(transaction => { const received = reimbursementReceived(transaction.id, transactions); const amount = Math.max(0, Number(transaction.reimbursableAmount) - received); if (amount > 0) rows.push({ date: transaction.date, source: "Budget · สำรองจ่าย", title: transaction.title, category: transaction.category || "อื่นๆ", accountId: null, accountName: "ยังไม่รับ", direction: "due", taxable: false, gross: Number(transaction.reimbursableAmount), deduction: 0, amount, note: [transaction.owedBy ? `รับคืนจาก ${transaction.owedBy}` : "", received > 0 ? `รับแล้ว ${received}` : ""].filter(Boolean).join(" · ") }); });
             return rows;
@@ -4572,9 +4578,9 @@ try {
             const received = sourceReceived(source);
             const remaining = sourceRemaining(source);
             if (sourcePaid(source))
-                return { label: `จ่ายครบ · รับแล้ว ฿${received.toLocaleString()}`, color: T.green };
+                return { label: `จ่ายครบ · รับแล้ว ${fmtBaht(received)}`, color: T.green };
             if (received > 0)
-                return { label: `รับแล้ว ฿${received.toLocaleString()} · ค้าง ฿${remaining.toLocaleString()}`, color: T.orange };
+                return { label: `รับแล้ว ${fmtBaht(received)} · ค้าง ${fmtBaht(remaining)}`, color: T.orange };
             return { label: "ยังไม่จ่าย · รับเงินที่หน้า Budget", color: T.red };
         };
         const groups = useMemo(() => {
@@ -4795,7 +4801,7 @@ try {
                                                 bookingSourcePayments.length > 1 ? `รับ ${bookingSourcePayments.length} ครั้ง` : (accounts.find(a => a.id === bookingLastPayment?.accountId)?.name || "ยังไม่ระบุบัญชี")),
                                             React.createElement("button", { onClick: () => openIncomeSourceBudget?.(bookingSource?.id), "aria-label": "เปิดประวัติรับเงิน", className: "w-5 h-5 rounded-md flex items-center justify-center shrink-0", style: { color: T.blue } },
                                                 React.createElement(Pencil, { size: 10 }))))),
-                                    React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: T.gold } }, b.loyaltyFree ? "ฟรี" : `฿${Number(b.totalPrice || 0).toLocaleString()}`)),
+                                    React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: T.gold } }, b.loyaltyFree ? "ฟรี" : fmtBaht(b.totalPrice))),
                                 React.createElement("div", { className: "flex items-center gap-1.5 mt-2.5 pt-2.5", style: { borderTop: `1px solid ${T.border}` } },
                                     React.createElement("button", { disabled: isInactive, onClick: () => toggleBookingDone(b.id), className: "flex items-center gap-1.5 flex-1 justify-center py-1.5 rounded-lg text-[11px] font-semibold disabled:opacity-40", style: { background: bkDone ? hex(T.green, .16) : T.surf2, color: bkDone ? T.green : T.sub } },
                                         React.createElement("span", { className: "w-4 h-4 rounded flex items-center justify-center", style: { background: bkDone ? T.green : "transparent", border: `1.5px solid ${bkDone ? T.green : T.border}` } }, bkDone && React.createElement(Check, { size: 11, color: "#000" })),
@@ -4877,7 +4883,7 @@ try {
                                 " \u00B7 ",
                                 hoursBetween(b.startTime, b.endTime),
                                 "h · ",
-                                b.loyaltyFree ? "ฟรี" : `฿${Number(b.totalPrice || 0).toLocaleString()}`),
+                                b.loyaltyFree ? "ฟรี" : fmtBaht(b.totalPrice)),
                             React.createElement("div", { className: "text-[10px]", style: { color: pi.color } },
                                 future ? "จะถึง · " : "",
                                 pi.label)),
@@ -7522,7 +7528,7 @@ try {
         children.push(React.createElement(Glass, { key: "summary", className: "p-3 mb-3" },
             React.createElement("div", { className: "flex items-center justify-between" },
                 React.createElement("span", { className: "text-sm", style: { color: T.sub } }, loyaltyMode ? "ฟรี 1 ชั่วโมง" : `${hrs} ชม. × ฿${f.ratePerHour}`),
-                React.createElement("span", { className: "text-xl font-extrabold", style: { color: T.gold } }, loyaltyMode ? "ฟรี" : `฿${total.toLocaleString()}`)),));
+                React.createElement("span", { className: "text-xl font-extrabold", style: { color: T.gold } }, loyaltyMode ? "ฟรี" : fmtBaht(total))),));
         if (conflict) {
             children.push(React.createElement("div", { key: "conflict", className: "p-3 rounded-xl mb-3", style: { background: hex(T.red, .14), color: T.red, border: `1px solid ${hex(T.red, .5)}` } },
                 React.createElement("div", { className: "text-xs font-semibold" }, `เวลาชนกับ “${conflict.title}” · ${shortDate(conflict.date)} ${conflict.startTime}–${conflict.endTime}`),
@@ -7589,6 +7595,10 @@ try {
                 return { overdue: true, upcoming: true };
             }
         });
+        const [dueSel, setDueSel] = useState([]);
+        const [bulkPayOpen, setBulkPayOpen] = useState(false);
+        const [bulkPay, setBulkPay] = useState(null);
+        const toggleDueSel = (id) => setDueSel(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
         const toggleDueSection = sectionKey => setDueSectionsOpen(current => {
             const next = { ...current, [sectionKey]: current[sectionKey] === false };
             try {
@@ -8205,7 +8215,7 @@ try {
                                             React.createElement("div", { className: "font-bold text-sm truncate" }, a.name),
                                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } },
                                                 "\u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19 \u0E3F",
-                                                Number(a.startBalance || 0).toLocaleString())),
+                                                bahtNumber(a.startBalance))),
                                         React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: bal >= 0 ? T.text : T.red } }, fmtBaht2(bal)),
                                         React.createElement("button", { onClick: () => setEditAcc(a), "aria-label": "\u0E41\u0E01\u0E49\u0E44\u0E02\u0E1A\u0E31\u0E0D\u0E0A\u0E35", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.blue } },
                                             React.createElement(Pencil, { size: 14 }))));
@@ -8445,6 +8455,16 @@ try {
                                 sorted.length > 0 && React.createElement(Pager, { page: ledgerPage, setPage: setLedgerPage, total: sorted.length })));
                         })()));
                 })(),
+            sub === "due" && dueSel.length > 0 && (() => {
+                const picked = dueRows.filter(row => row.incomeSourceId && dueSel.includes(row.incomeSourceId));
+                const total = picked.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+                return React.createElement("div", { className: "flex items-center gap-2 p-3 rounded-2xl", style: { background: hex(T.green, .12), border: `1px solid ${hex(T.green, .45)}` } },
+                    React.createElement("button", { onClick: () => setDueSel([]), className: "shrink-0 text-[11px] font-bold", style: { color: T.sub } }, "ล้าง"),
+                    React.createElement("div", { className: "flex-1 min-w-0 text-center" },
+                        React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, `เลือก ${picked.length} งาน`),
+                        React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.green } }, fmtBaht(total))),
+                    React.createElement("button", { onClick: () => { setBulkPay({ date: TK, accountId: accounts[0]?.id || null, payer: picked[0]?.note?.split(" · ")[0] || "", amounts: Object.fromEntries(picked.map(row => [row.incomeSourceId, String(row.amount)])), tips: {} }); setBulkPayOpen(true); }, className: "shrink-0 px-3 rounded-xl text-xs font-extrabold active:scale-95", style: { minHeight: 38, background: T.green, color: "#16200f" } }, "รับเงินรวม"));
+            })(),
             sub === "due" && (React.createElement(React.Fragment, null,
                 React.createElement(Glass, { className: "p-4", glowColor: overdueDue.length ? T.orange : T.green },
                     React.createElement("div", { className: "flex items-center justify-between" },
@@ -8462,12 +8482,73 @@ try {
                             list.length === 0 ? React.createElement(Empty, { text: sectionKey === "overdue" ? "ไม่มีงานที่ผ่านมาแล้วที่ยังค้างรับ" : "ไม่มีงานล่วงหน้าที่รอรับเงิน" }) : list.map(it => {
                                 const dt = parseK(it.workDate || it.date);
                                 const tag = srcTag(it.kind, it.category);
+                                const selectable = !!it.incomeSourceId;
+                                const picked = selectable && dueSel.includes(it.incomeSourceId);
                                 return React.createElement(Glass, { key: it.key, className: "p-3 flex items-center gap-3", glowColor: sectionKey === "overdue" ? T.orange : undefined },
+                                    selectable && React.createElement("button", { onClick: () => toggleDueSel(it.incomeSourceId), "aria-label": picked ? "เอาออกจากรายการรับเงิน" : "เลือกเพื่อรับเงินรวม", className: "shrink-0 flex items-center justify-center active:scale-90", style: { width: 22, height: 22, borderRadius: 7, background: picked ? T.green : "transparent", border: `1.5px solid ${picked ? T.green : T.border}`, color: "#fff" } }, picked ? React.createElement(Check, { size: 13, strokeWidth: 3 }) : null),
                                     React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_D[dt.getDay()].slice(0, 3)), React.createElement("div", { className: "font-extrabold leading-none", style: { fontSize: 19, color } }, dt.getDate()), React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_M_SHORT[dt.getMonth()])),
                                     React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-semibold text-sm truncate" }, it.title), React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5" }, React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(tag.c, .16), color: tag.c } }, tag.t)), Number(it.receivedAmount) > 0 && React.createElement("div", { className: "text-[9px] mt-1", style: { color: T.green } }, `รับแล้ว ${fmtBaht(it.receivedAmount)} · เหลือ ${fmtBaht(it.amount)}`)),
                                     React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("div", { className: "flex items-center gap-1.5 mt-1 justify-end" }, it.kind === "incomeSource" && React.createElement("button", { onClick: () => deleteIncomeSourceOnly?.(it.id), className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { background: hex(T.red, .1), color: T.red, border: `1px solid ${hex(T.red, .3)}` } }, React.createElement(Trash2, { size: 13 })), React.createElement("button", { onClick: () => tickDue(it), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน"))));
                             })));
                 }))),
+            bulkPayOpen && bulkPay && (() => {
+                const picked = dueRows.filter(row => row.incomeSourceId && dueSel.includes(row.incomeSourceId));
+                const amountOf = (id) => Math.max(0, Number(bulkPay.amounts[id]) || 0);
+                const tipOf = (id) => Math.max(0, Number((bulkPay.tips || {})[id]) || 0);
+                const principalTotal = picked.reduce((sum, row) => sum + amountOf(row.incomeSourceId), 0);
+                const tipTotal = picked.reduce((sum, row) => sum + tipOf(row.incomeSourceId), 0);
+                const total = principalTotal + tipTotal;
+                const overpaid = picked.filter(row => amountOf(row.incomeSourceId) > (Number(row.amount) || 0));
+                const valid = total > 0 && overpaid.length === 0;
+                const fieldStyle = { background: T.surf, color: T.text, border: `1px solid ${T.border}` };
+                const submit = () => {
+                    /* One payment record per job, exactly like paying them one by one —
+                       so remaining balances and the ledger stay consistent. */
+                    let done = 0;
+                    picked.forEach(row => {
+                        const amount = amountOf(row.incomeSourceId);
+                        const tip = tipOf(row.incomeSourceId);
+                        if (amount <= 0 && tip <= 0)
+                            return;
+                        const allocations = [];
+                        if (amount > 0)
+                            allocations.push({ role: "principal", category: row.category, amount });
+                        if (tip > 0)
+                            allocations.push({ role: "tip", category: "Tips", amount: tip });
+                        if (addIncomeSourcePayment(row.incomeSourceId, { amount: amount + tip, allocations, date: bulkPay.date, accountId: bulkPay.accountId, payer: bulkPay.payer, paymentType: amount >= (Number(row.amount) || 0) ? "full" : "balance", note: picked.length > 1 ? `รับรวม ${picked.length} งาน` : "" }))
+                            done += 1;
+                    });
+                    setBulkPayOpen(false);
+                    setBulkPay(null);
+                    setDueSel([]);
+                    fireToast(done ? `บันทึกรับเงิน ${done} งานแล้ว` : "บันทึกไม่สำเร็จ", done ? "ok" : "err");
+                };
+                return React.createElement(Sheet, { title: `รับเงินรวม · ${picked.length} งาน`, onClose: () => { setBulkPayOpen(false); setBulkPay(null); } },
+                    React.createElement("div", { className: "flex gap-2 mb-2" },
+                        React.createElement("input", { type: "date", value: bulkPay.date, onChange: e => setBulkPay({ ...bulkPay, date: e.target.value }), className: "flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm outline-none", style: fieldStyle }),
+                        React.createElement("select", { value: bulkPay.accountId || "", onChange: e => setBulkPay({ ...bulkPay, accountId: e.target.value || null }), className: "flex-1 min-w-0 px-3 rounded-xl text-sm outline-none", style: { ...fieldStyle, minHeight: 42, colorScheme: "light" } }, accounts.map(account => React.createElement("option", { key: account.id, value: account.id }, account.name)))),
+                    React.createElement("input", { value: bulkPay.payer, onChange: e => setBulkPay({ ...bulkPay, payer: e.target.value }), placeholder: "ผู้จ่าย (ไม่บังคับ)", className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-3", style: fieldStyle }),
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, picked.map(row => {
+                        const over = amountOf(row.incomeSourceId) > (Number(row.amount) || 0);
+                        return React.createElement("div", { key: row.incomeSourceId, className: "flex items-center gap-2 p-2.5 rounded-xl", style: { background: T.surf2, border: `1px solid ${over ? T.red : T.border}` } },
+                            React.createElement("div", { className: "flex-1 min-w-0" },
+                                React.createElement("div", { className: "text-xs font-bold truncate" }, row.title),
+                                React.createElement("div", { className: "text-[10px]", style: { color: over ? T.red : T.muted } }, over ? `เกินยอดค้าง ${fmtBaht(row.amount)}` : `ค้าง ${fmtBaht(row.amount)} · ${shortDate(row.date)}`)),
+                            React.createElement("div", { className: "shrink-0 flex items-center", style: { gap: 5 } },
+                                React.createElement("div", null,
+                                    React.createElement("div", { className: "font-bold text-center", style: { fontSize: 8, color: T.muted, marginBottom: 2 } }, "ยอดหลัก"),
+                                    React.createElement("input", { type: "number", inputMode: "decimal", value: bulkPay.amounts[row.incomeSourceId] ?? "", onChange: e => setBulkPay({ ...bulkPay, amounts: { ...bulkPay.amounts, [row.incomeSourceId]: e.target.value } }), className: "px-2 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 80, ...fieldStyle } })),
+                                React.createElement("div", null,
+                                    React.createElement("div", { className: "font-bold text-center", style: { fontSize: 8, color: T.gold, marginBottom: 2 } }, "ทิป"),
+                                    React.createElement("input", { type: "number", inputMode: "decimal", placeholder: "0", value: (bulkPay.tips || {})[row.incomeSourceId] ?? "", onChange: e => setBulkPay({ ...bulkPay, tips: { ...(bulkPay.tips || {}), [row.incomeSourceId]: e.target.value } }), className: "px-2 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 68, ...fieldStyle, borderColor: hex(T.gold, .45) } }))));
+                    })),
+                    React.createElement("div", { className: "flex items-center justify-between mt-3 mb-2" },
+                        React.createElement("button", { onClick: () => setBulkPay({ ...bulkPay, amounts: Object.fromEntries(picked.map(row => [row.incomeSourceId, String(row.amount)])) }), className: "text-[11px] font-bold", style: { color: T.blue } }, "เติมยอดค้างทั้งหมด"),
+                        React.createElement("div", { className: "text-right" },
+                            React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, tipTotal > 0 ? `หลัก ${fmtBaht(principalTotal)} + ทิป ${fmtBaht(tipTotal)}` : "รวมที่จะบันทึก"),
+                            React.createElement("div", { className: "text-lg font-extrabold", style: { color: valid ? T.green : T.red } }, fmtBaht(total)))),
+                    React.createElement("button", { onClick: submit, disabled: !valid, className: "w-full py-3.5 rounded-xl font-bold", style: { background: T.green, color: "#16200f", opacity: valid ? 1 : .4 } }, "บันทึกรับเงิน"));
+            })(),
             sub === "transactions" && transactionSection === "fixed" && (React.createElement(React.Fragment, null, (() => {
                 const mk = monthKey(TK);
                 const active = (fixedCosts || []).filter(fc => fc.kind !== "installment" || fixedCostPaidCount(fc) < Number(fc.installmentTotal || 0));
