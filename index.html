@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-tasklib-manage-119";
+window.__TASKROUTINE_BUILD__="2026-07-26-hold-timer-120";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -8937,6 +8937,11 @@ try {
     /* One column scale shared by the workout log and the preset editor so the
        set number, both number boxes and the action buttons always line up. */
     const MAX_DROPS = 3;
+    /* Holds are logged in seconds instead of reps. The value still lives in the
+       `reps` field so history, PR and "last time" keep working unchanged. */
+    const TIME_EXERCISE_HINTS = ["plank", "dead hang", "wall sit", "l-sit", "hollow hold", "hollow body", "superman hold", "bar hang"];
+    const isTimeExerciseName = (name) => { const key = String(name || "").toLowerCase(); return TIME_EXERCISE_HINTS.some(hint => key.includes(hint)); };
+    const exerciseIsTimed = (ex) => ex && (ex.mode ? ex.mode === "time" : isTimeExerciseName(ex.name));
     /* A set used to hold a single `drop` object. It now holds a `drops` array so a
        set can taper more than once; dropsOf() reads either shape. */
     const dropsOf = (set) => Array.isArray(set?.drops) ? set.drops : (set?.drop ? [set.drop] : []);
@@ -9032,6 +9037,16 @@ try {
         const [exName, setExName] = useState("");
         const [historyShown, setHistoryShown] = useState(10);
         const [presetPickOpen, setPresetPickOpen] = useState(false);
+        const [hold, setHold] = useState(null);
+        const [holdTick, setHoldTick] = useState(0);
+        useEffect(() => {
+            if (!hold)
+                return;
+            const id = setInterval(() => setHoldTick(Date.now()), 250);
+            return () => clearInterval(id);
+        }, [hold]);
+        const holdSeconds = hold ? Math.max(0, Math.round((Math.max(holdTick, Date.now()) - hold.startedAt) / 1000)) : 0;
+        useEffect(() => { setHold(null); }, [activeId]);
         const [showExSuggest, setShowExSuggest] = useState(false);
         const knownExerciseNames = useMemo(() => {
             const seen = new globalThis.Map();
@@ -9106,7 +9121,7 @@ try {
             }
             return null;
         };
-        const setsSummary = (sets) => (sets || []).map(s => `${s.reps || 0}${s.weight ? "×" + s.weight : ""}${dropsOf(s).filter(dropHasValue).map(d => `+${d.reps || 0}×${d.weight || 0}`).join("")}`).join(", ");
+        const setsSummary = (sets, timed = false) => (sets || []).map(s => timed ? `${s.reps || 0}s${s.weight ? "×" + s.weight : ""}` : `${s.reps || 0}${s.weight ? "×" + s.weight : ""}${dropsOf(s).filter(dropHasValue).map(d => `+${d.reps || 0}×${d.weight || 0}`).join("")}`).join(", ");
         const [pendingNew, setPendingNew] = useState(null);
         const staleSession = () => [...workouts].filter(w => w.date === TK && !w.endedAt && w.id !== activeId)
             .sort((a, b) => (Number(b.startedAt) || 0) - (Number(a.startedAt) || 0))[0] || null;
@@ -9322,6 +9337,7 @@ try {
         const renderExCard = (ex, idx, inSS) => {
             const prev = lastFor(ex.name, active.date, active.id);
             const isOpen = !!openEx[ex.id];
+        const timed = exerciseIsTimed(ex);
             const grouped = ex.ss && idx > 0 && active.exercises[idx - 1].ss === ex.ss;
             const allDone = ex.sets.length > 0 && ex.sets.every(sx => sx.st === "done");
             const isActiveEx = ex.sets.some(sx => sx.st === "active");
@@ -9338,7 +9354,7 @@ try {
                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } },
                                 ex.sets.length,
                                 " \u0E40\u0E0B\u0E47\u0E15 \u00B7 ",
-                                ex.target ? `เป้า ${setsSummary(ex.target) || "—"}` : (setsSummary(ex.sets) || "—"),
+                                ex.target ? `เป้า ${setsSummary(ex.target, exerciseIsTimed(ex)) || "—"}` : (setsSummary(ex.sets, exerciseIsTimed(ex)) || "—"),
                                 ex.rest ? ` · พัก ${ex.rest}s` : "",
                                 ex.target ? " · มีเป้า" : ""))),
                     React.createElement("span", { ...exerciseDnd.handleProps(idx), role: "button", "aria-label": `แตะค้างแล้วลากเรียงท่า ${ex.name}`, className: "w-9 h-10 shrink-0 flex items-center justify-center", style: { touchAction: "none", cursor: exerciseDnd.activeIndex === idx ? "grabbing" : "grab", color: exerciseDnd.activeIndex === idx || exerciseDnd.armedIndex === idx ? T.blue : T.muted } },
@@ -9348,7 +9364,7 @@ try {
                     React.createElement("button", { onClick: () => setOpenEx(o => ({ ...o, [ex.id]: !o[ex.id] })), className: "w-7 h-7 flex items-center justify-center shrink-0" },
                         React.createElement(ChevronDown, { size: 16, style: { color: T.muted, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" } }))),
                 isOpen && (React.createElement("div", { className: "px-3 pb-3 pt-2.5", style: { borderTop: `1px solid ${T.border}` } },
-                    prev && React.createElement("div", { className: "mb-2 mt-2 px-1 py-1 text-[10px]", style: { color: T.sub } }, `ครั้งก่อน (${shortDate(prev.date)}): ${setsSummary(prev.sets) || "—"}`),
+                    prev && React.createElement("div", { className: "mb-2 mt-2 px-1 py-1 text-[10px]", style: { color: T.sub } }, `ครั้งก่อน (${shortDate(prev.date)}): ${setsSummary(prev.sets, exerciseIsTimed(ex)) || "—"}`),
                     (() => {
                         const detailOpen = !!openExDetail[ex.id];
                         return React.createElement("div", { className: "mb-2 rounded-xl overflow-hidden" },
@@ -9360,19 +9376,23 @@ try {
                                     React.createElement(ChevronDown, { size: 12, style: { color: T.muted, transform: detailOpen ? "rotate(180deg)" : "none", transition: "transform .18s" } }))),
                             detailOpen && React.createElement("div", { className: "px-3 pb-3 pt-1" },
                                 React.createElement("label", { className: "text-[9px] font-bold mb-1 block", style: { color: T.muted } }, "\u0e2a\u0e48\u0e27\u0e19\u0e01\u0e25\u0e49\u0e32\u0e21\u0e40\u0e19\u0e37\u0e49\u0e2d"),
+                        React.createElement("button", { type: "button", onClick: () => patchEx(ex.id, e => ({ ...e, mode: exerciseIsTimed(e) ? "reps" : "time" })), className: "w-full flex items-center gap-2 mt-2 px-3 rounded-xl text-left", style: { minHeight: 40, background: T.surf, border: `1px solid ${timed ? hex(T.green, .5) : T.border}` } },
+                            React.createElement("span", { className: "w-9 h-5 rounded-full relative shrink-0", style: { background: timed ? T.green : T.muted } },
+                                React.createElement("span", { style: { position: "absolute", top: 1, left: timed ? 18 : 1, width: 16, height: 16, borderRadius: 8, background: "#fff", transition: "left .16s ease" } })),
+                            React.createElement("span", { className: "text-[11px] font-bold" }, "ท่าจับเวลา (วินาที)")),
                         React.createElement("select", { value: ex.muscle || PRESET_MUSCLE_GROUPS[0], onChange: event => patchEx(ex.id, exercise => ({ ...exercise, muscle: event.target.value })), className: "w-full px-3 py-2 rounded-lg text-xs font-medium outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }, PRESET_MUSCLE_GROUPS.map(m => React.createElement("option", { key: m, value: m }, m))),
                                 React.createElement("label", { className: "text-[9px] font-bold mb-1 mt-2 block", style: { color: T.muted } }, "\u0e42\u0e19\u0e49\u0e15\u0e23\u0e30\u0e2b\u0e27\u0e48\u0e32\u0e07\u0e40\u0e25\u0e48\u0e19"),
                         React.createElement("textarea", { value: ex.note || "", onChange: event => patchEx(ex.id, exercise => ({ ...exercise, note: event.target.value })), rows: 2, placeholder: "เพิ่มเทคนิค จังหวะ หรือสิ่งที่ต้องจำสำหรับท่านี้…", className: "w-full px-3 py-2 rounded-xl text-[11px] outline-none resize-none", style: { background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, lineHeight: 1.5 } })));
                     })(),
                     React.createElement("div", { className: "px-1.5 pb-1", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", justifyContent: "space-between", columnGap: `${SET_COL.gap}px`, border: "1px solid transparent", color: T.muted } },
                         React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, "Set"),
-                        React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, "Reps"),
+                        React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, timed ? "Sec" : "Reps"),
                         React.createElement("span", null),
                         React.createElement("span", { style: { display: "flex", alignItems: "center", gap: SET_COL.unitGap } },
                             React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8, width: SET_COL.num } }, "Weight"),
                             React.createElement("span", { style: { width: SET_COL.unit, flexShrink: 0 } })),
                         React.createElement("span", { className: "font-bold", style: { fontSize: 8 } }, "Prev"),
-                        React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, "Drop"),
+                        React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, timed ? "Timer" : "Drop"),
                         React.createElement("span", { className: "font-bold text-center", style: { fontSize: 8 } }, "Done"),
                         React.createElement("span", null)),
                     React.createElement("div", { className: "space-y-1.5" }, ex.sets.map((st, i) => {
@@ -9403,7 +9423,20 @@ try {
                                     wDisplay(pw, ex.unit || "kg"),
                                     diff > 0 ? "▲" : diff < 0 ? "▼" : "");
                             })()),
-                                React.createElement(drops.length >= MAX_DROPS ? "span" : "button", { onClick: drops.length >= MAX_DROPS ? undefined : addDrop, "aria-label": "เพิ่มน้ำหนักรอง (drop set)", className: "w-full h-7 rounded-lg text-[9px] font-extrabold flex items-center justify-center", style: { color: "#4a6fa5", background: hex("#4a6fa5", .12), opacity: drops.length >= MAX_DROPS ? .45 : 1 } }, drops.length ? `drop ${drops.length}/${MAX_DROPS}` : "+drop"),
+                                timed
+                                    ? (() => {
+                                        const running = hold && hold.exId === ex.id && hold.i === i;
+                                        return React.createElement("button", { onClick: () => {
+                                            if (running) {
+                                                patchEx(ex.id, e => ({ ...e, sets: e.sets.map((s2, j) => j === i ? { ...s2, reps: holdSeconds } : s2) }));
+                                                setHold(null);
+                                                return;
+                                            }
+                                            setHoldTick(Date.now());
+                                            setHold({ exId: ex.id, i, startedAt: Date.now() });
+                                        }, "aria-label": running ? "หยุดจับเวลา" : "เริ่มจับเวลา", className: "w-full h-7 rounded-lg text-[9px] font-extrabold flex items-center justify-center", style: { color: running ? "#fff" : T.green, background: running ? T.green : hex(T.green, .14) } }, running ? `${holdSeconds}s` : React.createElement(Play, { size: 12 }));
+                                    })()
+                                    : React.createElement(drops.length >= MAX_DROPS ? "span" : "button", { onClick: drops.length >= MAX_DROPS ? undefined : addDrop, "aria-label": "เพิ่มน้ำหนักรอง (drop set)", className: "w-full h-7 rounded-lg text-[9px] font-extrabold flex items-center justify-center", style: { color: "#4a6fa5", background: hex("#4a6fa5", .12), opacity: drops.length >= MAX_DROPS ? .45 : 1 } }, drops.length ? `drop ${drops.length}/${MAX_DROPS}` : "+drop"),
                                 D ? (React.createElement("button", { onClick: () => undoSet(ex.id, i), "aria-label": "ยกเลิกว่าเซ็ตนี้เสร็จแล้ว", "aria-pressed": true, className: "w-full h-8 rounded-lg flex items-center justify-center", style: { background: hex(T.green, .2), color: T.green, border: `1px solid ${hex(T.green, .5)}` } },
                                     React.createElement(Check, { size: 16, strokeWidth: 2.5 }))) : (React.createElement("button", { onClick: () => doneSet(ex.id, i), "aria-label": "ทำเครื่องหมายว่าเซ็ตนี้เสร็จแล้ว", "aria-pressed": false, className: "w-full h-8 rounded-lg flex items-center justify-center", style: { background: A ? hex(T.green, .08) : "#FFFFFF", border: `1.5px solid ${A ? T.green : T.border}` } })),
                                 React.createElement("button", { onClick: () => patchEx(ex.id, e => ({ ...e, sets: e.sets.filter((_, j) => j !== i) })), className: "w-full h-7 rounded-lg flex items-center justify-center", style: { color: T.muted } },
