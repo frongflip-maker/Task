@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-bulkpay-fix-129";
+window.__TASKROUTINE_BUILD__="2026-07-27-batch-merge-130";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2612,7 +2612,11 @@ try {
         const resetLoyalty = (customerId) => setLoyaltyRemaining(customerId, 0);
         const updateReconcileStatus = (kind, recordId, paymentId, status) => {
             if (kind === "incomeSource") {
-                setPayments(list => list.map(payment => payment.id === paymentId ? { ...payment, reconcileStatus: status } : payment));
+                /* A merged row stands for every payment in its batch, so ticking it
+                   marks them all — they came from one bank line. */
+                const target = payments.find(payment => payment.id === paymentId);
+                const batchId = target?.batchId || null;
+                setPayments(list => list.map(payment => (payment.id === paymentId || (batchId && payment.batchId === batchId)) ? { ...payment, reconcileStatus: status } : payment));
                 return;
             }
             if (kind === "txn")
@@ -2774,7 +2778,7 @@ try {
             if (amount <= 0 || !passThroughValid)
                 return false;
             rememberPayer(payment.payer);
-            const nextPayment = { id: uid(), incomeSourceId, sourceType: source.sourceType, sourceId: source.sourceId, paymentType, amount, principalAmount, tipAmount, passThroughAmount, allocations, date: payment.date || TK, accountId: payment.accountId || null, payer: String(payment.payer || "").trim(), note: String(payment.note || "").trim(), reconcileStatus: payment.reconcileStatus || "unchecked", moneyType: "work_income", createdAt: new Date().toISOString() };
+            const nextPayment = { id: uid(), incomeSourceId, sourceType: source.sourceType, sourceId: source.sourceId, paymentType, amount, principalAmount, tipAmount, passThroughAmount, allocations, ...(payment.batchId ? { batchId: payment.batchId } : {}), date: payment.date || TK, accountId: payment.accountId || null, payer: String(payment.payer || "").trim(), note: String(payment.note || "").trim(), reconcileStatus: payment.reconcileStatus || "unchecked", moneyType: "work_income", createdAt: new Date().toISOString() };
             setPayments(list => [...list, nextPayment]);
             if (principalAmount >= remaining && remaining > 0)
                 setIncomeSources(list => list.map(item => item.id === incomeSourceId ? { ...item, status: "paid", updatedAt: new Date().toISOString() } : item));
@@ -7741,7 +7745,7 @@ try {
                     const tipPayment = principalAmount <= 0 && tipAmount > 0;
                     const allocationTotals = paymentCategoryTotals(payment, common.category);
                     const allocationCategories = Object.keys(allocationTotals);
-                    sourceRows.push({ ...common, key: "ip" + payment.id, paymentId: payment.id, paymentType: payment.paymentType || "full", date: payment.date || source.dueDate, createdAt: payment.createdAt || payment.updatedAt || "", title: incomeSourcePaymentDisplayTitle(source, payment), amount: principalAmount + tipAmount, statementAmount: Number(payment.amount) || 0, principalAmount, tipAmount, passThroughAmount: paymentPassThroughAmount(payment, common.category), accountId: payment.accountId || null, category: allocationCategories.join(" + ") || common.category, allocationCategories, allocationTotals, allocationSummary: paymentTransactionSummary(payment, common.category), paymentRaw: payment, payer: payment.payer || "", moneyType: "work_income", taxable: common.taxable, reconcileStatus: payment.reconcileStatus || "unchecked", paid: true });
+                    sourceRows.push({ ...common, key: "ip" + payment.id, paymentId: payment.id, batchId: payment.batchId || null, paymentType: payment.paymentType || "full", date: payment.date || source.dueDate, createdAt: payment.createdAt || payment.updatedAt || "", title: incomeSourcePaymentDisplayTitle(source, payment), amount: principalAmount + tipAmount, statementAmount: Number(payment.amount) || 0, principalAmount, tipAmount, passThroughAmount: paymentPassThroughAmount(payment, common.category), accountId: payment.accountId || null, category: allocationCategories.join(" + ") || common.category, allocationCategories, allocationTotals, allocationSummary: paymentTransactionSummary(payment, common.category), paymentRaw: payment, payer: payment.payer || "", moneyType: "work_income", taxable: common.taxable, reconcileStatus: payment.reconcileStatus || "unchecked", paid: true });
                 });
                 const receivedAmount = sourcePayments.reduce((sum, payment) => sum + paymentPrincipalAmount(payment, common.category), 0);
                 const remainingAmount = Math.max(0, Number(source.expectedAmount) - receivedAmount);
@@ -7751,7 +7755,32 @@ try {
             const txs = transactions.filter(t => t.kind === "in")
                 .map(t => ({ key: "t" + t.id, kind: "txn", id: t.id, date: t.date, workDate: t.date, createdAt: t.createdAt || t.updatedAt || "", title: t.title, amount: personalIncomeAmount(t), statementAmount: Number(t.amount || 0), accountId: t.accountId || null, category: normalizeIncomeCategory(t.category || "Work"), payer: t.payer || "", moneyType: t.moneyType || "work_income", taxable: t.taxable !== false, reconcileStatus: t.reconcileStatus || "unchecked", paid: true, raw: t }));
             const reimbursements = transactions.filter(t => t.kind === "out" && Number(t.reimbursableAmount) > 0).map(t => { const receivedAmount = reimbursementReceived(t.id, transactions); const amount = Math.max(0, Number(t.reimbursableAmount) - receivedAmount); return { key: "rd" + t.id, kind: "reimbursement", id: t.id, date: t.date, workDate: t.date, startTime: "00:00", endTime: "00:00", title: `รับคืน: ${t.title}`, amount, receivedAmount, accountId: null, category: t.category || "อื่นๆ", payer: t.owedBy || "", taxable: false, paid: amount <= 0, raw: t }; }).filter(item => item.amount > 0);
-            return [...sourceRows, ...txs, ...reimbursements];
+            /* Money received in one transfer that settles several jobs is stored as one
+               payment per job (so each balance stays right) but the bank shows a single
+               line — collapse those back into one row so statement matching lines up. */
+            const merged = [];
+            const batches = new globalThis.Map();
+            sourceRows.forEach(row => {
+                const batchId = row.paymentId ? row.batchId : null;
+                if (!batchId) {
+                    merged.push(row);
+                    return;
+                }
+                const head = batches.get(batchId);
+                if (!head) {
+                    const seed = { ...row, key: "ib" + batchId, batchId, parts: [row] };
+                    batches.set(batchId, seed);
+                    merged.push(seed);
+                    return;
+                }
+                head.parts.push(row);
+                head.amount = (Number(head.amount) || 0) + (Number(row.amount) || 0);
+                head.statementAmount = (Number(head.statementAmount) || 0) + (Number(row.statementAmount) || 0);
+                head.principalAmount = (Number(head.principalAmount) || 0) + (Number(row.principalAmount) || 0);
+                head.tipAmount = (Number(head.tipAmount) || 0) + (Number(row.tipAmount) || 0);
+                head.title = `รับรวม ${head.parts.length} งาน${head.raw?.customerName ? ` · ${head.raw.customerName}` : ""}`;
+            });
+            return [...merged, ...txs, ...reimbursements];
         }, [events, bookings, incomeSources, paymentsBySourceId, transactions]);
         const reconciliationItems = useMemo(() => {
             const incomeRows = items.map(item => ({
@@ -8506,6 +8535,7 @@ try {
                     /* One payment record per job, exactly like paying them one by one —
                        so remaining balances and the ledger stay consistent. */
                     let done = 0;
+                    const batchId = picked.length > 1 ? `b${uid()}` : null;
                     picked.forEach(row => {
                         const amount = amountOf(row.id);
                         const tip = tipOf(row.id);
@@ -8516,7 +8546,7 @@ try {
                             allocations.push({ role: "principal", category: row.category, amount });
                         if (tip > 0)
                             allocations.push({ role: "tip", category: "Tips", amount: tip });
-                        if (addIncomeSourcePayment(row.id, { amount: amount + tip, allocations, date: bulkPay.date, accountId: bulkPay.accountId, payer: bulkPay.payer, paymentType: amount >= (Number(row.amount) || 0) ? "full" : "balance", note: picked.length > 1 ? `รับรวม ${picked.length} งาน` : "" }))
+                        if (addIncomeSourcePayment(row.id, { amount: amount + tip, allocations, batchId, date: bulkPay.date, accountId: bulkPay.accountId, payer: bulkPay.payer, paymentType: amount >= (Number(row.amount) || 0) ? "full" : "balance", note: picked.length > 1 ? `รับรวม ${picked.length} งาน` : "" }))
                             done += 1;
                     });
                     setBulkPayOpen(false);
