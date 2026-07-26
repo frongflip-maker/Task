@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-notif-group-122";
+window.__TASKROUTINE_BUILD__="2026-07-27-classes-clean-126";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -461,15 +461,12 @@ try {
     const Sparkles = makeIcon("Sparkles");
     const TrendingUp = makeIcon("TrendingUp");
     const Clock = makeIcon("Clock");
-    const Heart = makeIcon("Heart");
     const ChevronLeft = makeIcon("ChevronLeft");
     const ChevronRight = makeIcon("ChevronRight");
-    const Trophy = makeIcon("Trophy");
     const Settings = makeIcon("Settings");
     const Download = makeIcon("Download");
     const Upload = makeIcon("Upload");
     const Cloud = makeIcon("Cloud");
-    const LogOut = makeIcon("LogOut");
     const Gift = makeIcon("Gift");
     const RotateCcw = makeIcon("RotateCcw");
     const History = makeIcon("History");
@@ -479,12 +476,9 @@ try {
     const CalendarPlus = makeIcon("CalendarPlus");
     const MapPin = makeIcon("MapPin");
     const Play = makeIcon("Play");
-    const Pause = makeIcon("Pause");
     const Timer = makeIcon("Timer");
     const Minus = makeIcon("Minus");
     const Repeat = makeIcon("Repeat");
-    const Tag = makeIcon("Tag");
-    const ChevronUp = makeIcon("ChevronUp");
     const GripVertical = makeIcon("GripVertical");
     const Target = makeIcon("Target");
     const LayersIcon = makeIcon("Layers");
@@ -2669,10 +2663,24 @@ try {
             const sourceIds = new Set(incomeSources.filter(source => source.sourceType === "studio" && source.sourceId === id).map(source => source.id));
             if (payments.some(payment => sourceIds.has(payment.incomeSourceId)))
                 return false;
+            /* One cancel wipes the booking, its events and its income rows, so keep
+               every removed record to put back if the user changes their mind. */
+            const removedEvents = events.filter(event => event.bookingId === id);
+            const removedSources = incomeSources.filter(source => source.sourceType === "studio" && source.sourceId === id);
+            const removedPayments = payments.filter(payment => sourceIds.has(payment.incomeSourceId));
             setBookings(bs => bs.filter(booking => booking.id !== id));
             setEvents(es => es.filter(event => event.bookingId !== id));
             setIncomeSources(list => list.filter(source => !(source.sourceType === "studio" && source.sourceId === id)));
             setPayments(list => list.filter(payment => !sourceIds.has(payment.incomeSourceId)));
+            offerUndo(`ยกเลิกจอง "${current.bandName || "การจอง"}" แล้ว`, () => {
+                setBookings(bs => [...bs.filter(booking => booking.id !== id), current]);
+                if (removedEvents.length)
+                    setEvents(es => [...es.filter(event => event.bookingId !== id), ...removedEvents]);
+                if (removedSources.length)
+                    setIncomeSources(list => [...list.filter(source => !(source.sourceType === "studio" && source.sourceId === id)), ...removedSources]);
+                if (removedPayments.length)
+                    setPayments(list => [...list.filter(payment => !sourceIds.has(payment.incomeSourceId)), ...removedPayments]);
+            });
             return true;
         };
         const updateCustomerProfile = (customerId, patch) => {
@@ -3071,7 +3079,7 @@ try {
                 React.createElement("div", { className: "relative text-center", style: { width: "min(100%, 360px)", padding: "30px 24px 24px", borderRadius: "24px", background: hex(T.surf, .78), border: `1px solid ${T.border}`, boxShadow: "0 24px 70px rgba(0,0,0,.34)", backdropFilter: "blur(14px)" } },
                     React.createElement("div", { className: "mx-auto flex items-center justify-center", style: { width: "58px", height: "58px", marginBottom: "18px", borderRadius: "18px", background: hex(T.purple, .16), border: `1px solid ${hex(T.purple, .45)}`, boxShadow: `0 0 32px ${hex(T.purple, .16)}` } },
                         React.createElement(Check, { size: 27, style: { color: T.purple } })),
-                    React.createElement("h1", { className: "font-extrabold tracking-tight", style: { fontSize: "30px", lineHeight: 1.15 } }, "TaskRoutine"),
+                    React.createElement("h1", { className: "font-extrabold", style: { letterSpacing: "-0.025em", fontSize: "30px", lineHeight: 1.15 } }, "TaskRoutine"),
                     React.createElement("p", { className: "text-sm", style: { color: T.muted, margin: "9px auto 24px", lineHeight: 1.5, maxWidth: "280px" } }, waiting ? "กำลังตรวจสอบการเข้าสู่ระบบ…" : "เข้าสู่ระบบเพื่อใช้งานและซิงก์ข้อมูลของคุณ"),
                     waiting ? React.createElement("div", { className: "mx-auto rounded-full", style: { width: "30px", height: "30px", border: `3px solid ${T.border}`, borderTopColor: T.purple, animation: "spin 1s linear infinite" } }) : React.createElement("button", { onClick: signInWithGoogle, className: "font-bold flex items-center justify-center gap-3 active:scale-[.98]", style: { width: "100%", height: "48px", borderRadius: "12px", background: "#fff", color: "#111", boxShadow: "0 10px 28px rgba(0,0,0,.25)" } },
                         React.createElement("span", { className: "text-lg font-extrabold", style: { color: "#4285F4" } }, "G"),
@@ -3316,7 +3324,7 @@ try {
             React.createElement("div", { className: "flex items-center justify-end" },
                 React.createElement("button", { onClick: () => setNotifOpen(true), "aria-label": `การแจ้งเตือน ${notifications.length} รายการ`, className: "flex items-center justify-center active:scale-90", style: { position: "relative", width: 38, height: 38, borderRadius: 999, background: T.surf, border: `1px solid ${T.border}` } },
                     React.createElement(Bell, { size: 18, style: { color: notifications.length ? T.purple : T.muted } }),
-                    notifications.length > 0 && React.createElement("span", { className: "font-extrabold flex items-center justify-center", style: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, fontSize: 10, background: T.red, color: "#fff", border: `2px solid ${T.bg}` } }, notifications.length > 99 ? "99+" : notifications.length))),
+                    notifications.length > 0 && React.createElement("span", { className: "font-extrabold flex items-center justify-center", style: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, fontSize: 10, background: T.red, color: "#fff" } }, notifications.length > 99 ? "99+" : notifications.length))),
             notifOpen && React.createElement(Sheet, { title: "การแจ้งเตือน", onClose: () => setNotifOpen(false) }, notifications.length === 0
                 ? React.createElement("div", { className: "text-center text-sm", style: { padding: "24px 0", color: T.muted } }, "ไม่มีอะไรค้าง 🎉")
                 : React.createElement("div", null, notifications.map((item, idx) => React.createElement(React.Fragment, { key: item.id },
@@ -3341,11 +3349,11 @@ try {
                         React.createElement("div", { className: "flex-1 flex items-center justify-center min-w-0", style: { gap: 20, paddingTop: 24, paddingBottom: 24 } },
                             React.createElement("div", { className: "min-w-0", style: { width: 168 } },
                                 React.createElement("div", { className: "flex items-center gap-1.5" },
-                                    React.createElement("div", { className: "text-xs font-extrabold tracking-[0.28em]", style: { color: T.purple } }, EN_D[d.getDay()]),
+                                    React.createElement("div", { className: "text-xs font-extrabold", style: { letterSpacing: "0.28em", color: T.purple } }, EN_D[d.getDay()]),
                                     sel !== TK && React.createElement("button", { onClick: () => setSel(TK), className: "text-[10px] font-bold px-2 py-1 rounded-full", style: { background: hex(T.gold, .16), color: T.gold } }, "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49")),
                                 React.createElement("div", { className: "flex items-end gap-2 mt-1" },
                                     React.createElement("span", { className: "text-5xl font-extrabold leading-none tabular-nums", style: { color: T.text } }, String(d.getDate()).padStart(2, "0")),
-                                    React.createElement("div", { className: "pb-1" }, React.createElement("div", { className: "text-lg font-extrabold leading-tight", style: { color: T.sub } }, EN_M[d.getMonth()]), React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, d.getFullYear()))),
+                                    React.createElement("div", { className: "pb-1" }, React.createElement("div", { className: "text-lg font-extrabold", style: { lineHeight: 1.25, color: T.sub } }, EN_M[d.getMonth()]), React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, d.getFullYear()))),
                                 React.createElement("div", { className: "inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold mt-2", style: { color: T.sub, background: hex(T.surf2, .8), border: `1px solid ${T.border}` } },
                                     todayEvents.length,
                                     " \u0E07\u0E32\u0E19")),
@@ -4443,7 +4451,7 @@ try {
                 React.createElement(ChevronDown, { size: 16, style: { color: T.muted, transform: showHistory ? "rotate(180deg)" : "none", transition: "transform .2s" } })),
             showHistory && React.createElement(Glass, { className: "p-4 space-y-2" },
                 React.createElement("div", { className: "text-xs leading-relaxed mb-3", style: { color: T.sub } }, "เก็บไม่เกิน 6 ชุด และสำรองก่อน Cloud เขียนทับ นำเข้าไฟล์ ล้างข้อมูล หรือกู้คืน"),
-                historyEntries.length === 0 ? React.createElement("div", { className: "py-5 text-center text-xs", style: { color: T.muted } }, "ยังไม่มีประวัติให้กู้คืน") : historyEntries.map(entry => React.createElement("div", { key: entry.id, className: "p-3 rounded-xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                historyEntries.length === 0 ? React.createElement("div", { className: "text-center text-xs", style: { paddingTop: 20, paddingBottom: 20, color: T.muted } }, "ยังไม่มีประวัติให้กู้คืน") : historyEntries.map(entry => React.createElement("div", { key: entry.id, className: "p-3 rounded-xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                     React.createElement("div", { className: "flex items-start gap-3" },
                         React.createElement("div", { className: "flex-1 min-w-0" },
                             React.createElement("div", { className: "text-sm font-extrabold" }, entry.reason || "จุดกู้คืน"),
@@ -4792,7 +4800,7 @@ try {
                                     React.createElement("button", { disabled: isInactive, onClick: () => toggleBookingDone(b.id), className: "flex items-center gap-1.5 flex-1 justify-center py-1.5 rounded-lg text-[11px] font-semibold disabled:opacity-40", style: { background: bkDone ? hex(T.green, .16) : T.surf2, color: bkDone ? T.green : T.sub } },
                                         React.createElement("span", { className: "w-4 h-4 rounded flex items-center justify-center", style: { background: bkDone ? T.green : "transparent", border: `1.5px solid ${bkDone ? T.green : T.border}` } }, bkDone && React.createElement(Check, { size: 11, color: "#000" })),
                                         "\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08"),
-                                    React.createElement("button", { disabled: isInactive || b.loyaltyFree, onClick: () => !b.loyaltyFree && openIncomeSourceBudget?.(sourceForBooking(b)?.id), className: "flex items-center gap-1.5 flex-1 justify-center py-1.5 rounded-lg text-[11px] font-semibold disabled:opacity-60", style: { background: b.loyaltyFree ? hex(T.gold, .14) : (paidNow ? hex(T.green, .16) : T.surf2), color: b.loyaltyFree ? T.gold : (paidNow ? T.green : T.sub) } },
+                                    React.createElement("button", { disabled: isInactive || b.loyaltyFree, onClick: () => !b.loyaltyFree && openIncomeSourceBudget?.(sourceForBooking(b)?.id), className: "flex items-center gap-1.5 flex-1 justify-center py-1.5 rounded-lg text-[11px] font-semibold", style: { opacity: (isInactive || b.loyaltyFree) ? .6 : 1, background: b.loyaltyFree ? hex(T.gold, .14) : (paidNow ? hex(T.green, .16) : T.surf2), color: b.loyaltyFree ? T.gold : (paidNow ? T.green : T.sub) } },
                                         React.createElement("span", { className: "w-4 h-4 rounded flex items-center justify-center", style: { background: b.loyaltyFree ? T.gold : (paidNow ? T.green : "transparent"), border: `1.5px solid ${b.loyaltyFree ? T.gold : (paidNow ? T.green : T.border)}` } }, (paidNow || b.loyaltyFree) && React.createElement(Check, { size: 11, color: "#000" })),
                                         b.loyaltyFree ? "สิทธิ์ฟรี" : (paidNow ? "ดูการรับเงิน" : (sourceReceived(bookingSource) > 0 ? "รับเพิ่ม" : "รับเงิน"))),
                                     React.createElement("button", { disabled: isInactive, onClick: () => setEditBk(b), "aria-label": "แก้ไขการจอง", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 disabled:opacity-40", style: { color: T.blue, background: T.surf2 } },
@@ -4873,7 +4881,7 @@ try {
                             React.createElement("div", { className: "text-[10px]", style: { color: pi.color } },
                                 future ? "จะถึง · " : "",
                                 pi.label)),
-                        React.createElement("button", { disabled: b.cancelled || b.archived || b.loyaltyFree, onClick: () => !b.loyaltyFree && openIncomeSourceBudget?.(sourceForBooking(b)?.id), "aria-label": b.loyaltyFree ? "สิทธิ์ฟรี" : (sourcePaid(sourceForBooking(b)) ? "ดูประวัติรับเงิน" : "รับยอดคงเหลือ"), className: "w-7 h-7 rounded-md flex items-center justify-center shrink-0 active:scale-90 disabled:opacity-60", style: { background: b.loyaltyFree ? T.gold : (sourcePaid(sourceForBooking(b)) ? T.green : "transparent"), border: `2px solid ${b.loyaltyFree ? T.gold : (sourcePaid(sourceForBooking(b)) ? T.green : T.border)}` } }, (sourcePaid(sourceForBooking(b)) || b.loyaltyFree) ? React.createElement(Check, { size: 14, color: "#000" }) : React.createElement(Wallet, { size: 12, style: { color: T.green } }))));
+                        React.createElement("button", { disabled: b.cancelled || b.archived || b.loyaltyFree, onClick: () => !b.loyaltyFree && openIncomeSourceBudget?.(sourceForBooking(b)?.id), "aria-label": b.loyaltyFree ? "สิทธิ์ฟรี" : (sourcePaid(sourceForBooking(b)) ? "ดูประวัติรับเงิน" : "รับยอดคงเหลือ"), className: "w-7 h-7 rounded-md flex items-center justify-center shrink-0 active:scale-90", style: { opacity: (b.cancelled || b.archived || b.loyaltyFree) ? .6 : 1, background: b.loyaltyFree ? T.gold : (sourcePaid(sourceForBooking(b)) ? T.green : "transparent"), border: `2px solid ${b.loyaltyFree ? T.gold : (sourcePaid(sourceForBooking(b)) ? T.green : T.border)}` } }, (sourcePaid(sourceForBooking(b)) || b.loyaltyFree) ? React.createElement(Check, { size: 14, color: "#000" }) : React.createElement(Wallet, { size: 12, style: { color: T.green } }))));
                 }))))));
     }
     function LoyaltyAdjustModal({ group, onClose, onSave }) {
@@ -4985,7 +4993,7 @@ try {
         const canDrag = list.length > 1;
         return (React.createElement(Sheet, { onClose, title: `จัดการ: ${title}` },
             React.createElement("div", { className: "text-[11px] mb-3", style: { color: dnd.dragging ? T.blue : T.muted } }, dnd.dragging ? "กำลังลาก — ปล่อยเพื่อวางตำแหน่ง" : (allowRename ? "จับ ≡ ลากเพื่อจัดลำดับ · แตะชื่อเพื่อแก้ · ถังขยะเพื่อลบ (ไม่ลบประวัติเดิม)" : "จับ ≡ ลากเพื่อจัดลำดับ · ถังขยะเพื่อลบ (ไม่ลบประวัติเดิม)")),
-            React.createElement("div", { className: "space-y-1.5 mb-4", style: { overscrollBehavior: "contain" } }, list.map((it, i) => { const active = dnd.activeIndex === i; const armed = dnd.armedIndex === i; const locked = lockedItems.includes(it); return React.createElement("div", { key: it, ...dnd.rowProps(i), className: "flex items-center gap-2 p-2 rounded-lg transition-[transform,opacity,box-shadow,border-color] duration-150", style: { ...dnd.itemStyle(i), touchAction: "auto", WebkitUserSelect: "auto", userSelect: "auto", cursor: "default", background: active ? T.surf : i < 5 ? hex(T.green, .1) : T.surf2, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .65) : i < 5 ? hex(T.green, .4) : T.border}` } },
+            React.createElement("div", { className: "space-y-1.5 mb-4", style: { overscrollBehavior: "contain" } }, list.map((it, i) => { const active = dnd.activeIndex === i; const armed = dnd.armedIndex === i; const locked = lockedItems.includes(it); return React.createElement("div", { key: it, ...dnd.rowProps(i), className: "flex items-center gap-2 p-2 rounded-lg", style: { ...dnd.itemStyle(i), touchAction: "auto", WebkitUserSelect: "auto", userSelect: "auto", cursor: "default", background: active ? T.surf : i < 5 ? hex(T.green, .1) : T.surf2, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .65) : i < 5 ? hex(T.green, .4) : T.border}` } },
                 React.createElement("span", { ...(canDrag ? dnd.handleProps(i) : {}), className: "shrink-0 flex items-center justify-center", style: { touchAction: "none", cursor: canDrag ? "grab" : "default", color: active || armed ? T.blue : T.muted, opacity: canDrag ? 1 : .3, width: 30, height: 34 } }, React.createElement(GripVertical, { size: 18 })),
                 (allowRename && !locked) ? React.createElement("input", { value: names[it] ?? it, onChange: e => setNames(m => ({ ...m, [it]: e.target.value })), className: "flex-1 min-w-0 px-2.5 py-2 rounded-lg text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }) : React.createElement("span", { className: "flex-1 min-w-0 text-sm truncate px-1" }, names[it] ?? it),
                 locked ? React.createElement("span", { className: "text-[9px] font-extrabold shrink-0 w-8 text-center", style: { color: T.green } }, "หลัก") : React.createElement("button", { onPointerDown: e => e.stopPropagation(), onClick: () => removeItem(it), "aria-label": "ลบ", className: "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", style: { background: hex(T.red, .12), color: T.red } }, React.createElement(Trash2, { size: 15 }))); })),
@@ -5764,8 +5772,8 @@ try {
                 React.createElement("select", { value: allocation.category, onChange: event => updateLinkedAllocation(allocation.id, { category: event.target.value }), className: "px-2 py-2.5 rounded-xl text-xs font-semibold outline-none min-w-0", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }, linkedIncomeCatOptions.map(cat => React.createElement("option", { key: cat, value: cat }, cat))),
                 React.createElement("select", { value: allocation.stage || "full", onChange: event => updateLinkedAllocation(allocation.id, { stage: event.target.value }), className: "px-2 py-2.5 rounded-xl text-xs outline-none min-w-0", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, LINKED_STAGES.map(([value, label]) => React.createElement("option", { key: value, value: value }, label))),
                 React.createElement("input", { type: "number", inputMode: "decimal", value: allocation.amount, onChange: event => updateLinkedAllocation(allocation.id, { amount: event.target.value }), placeholder: "0", className: "px-3 py-2.5 rounded-xl text-sm text-right outline-none min-w-0", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
-                React.createElement("button", { type: "button", onClick: () => removeLinkedAllocation(allocation.id), disabled: linkedAllocations.filter(a => a.role !== "tip" && a.role !== "pass_through").length <= 1, className: "w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30", style: { color: T.red } }, React.createElement(Trash2, { size: 14 }))),
-                splitAccounts && React.createElement("div", { className: "flex items-center gap-2 mt-1 mb-1 pl-1" },
+                React.createElement("button", { type: "button", onClick: () => removeLinkedAllocation(allocation.id), disabled: linkedAllocations.filter(a => a.role !== "tip" && a.role !== "pass_through").length <= 1, className: "w-8 h-8 rounded-lg flex items-center justify-center", style: { opacity: linkedAllocations.filter(a => a.role !== "tip" && a.role !== "pass_through").length <= 1 ? .3 : 1, color: T.red } }, React.createElement(Trash2, { size: 14 }))),
+                splitAccounts && React.createElement("div", { className: "flex items-center gap-2 mt-1 mb-1", style: { paddingLeft: 4 } },
                   React.createElement("span", { className: "text-[9px] font-bold shrink-0", style: { color: T.muted } }, "เข้าบัญชี"),
                   React.createElement("select", { value: allocation.settledAccountId || "", onChange: event => updateLinkedAllocation(allocation.id, { settledAccountId: event.target.value || null }), className: "flex-1 px-2 py-1.5 rounded-lg text-xs outline-none min-w-0", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } },
                     React.createElement("option", { value: "" }, `— ใช้บัญชีหลัก (${accounts.find(account => account.id === f.accountId)?.name || "ยังไม่เลือก"}) —`),
@@ -5826,8 +5834,8 @@ try {
                 React.createElement("select", { value: allocation.category, onChange: event => updateLinkedAllocation(allocation.id, { category: event.target.value }), className: "px-2 py-2.5 rounded-xl text-xs font-semibold outline-none min-w-0", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }, linkedIncomeCatOptions.map(cat => React.createElement("option", { key: cat, value: cat }, cat))),
                 React.createElement("select", { value: allocation.stage || "full", onChange: event => updateLinkedAllocation(allocation.id, { stage: event.target.value }), className: "px-2 py-2.5 rounded-xl text-xs outline-none min-w-0", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, LINKED_STAGES.map(([value, label]) => React.createElement("option", { key: value, value: value }, label))),
                 React.createElement("input", { type: "number", inputMode: "decimal", value: allocation.amount, onChange: event => updateLinkedAllocation(allocation.id, { amount: event.target.value }), placeholder: "0", className: "px-3 py-2.5 rounded-xl text-sm text-right outline-none min-w-0", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
-                React.createElement("button", { type: "button", onClick: () => removeLinkedAllocation(allocation.id), disabled: linkedAllocations.filter(a => a.role !== "pass_through").length <= 1, className: "w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-30", style: { color: T.red } }, React.createElement(Trash2, { size: 14 }))),
-                splitAccounts && React.createElement("div", { className: "flex items-center gap-2 mt-1 mb-1 pl-1" },
+                React.createElement("button", { type: "button", onClick: () => removeLinkedAllocation(allocation.id), disabled: linkedAllocations.filter(a => a.role !== "pass_through").length <= 1, className: "w-8 h-8 rounded-lg flex items-center justify-center", style: { opacity: linkedAllocations.filter(a => a.role !== "pass_through").length <= 1 ? .3 : 1, color: T.red } }, React.createElement(Trash2, { size: 14 }))),
+                splitAccounts && React.createElement("div", { className: "flex items-center gap-2 mt-1 mb-1", style: { paddingLeft: 4 } },
                   React.createElement("span", { className: "text-[9px] font-bold shrink-0", style: { color: T.muted } }, "เข้าบัญชี"),
                   React.createElement("select", { value: allocation.settledAccountId || "", onChange: event => updateLinkedAllocation(allocation.id, { settledAccountId: event.target.value || null }), className: "flex-1 px-2 py-1.5 rounded-lg text-xs outline-none min-w-0", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } },
                     React.createElement("option", { value: "" }, `— ใช้บัญชีหลัก (${accounts.find(account => account.id === f.accountId)?.name || "ยังไม่เลือก"}) —`),
@@ -7930,7 +7938,7 @@ try {
             })),
             sub === "transactions" && React.createElement("div", { className: "flex gap-1.5 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } }, [["all", "รายการทั้งหมด"], ["fixed", "ค่าใช้จ่ายประจำ"]].map(([key, label]) => React.createElement("button", { key, onClick: () => setTransactionSection(key), className: "flex-1 py-2.5 rounded-xl text-xs font-bold active:scale-[.98]", style: { minHeight: 42, background: transactionSection === key ? T.purple : "transparent", color: transactionSection === key ? "#fff" : T.sub, boxShadow: transactionSection === key ? "0 5px 14px rgba(173,95,68,.22)" : "none", transition: "all .18s ease" } }, label))),
             sub === "monthclose" && React.createElement("div", { className: "flex gap-1 p-1 rounded-xl", style: { background: T.surf2 } }, [["statement", "1 · Statement"], ["close", "2 · สรุปและปิดเดือน"]].map(([key, label]) => React.createElement("button", { key, onClick: () => setCloseStep(key), className: "flex-1 py-2 rounded-lg text-xs font-bold", style: { background: closeStep === key ? T.green : "transparent", color: closeStep === key ? "#000" : T.sub } }, label))),
-            sub === "monthclose" && closeStep === "statement" && React.createElement(Glass, { className: "p-3 sticky top-2 z-20", glowColor: T.blue },
+            sub === "monthclose" && closeStep === "statement" && React.createElement(Glass, { className: "p-3", style: { position: "sticky", top: 8, zIndex: 20 }, glowColor: T.blue },
                 React.createElement("div", { className: "text-[10px] font-bold mb-2", style: { color: T.blue } }, "เลือกข้อมูลที่ต้องการเทียบ"),
                 React.createElement("div", { className: "grid grid-cols-2 gap-2" },
                     React.createElement("div", null, React.createElement(Label, null, "เดือน"), React.createElement("input", { type: "month", value: reconcileMonth, onChange: event => setReconcileMonth(event.target.value), className: "w-full min-w-0 px-2.5 py-2.5 rounded-xl text-xs outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}`, colorScheme: "dark" } })),
@@ -8079,10 +8087,10 @@ try {
                                     React.createElement("span", { className: "text-xs font-extrabold", style: { color: T.green } }, fmtBaht(row.amount)),
                                     React.createElement("span", { className: "text-[9px] font-bold", style: { color: row.matchedKey ? T.green : T.orange } }, row.matchedKey ? "จับคู่แล้ว" : "ยังไม่พบคู่")),
                                 row.matchedKey ? React.createElement("button", { onClick: () => unmatchStatementRow(row), className: "w-full mt-2 py-2 rounded-lg text-[10px] font-bold", style: { background: hex(T.orange, .12), color: T.orange, border: `1px solid ${hex(T.orange, .4)}` } }, "ยกเลิกการจับคู่") : React.createElement(React.Fragment, null,
-                                    React.createElement("div", { className: "grid grid-cols-[1fr_auto] gap-1.5 mt-2" },
+                                    React.createElement("div", { className: "grid gap-1.5 mt-2", style: { gridTemplateColumns: "1fr auto" } },
                                         React.createElement("select", { value: manualMatches[row.id] || "", onChange: event => setManualMatches(values => ({ ...values, [row.id]: event.target.value })), className: "min-w-0 px-2 py-2 rounded-lg text-[10px] outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}`, colorScheme: "dark" } }, React.createElement("option", { value: "" }, "เลือกจับคู่กับรายการในแอป"), rows.map(item => React.createElement("option", { key: item.key, value: item.key }, `${shortDate(item.date)} · ${item.title} · ${fmtBaht(item.amount)}`))),
                                         React.createElement("button", { onClick: () => manualMatch(row), className: "px-2.5 py-2 rounded-lg text-[10px] font-bold", style: { background: T.blue, color: "#001018" } }, "จับคู่")),
-                                    React.createElement("div", { className: "grid grid-cols-[1fr_auto] gap-1.5 mt-1.5" },
+                                    React.createElement("div", { className: "grid gap-1.5 mt-1.5", style: { gridTemplateColumns: "1fr auto" } },
                                         React.createElement("select", { value: importMoneyTypes[row.id] || "work_income", onChange: event => { const value = event.target.value; setImportMoneyTypes(values => ({ ...values, [row.id]: value })); if (value !== "reimbursement") setImportLinkedExpenses(values => ({ ...values, [row.id]: "" })); }, className: "min-w-0 px-2 py-2 rounded-lg text-[10px] outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}`, colorScheme: "dark" } }, React.createElement("option", { value: "work_income" }, "รายได้จากงาน"), React.createElement("option", { value: "refund" }, "เงินคืน"), React.createElement("option", { value: "reimbursement" }, "เงินสำรองจ่ายคืน"), React.createElement("option", { value: "personal" }, "เงินส่วนตัว/อื่น ๆ")),
                                         React.createElement("button", { onClick: () => createFromStatement(row), className: "px-2.5 py-2 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#000" } }, "สร้างรายการ")),
                                     (importMoneyTypes[row.id] || "work_income") === "reimbursement" && React.createElement("select", { value: importLinkedExpenses[row.id] || "", onChange: event => setImportLinkedExpenses(values => ({ ...values, [row.id]: event.target.value })), className: "w-full mt-1.5 px-2 py-2 rounded-lg text-[10px] outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}`, colorScheme: "dark" } }, React.createElement("option", { value: "" }, "เลือกค่าใช้จ่ายต้นทางที่รอรับคืน"), statementReimbursementExpenses.map(expense => React.createElement("option", { key: expense.id, value: expense.id }, `${shortDate(expense.date)} · ${expense.title} · ค้าง ${fmtBaht(expense.remainingReimbursement)}`)))
@@ -8091,15 +8099,15 @@ try {
                     React.createElement(Glass, { className: "p-4" },
                         React.createElement("div", { className: "flex items-center justify-between mb-3" }, React.createElement("div", { className: "font-bold text-sm" }, `รายการเงินเข้า ${rows.length} รายการ`), rows.length > 0 && React.createElement("button", { onClick: () => importedRows.length ? autoMatch() : rows.forEach(item => updateReconcileStatus(item.kind, item.id, item.paymentId, "matched")), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: hex(T.green, .15), color: T.green, border: `1px solid ${hex(T.green, .4)}` } }, importedRows.length ? "จับคู่ทั้งหมด" : "ตรงทั้งหมด")),
                         rows.length === 0 ? React.createElement(Empty, { text: "ไม่มีรายการเงินเข้าในเดือนและบัญชีนี้" }) : React.createElement("div", { className: "rounded-xl overflow-hidden", style: { background: "#FFFFFF", border: `1px solid ${T.border}` } },
-                            (() => { let prevDate = null; return rows.map((item, idx) => { const showDate = item.date !== prevDate; prevDate = item.date; const stColor = statusColor(item.reconcileStatus || "unchecked"); const rowMinHeight = item.allocationSummary ? 86 : 68; return React.createElement("div", { key: item.key, className: "flex items-stretch", style: { minHeight: rowMinHeight, background: "#FFFFFF" } },
+                            (() => { let prevDate = null; return rows.map((item, idx) => { const showDate = item.date !== prevDate; prevDate = item.date; const stColor = statusColor(item.reconcileStatus || "unchecked"); const rowMinHeight = item.allocationSummary ? 86 : 68; return React.createElement("div", { key: item.key, className: "flex", style: { alignItems: "stretch", minHeight: rowMinHeight, background: "#FFFFFF" } },
                                 React.createElement("div", { className: "shrink-0 flex justify-center px-1", style: { width: 62, minHeight: rowMinHeight, alignItems: "flex-start", paddingTop: 12 } }, showDate ? React.createElement("span", { className: "font-extrabold whitespace-nowrap", style: { color: T.sub, fontSize: 14, lineHeight: "20px" } }, shortDate(item.date)) : null),
-                                React.createElement("div", { className: "flex-1 min-w-0 pl-2.5", style: { minHeight: rowMinHeight, paddingTop: 12, paddingRight: 16, paddingBottom: 12, borderBottom: idx < rows.length - 1 ? `1px solid ${T.border}` : "none" } },
+                                React.createElement("div", { className: "flex-1 min-w-0", style: { paddingLeft: 10, minHeight: rowMinHeight, paddingTop: 12, paddingRight: 16, paddingBottom: 12, borderBottom: idx < rows.length - 1 ? `1px solid ${T.border}` : "none" } },
                                     React.createElement("div", { className: "flex items-start justify-between gap-2" },
                                         React.createElement("div", { className: "flex-1 min-w-0 text-sm font-bold truncate", style: { lineHeight: "20px" }, title: item.title }, item.title),
                                         React.createElement("div", { className: "shrink-0 font-extrabold whitespace-nowrap", style: { color: T.green, fontSize: 15, lineHeight: "20px" } }, fmtBaht(item.amount))),
                                     React.createElement("div", { className: "flex items-center justify-between gap-2 mt-0.5" },
                                         React.createElement("div", { className: "flex-1 min-w-0 text-[10px] truncate", style: { color: T.muted } }, item.payer || "—"),
-                                        React.createElement("select", { value: item.reconcileStatus || "unchecked", disabled: importedRows.length > 0, title: importedRows.length > 0 ? "สถานะนี้ควบคุมจากการจับคู่ Statement ด้านบน" : "", onChange: event => updateReconcileStatus(item.kind, item.id, item.paymentId, event.target.value), className: "shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold outline-none disabled:opacity-60", style: { background: hex(stColor, .12), color: stColor, border: `1px solid ${hex(stColor, .4)}`, maxWidth: 112 } },
+                                        React.createElement("select", { value: item.reconcileStatus || "unchecked", disabled: importedRows.length > 0, title: importedRows.length > 0 ? "สถานะนี้ควบคุมจากการจับคู่ Statement ด้านบน" : "", onChange: event => updateReconcileStatus(item.kind, item.id, item.paymentId, event.target.value), className: "shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold outline-none", style: { opacity: importedRows.length > 0 ? .6 : 1, background: hex(stColor, .12), color: stColor, border: `1px solid ${hex(stColor, .4)}`, maxWidth: 112 } },
                                             React.createElement("option", { value: "unchecked" }, "ยังไม่ตรวจ"),
                                             React.createElement("option", { value: "matched", disabled: importedRows.length > 0 }, importedRows.length > 0 ? "ตรงแล้ว (จับคู่จากด้านบน)" : "ตรงแล้ว"),
                                             React.createElement("option", { value: "mismatch" }, "ยอดไม่ตรง"),
@@ -8237,7 +8245,7 @@ try {
                         React.createElement("div", { className: "flex items-center gap-1 mb-1", style: { color: c } },
                             React.createElement(Ic, { size: 14 }),
                             React.createElement("span", { className: "text-[11px] font-bold" }, lab)),
-                        React.createElement("div", { className: "text-lg sm:text-xl font-extrabold leading-tight", style: { color: c } },
+                        React.createElement("div", { className: "text-lg font-extrabold", style: { lineHeight: 1.25, color: c } },
                             val < 0 ? "−" : "",
                             fmtBaht(Math.abs(val)))))))),
                     sub === "summary" && React.createElement("div", { className: "mt-3 rounded-xl overflow-hidden", style: { order: 3, background: T.surf2, border: `1px solid ${T.border}` } },
@@ -8254,8 +8262,8 @@ try {
                                     React.createElement("div", { className: "flex items-center gap-2 mb-2" }, React.createElement("span", { className: "flex-1 text-sm font-extrabold truncate" }, row.category), React.createElement("span", { className: "text-xs font-extrabold", style: { color } }, row.target > 0 ? `${percent}%` : "ยังไม่ตั้งเป้า")),
                                     React.createElement("div", { className: "h-2 rounded-full overflow-hidden mb-2.5", style: { background: T.border } }, React.createElement("div", { style: { height: "100%", width: `${row.target > 0 ? Math.min(100, percent) : 0}%`, background: color, transition: "width .25s ease" } })),
                                     React.createElement("div", { className: "flex items-center gap-3" },
-                                        React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, "ใช้แล้ว"), React.createElement("div", { className: "text-lg font-extrabold leading-tight", style: { color: row.spent > 0 ? T.red : T.muted } }, fmtBaht(row.spent))),
-                                        React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, React.createElement("span", { className: "text-[11px] font-bold", style: { color: T.sub } }, "Target ฿"), React.createElement("input", { type: "number", min: "0", value: row.target || "", onChange: event => { const value = Math.max(0, Number(event.target.value) || 0); setExpenseTargets(targets => ({ ...targets, [row.category]: value })); }, placeholder: "0", className: "w-28 px-2.5 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } }))),
+                                        React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, "ใช้แล้ว"), React.createElement("div", { className: "text-lg font-extrabold", style: { lineHeight: 1.25, color: row.spent > 0 ? T.red : T.muted } }, fmtBaht(row.spent))),
+                                        React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, React.createElement("span", { className: "text-[11px] font-bold", style: { color: T.sub } }, "Target ฿"), React.createElement("input", { type: "number", min: "0", value: row.target || "", onChange: event => { const value = Math.max(0, Number(event.target.value) || 0); setExpenseTargets(targets => ({ ...targets, [row.category]: value })); }, placeholder: "0", className: "px-2.5 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 112, background: T.surf2, color: T.text, border: `1px solid ${T.border}` } }))),
                                     row.target > 0 && React.createElement("div", { className: "text-[11px] font-semibold mt-2", style: { color } }, row.spent > row.target ? `เกิน Target ${fmtBaht(row.spent - row.target)}` : `เหลือใช้ได้ ${fmtBaht(row.target - row.spent)}`));
                             }))),
                     sub === "summary" && React.createElement("div", { className: "mt-1.5 rounded-xl overflow-hidden", style: { order: 4, background: T.surf2, border: `1px solid ${T.border}` } },
@@ -8314,7 +8322,7 @@ try {
                                 React.createElement("text", { x, y: chartH - 9, textAnchor: "middle", fontSize: 10, fontWeight: on ? 700 : 500, fill: on ? T.text : T.muted }, TH_M[Number(row.mk.slice(5, 7)) - 1]),
                                 React.createElement("rect", { x: x - groupW / 2, y: 0, width: groupW, height: chartH, fill: "transparent" })); }),
                             React.createElement("polyline", { points: netPoints, fill: "none", stroke: T.blue, strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round" }),
-                            cfData.map((row, index) => React.createElement("circle", { key: `net-${row.mk}`, cx: xAt(index), cy: yAt(row.net), r: row.mk === selMk ? 5 : 3.5, fill: T.surf, stroke: T.blue, strokeWidth: 2 }))) : React.createElement("div", { className: "h-[120px] flex items-center justify-center text-[11px]", style: { color: T.muted } }, "ยังไม่มีข้อมูลย้อนหลัง"),
+                            cfData.map((row, index) => React.createElement("circle", { key: `net-${row.mk}`, cx: xAt(index), cy: yAt(row.net), r: row.mk === selMk ? 5 : 3.5, fill: T.surf, stroke: T.blue, strokeWidth: 2 }))) : React.createElement("div", { className: "flex items-center justify-center text-[11px]", style: { height: 120, color: T.muted } }, "ยังไม่มีข้อมูลย้อนหลัง"),
                         selData && (React.createElement("div", { className: "flex items-center justify-between mt-3 pt-2.5 px-1", style: { borderTop: `1px solid ${hex(T.border, .7)}` } },
                             React.createElement("span", { className: "text-xs font-bold", style: { color: T.sub } }, monthLabel(selMk)),
                             React.createElement("div", { className: "flex items-center gap-2.5 text-xs font-semibold" },
@@ -8402,7 +8410,7 @@ try {
                                     React.createElement(Search, { size: 16, className: "absolute", style: { left: 14, top: 14, color: T.muted } }),
                                     React.createElement("input", { value: txSearch, onChange: e => { setTxSearch(e.target.value); setLedgerPage(0); }, placeholder: "ค้นหารายการ", className: "w-full rounded-2xl text-xs outline-none", style: { minHeight: 44, paddingTop: 11, paddingRight: 44, paddingBottom: 11, paddingLeft: 42, boxSizing: "border-box", background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, boxShadow: "inset 0 1px 0 rgba(255,255,255,.8), 0 3px 10px rgba(83,67,43,.05)" } }),
                                     txSearch && React.createElement("button", { onClick: () => { setTxSearch(""); setLedgerPage(0); }, "aria-label": "ล้างคำค้นหา", className: "absolute w-8 h-8 rounded-xl flex items-center justify-center active:scale-90", style: { right: 6, top: 6, color: T.muted, background: T.surf2 } }, React.createElement(X, { size: 13 }))),
-                                React.createElement("div", { className: "flex items-stretch gap-1.5 mb-3 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                                React.createElement("div", { className: "flex gap-1.5 mb-3 p-1.5 rounded-2xl", style: { alignItems: "stretch", background: T.surf2, border: `1px solid ${T.border}` } },
                                     React.createElement("div", { className: "flex gap-1 flex-1 min-w-0" }, [["all", "ทั้งหมด"], ["in", "รายรับ"], ["out", "รายจ่าย"], ["transfer", "โอนย้าย"]].map(([k, label]) => {
                                         const on = txKind === k;
                                         return React.createElement("button", { key: k, onClick: () => { setTxKind(k); setLedgerPage(0); }, className: "py-2 px-1 rounded-xl text-[10px] font-bold truncate transition active:scale-95", style: { flex: "1 1 0", minWidth: 0, background: on ? (k === "in" ? T.green : k === "out" ? T.red : k === "transfer" ? TRANSFER_COLOR : T.purple) : "transparent", color: on ? (k === "in" || k === "transfer" ? "#000" : "#fff") : T.sub, boxShadow: on ? "0 4px 10px rgba(83,67,43,.16)" : "none" } }, label);
@@ -8416,12 +8424,12 @@ try {
                                     txFilter !== "all" && React.createElement("button", { onClick: () => { setTxFilter("all"); setLedgerPage(0); }, className: "px-2.5 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 flex items-center gap-1", style: { background: hex(T.blue, .1), color: T.blue, border: `1px solid ${hex(T.blue, .32)}` } }, `บัญชี: ${accName(txFilter)}`, React.createElement(X, { size: 11 }))),
                                 React.createElement("div", { className: "grid grid-cols-3 gap-2 mb-4" },
                                     [["รับเข้า", filteredIncome, T.green], ["จ่ายออก", filteredExpense, T.red], ["โอนย้าย", filteredTransfers, TRANSFER_COLOR]].map(([label, value, color], index) => React.createElement("div", { key: label, className: "rounded-xl min-w-0", style: { padding: "11px 12px", background: "#FFFFFF", border: `1px solid ${hex(color, .22)}`, boxShadow: "0 4px 12px rgba(83,67,43,.05)" } },
-                                        React.createElement("div", { className: "text-[9px] mb-0.5", style: { color: T.muted } }, label),
+                                        React.createElement("div", { className: "text-[9px]", style: { marginBottom: 2, color: T.muted } }, label),
                                         React.createElement("div", { className: "font-extrabold truncate", style: { color, fontSize: 14, lineHeight: "18px" } }, index === 2 ? `${value.toLocaleString()} ครั้ง` : fmtBaht(value))))),
                                 slice.length === 0 ? React.createElement(Empty, { text: "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E18\u0E38\u0E23\u0E01\u0E23\u0E23\u0E21" }) : React.createElement("div", { className: "rounded-xl mt-1 overflow-hidden", style: { background: "#FFFFFF", border: `1px solid ${T.border}` } },
-                                    (() => { let prevDate = null; return slice.map((l, idx) => { const showDate = l.date !== prevDate; prevDate = l.date; const tColor = l.raw?.kind === "transfer" ? TRANSFER_COLOR : l.dir === "in" ? T.green : T.red; const hasThirdLine = (l.kind === "incomeSource" && !!l.detailSummary) || (l.kind === "txn" && passThroughTotal(l.raw) > 0); const rowMinHeight = hasThirdLine ? 86 : 68; return React.createElement("div", { key: l.id, className: "flex items-stretch", style: { minHeight: rowMinHeight, background: "#FFFFFF" } },
+                                    (() => { let prevDate = null; return slice.map((l, idx) => { const showDate = l.date !== prevDate; prevDate = l.date; const tColor = l.raw?.kind === "transfer" ? TRANSFER_COLOR : l.dir === "in" ? T.green : T.red; const hasThirdLine = (l.kind === "incomeSource" && !!l.detailSummary) || (l.kind === "txn" && passThroughTotal(l.raw) > 0); const rowMinHeight = hasThirdLine ? 86 : 68; return React.createElement("div", { key: l.id, className: "flex", style: { alignItems: "stretch", minHeight: rowMinHeight, background: "#FFFFFF" } },
                                         React.createElement("div", { className: "shrink-0 flex justify-center px-1", style: { width: 62, minHeight: rowMinHeight, alignItems: "flex-start", paddingTop: 12 } }, showDate ? React.createElement("span", { className: "font-extrabold whitespace-nowrap", style: { color: T.sub, fontSize: 14, lineHeight: "20px" } }, shortDate(l.date)) : null),
-                                        React.createElement("div", { className: "flex-1 min-w-0 flex items-start gap-2 pl-2.5", style: { minHeight: rowMinHeight, paddingTop: 12, paddingRight: 16, paddingBottom: 12, borderBottom: idx < slice.length - 1 ? `1px solid ${T.border}` : "none" } },
+                                        React.createElement("div", { className: "flex-1 min-w-0 flex items-start gap-2", style: { paddingLeft: 10, minHeight: rowMinHeight, paddingTop: 12, paddingRight: 16, paddingBottom: 12, borderBottom: idx < slice.length - 1 ? `1px solid ${T.border}` : "none" } },
                                         React.createElement("div", { className: "flex-1 min-w-0" },
                                             React.createElement("div", { className: "text-sm font-bold truncate", style: { lineHeight: "20px" }, title: l.title }, l.title),
                                             l.kind === "txn" && passThroughTotal(l.raw) > 0 && React.createElement("div", { className: "text-[9px] truncate mt-0.5", style: { color: "#4a6fa5" } }, `ของฉัน ${fmtBaht(personalIncomeAmount(l.raw))} · เงินผู้อื่น ${fmtBaht(passThroughTotal(l.raw))}`),
@@ -9378,13 +9386,13 @@ try {
                                     React.createElement("span", { className: "text-[9px]", style: { color: T.sub } }, detailOpen ? "\u0e0b\u0e48\u0e2d\u0e19" : "\u0e41\u0e01\u0e49\u0e44\u0e02"),
                                     React.createElement(ChevronDown, { size: 12, style: { color: T.muted, transform: detailOpen ? "rotate(180deg)" : "none", transition: "transform .18s" } }))),
                             detailOpen && React.createElement("div", { className: "px-3 pb-3 pt-1" },
-                                React.createElement("label", { className: "text-[9px] font-bold mb-1 block", style: { color: T.muted } }, "\u0e2a\u0e48\u0e27\u0e19\u0e01\u0e25\u0e49\u0e32\u0e21\u0e40\u0e19\u0e37\u0e49\u0e2d"),
+                                React.createElement("label", { className: "text-[9px] font-bold mb-1", style: { display: "block", color: T.muted } }, "\u0e2a\u0e48\u0e27\u0e19\u0e01\u0e25\u0e49\u0e32\u0e21\u0e40\u0e19\u0e37\u0e49\u0e2d"),
                         React.createElement("button", { type: "button", onClick: () => patchEx(ex.id, e => ({ ...e, mode: exerciseIsTimed(e) ? "reps" : "time" })), className: "w-full flex items-center gap-2 mt-2 px-3 rounded-xl text-left", style: { minHeight: 40, background: T.surf, border: `1px solid ${timed ? hex(T.green, .5) : T.border}` } },
                             React.createElement("span", { className: "w-9 h-5 rounded-full relative shrink-0", style: { background: timed ? T.green : T.muted } },
                                 React.createElement("span", { style: { position: "absolute", top: 1, left: timed ? 18 : 1, width: 16, height: 16, borderRadius: 8, background: "#fff", transition: "left .16s ease" } })),
                             React.createElement("span", { className: "text-[11px] font-bold" }, "ท่าจับเวลา (วินาที)")),
                         React.createElement("select", { value: ex.muscle || PRESET_MUSCLE_GROUPS[0], onChange: event => patchEx(ex.id, exercise => ({ ...exercise, muscle: event.target.value })), className: "w-full px-3 py-2 rounded-lg text-xs font-medium outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }, PRESET_MUSCLE_GROUPS.map(m => React.createElement("option", { key: m, value: m }, m))),
-                                React.createElement("label", { className: "text-[9px] font-bold mb-1 mt-2 block", style: { color: T.muted } }, "\u0e42\u0e19\u0e49\u0e15\u0e23\u0e30\u0e2b\u0e27\u0e48\u0e32\u0e07\u0e40\u0e25\u0e48\u0e19"),
+                                React.createElement("label", { className: "text-[9px] font-bold mb-1 mt-2", style: { display: "block", color: T.muted } }, "\u0e42\u0e19\u0e49\u0e15\u0e23\u0e30\u0e2b\u0e27\u0e48\u0e32\u0e07\u0e40\u0e25\u0e48\u0e19"),
                         React.createElement("textarea", { value: ex.note || "", onChange: event => patchEx(ex.id, exercise => ({ ...exercise, note: event.target.value })), rows: 2, placeholder: "เพิ่มเทคนิค จังหวะ หรือสิ่งที่ต้องจำสำหรับท่านี้…", className: "w-full px-3 py-2 rounded-xl text-[11px] outline-none resize-none", style: { background: "#FFFFFF", color: T.text, border: `1px solid ${T.border}`, lineHeight: 1.5 } })));
                     })(),
                     React.createElement("div", { className: "px-1.5 pb-1", style: { display: "grid", gridTemplateColumns: SET_ROW_GRID, alignItems: "center", justifyContent: "space-between", columnGap: `${SET_COL.gap}px`, border: "1px solid transparent", color: T.muted } },
@@ -9608,7 +9616,7 @@ try {
             })(),
             presetPickOpen && React.createElement(Sheet, { title: "\u0e42\u0e2b\u0e25\u0e14\u0e0a\u0e38\u0e14\u0e17\u0e48\u0e32", onClose: () => setPresetPickOpen(false) },
                 (workoutPresets || []).length === 0
-                    ? React.createElement("div", { className: "py-6 text-center text-xs", style: { color: T.muted } }, "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e0a\u0e38\u0e14\u0e17\u0e48\u0e32 \u00b7 \u0e2a\u0e23\u0e49\u0e32\u0e07\u0e44\u0e14\u0e49\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e1f\u0e34\u0e15\u0e40\u0e19\u0e2a")
+                    ? React.createElement("div", { className: "text-center text-xs", style: { paddingTop: 24, paddingBottom: 24, color: T.muted } }, "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e0a\u0e38\u0e14\u0e17\u0e48\u0e32 \u00b7 \u0e2a\u0e23\u0e49\u0e32\u0e07\u0e44\u0e14\u0e49\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e1f\u0e34\u0e15\u0e40\u0e19\u0e2a")
                     : React.createElement("div", { className: "space-y-2" }, workoutPresets.map(preset =>
                         React.createElement("button", { key: preset.id, onClick: () => { applyWorkoutPreset(preset); setPresetPickOpen(false); }, className: "w-full p-3 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                             React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.violet, .14), color: T.violet } }, React.createElement(Layers, { size: 16 })),
@@ -9817,10 +9825,10 @@ try {
                         React.createElement("button", { onClick: saveEdit, disabled: !(ef.name || "").trim(), className: "flex-1 py-2 rounded-xl text-sm font-bold", style: { background: T.green, color: "#000", opacity: (ef.name || "").trim() ? 1 : .4 } }, "บันทึก"),
                         React.createElement("button", { onClick: () => { setEditId(null); setEf(null); setNewCategoryMode(false); }, className: "px-4 py-2 rounded-xl text-sm font-bold", style: { color: T.muted } }, "ยกเลิก")));
             }
-            return React.createElement("div", { key: food.id, ...dnd.rowProps(index), className: "flex items-center gap-2 p-2 rounded-xl transition-[transform,opacity,box-shadow,border-color] duration-150", style: { ...dnd.itemStyle(index), touchAction: "auto", WebkitUserSelect: "auto", userSelect: "auto", cursor: "default", background: active ? T.surf : T.surf2, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .65) : T.border}` } },
+            return React.createElement("div", { key: food.id, ...dnd.rowProps(index), className: "flex items-center gap-2 p-2 rounded-xl", style: { ...dnd.itemStyle(index), touchAction: "auto", WebkitUserSelect: "auto", userSelect: "auto", cursor: "default", background: active ? T.surf : T.surf2, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .65) : T.border}` } },
                 React.createElement("span", { ...(visibleFoods.length > 1 ? dnd.handleProps(index) : {}), className: "shrink-0 flex items-center justify-center", style: { touchAction: "none", cursor: visibleFoods.length > 1 ? "grab" : "default", color: active || armed ? T.blue : T.muted, opacity: visibleFoods.length > 1 ? 1 : .3, width: 30, height: 34 } }, React.createElement(GripVertical, { size: 18 })),
                 React.createElement("div", { className: "flex-1 min-w-0" },
-                    React.createElement("div", { className: "text-sm font-bold truncate" }, food.name, food.unit ? React.createElement("span", { className: "text-[10px] font-normal ml-1", style: { color: T.muted } }, `/ ${food.unit}`) : null),
+                    React.createElement("div", { className: "text-sm font-bold truncate" }, food.name, food.unit ? React.createElement("span", { className: "text-[10px]", style: { fontWeight: 400, marginLeft: 4, color: T.muted } }, `/ ${food.unit}`) : null),
                     React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, `${r1(food.cal)} kcal · P ${r1(food.protein)}g · C ${r1(food.carb)}g · F ${r1(food.fat)}g`)),
                 React.createElement("button", { onPointerDown: event => event.stopPropagation(), onClick: () => beginEdit(food), "aria-label": "แก้ไข", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.blue } }, React.createElement(Pencil, { size: 14 })),
                 delId === food.id ? React.createElement("button", { onPointerDown: event => event.stopPropagation(), onClick: () => { setFoodLibrary(foods => foods.filter(item => item.id !== food.id)); setDelId(null); }, className: "text-[10px] font-bold px-2 py-1.5 rounded-lg shrink-0", style: { background: T.red, color: "#fff" } }, "ลบ") : React.createElement("button", { onPointerDown: event => event.stopPropagation(), onClick: () => setDelId(food.id), "aria-label": "ลบ", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { background: hex(T.red, .12), color: T.red } }, React.createElement(Trash2, { size: 14 })));
@@ -9863,7 +9871,7 @@ try {
                             React.createElement("div", { className: "text-sm font-extrabold truncate" }, foodCategoryLabel(category)),
                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, `${count} รายการ`)),
                         React.createElement(ChevronDown, { size: 17, style: { color: T.muted, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" } })),
-                    open && React.createElement("div", { className: "space-y-1.5 p-2.5 pt-0", style: { overscrollBehavior: "contain", borderTop: `1px solid ${T.border}` } }, visibleFoods.map(renderFoodRow)));
+                    open && React.createElement("div", { className: "space-y-1.5 p-2.5", style: { paddingTop: 0, overscrollBehavior: "contain", borderTop: `1px solid ${T.border}` } }, visibleFoods.map(renderFoodRow)));
             })));
     }
     function FoodTemplatePickerSheet({ foodLibrary = [], setFoodLibrary, slot = "breakfast", onAdd, onClose, onComplete }) {
@@ -9999,7 +10007,7 @@ try {
             }
             onClose();
         };
-        const modeToggle = (value, setValue) => React.createElement("div", { className: "flex rounded-full p-0.5", style: { background: T.surf } }, [["serving", "ต่อเสิร์ฟ"], ["gram", "ตามกรัม"]].map(([mode, label]) => React.createElement("button", { key: mode, onClick: () => setValue(mode), className: "flex-1 py-1.5 rounded-full text-[11px] font-bold transition-colors", style: { background: value === mode ? T.green : "transparent", color: value === mode ? "#000" : T.muted } }, label)));
+        const modeToggle = (value, setValue) => React.createElement("div", { className: "flex rounded-full", style: { padding: 2, background: T.surf } }, [["serving", "ต่อเสิร์ฟ"], ["gram", "ตามกรัม"]].map(([mode, label]) => React.createElement("button", { key: mode, onClick: () => setValue(mode), className: "flex-1 py-1.5 rounded-full text-[11px] font-bold transition-colors", style: { background: value === mode ? T.green : "transparent", color: value === mode ? "#000" : T.muted } }, label)));
         const slotLabel = ({ breakfast: "มื้อเช้า", lunch: "มื้อกลางวัน", dinner: "มื้อเย็น", snack: "มื้อว่าง" })[slot] || "";
         return React.createElement(React.Fragment, null,
             React.createElement(Sheet, { onClose, title: `เพิ่มอาหาร · ${slotLabel}` },
@@ -10238,7 +10246,7 @@ try {
                             React.createElement(Flame, { size: 13, style: { color: T.orange } }),
                             React.createElement("span", { className: "text-[11px] flex-1", style: { color: T.muted } }, "Consumed"),
                             React.createElement("span", { className: "text-sm font-extrabold", style: { color: T.orange } }, `-${Math.round(calNow).toLocaleString()}`)),
-                        React.createElement("div", { className: "my-2", style: { borderTop: `1px solid ${T.border}` } }),
+                        React.createElement("div", { style: { marginTop: 8, marginBottom: 8, borderTop: `1px solid ${T.border}` } }),
                         React.createElement("div", { className: "flex items-baseline justify-between" },
                             React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, calOver ? "Over Target" : "Remaining"),
                             React.createElement("span", { className: "text-2xl font-extrabold", style: { color: calOver ? T.red : T.text } }, calTg ? Math.abs(calTg - calNow).toLocaleString() : "—")))),
@@ -10280,7 +10288,7 @@ try {
                         React.createElement("button", { onClick: () => { setAddSlot(slot); setAddOpen(true); }, "aria-label": `เพิ่มอาหาร ${label}`, className: "ml-auto w-7 h-7 rounded-full flex items-center justify-center active:scale-90", style: { background: hex(T.green, .18), color: T.green } }, React.createElement(Plus, { size: 15 }))),
                     ...(collapsedSlots[slot] ? [] : ms).map((m, i) => React.createElement("div", { key: m.id, className: "flex items-center gap-2 px-3.5 py-2", style: { minHeight: 48, borderBottom: i < ms.length - 1 ? `1px solid ${T.border}` : "none" } },
                         React.createElement("div", { className: "flex-1 min-w-0" },
-                            React.createElement("div", { className: "text-sm font-bold truncate" }, m.name, React.createElement("span", { className: "text-[10px] font-normal ml-1", style: { color: T.muted } }, foodPortionLabel(m))),
+                            React.createElement("div", { className: "text-sm font-bold truncate" }, m.name, React.createElement("span", { className: "text-[10px]", style: { fontWeight: 400, marginLeft: 4, color: T.muted } }, foodPortionLabel(m))),
                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, `Protein ${r1(m.protein)}g · Carbs ${r1(m.carb)}g · Fat ${r1(m.fat)}g`)),
                         React.createElement("div", { className: "shrink-0 text-right" },
                             React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.gold } }, r1(m.cal)),
@@ -10315,16 +10323,16 @@ try {
                             const selected = item.k === nd;
                             const calOverTarget = item.calPct > 100;
                             return React.createElement("button", { key: item.k, onClick: () => setNd(item.k), className: "flex-1 h-full flex flex-col items-center justify-end gap-1 rounded-lg px-0.5 active:scale-95", style: { background: selected ? hex(T.gold, .08) : "transparent", border: selected ? `1px solid ${hex(T.gold, .4)}` : "1px solid transparent" } },
-                                React.createElement("div", { className: "w-full flex-1 flex items-end justify-center gap-[3px]", style: { minHeight: 88 } },
+                                React.createElement("div", { className: "w-full flex-1 flex items-end justify-center", style: { gap: 3, minHeight: 88 } },
                                     React.createElement("div", { className: "rounded-t-md", title: `Calories ${Math.round(item.calPct)}%`, style: { width: "40%", height: trendBarHeight(item.calPct), background: item.cal ? (calOverTarget ? T.red : T.gold) : T.border, opacity: selected ? 1 : .72, boxShadow: selected && item.cal ? `0 0 7px ${hex(calOverTarget ? T.red : T.gold, .45)}` : "none" } }),
                                     React.createElement("div", { className: "rounded-t-md", title: `Protein ${Math.round(item.proPct)}%`, style: { width: "40%", height: trendBarHeight(item.proPct), background: item.pro ? T.green : T.border, opacity: selected ? 1 : .72, boxShadow: selected && item.pro ? `0 0 7px ${hex(T.green, .45)}` : "none" } })),
                                 React.createElement("span", { className: "text-[9px] font-extrabold", style: { color: selected ? T.text : T.muted } }, TH_D[item.dt.getDay()]),
                                 React.createElement("span", { className: "font-bold", style: { fontSize: 8, color: selected ? T.gold : T.muted } }, item.dt.getDate()));
                         }))),
                     React.createElement("div", { className: "flex items-center justify-center gap-3 mt-2 text-[9px]", style: { color: T.muted } },
-                        React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2 rounded-sm", style: { background: T.gold } }), "Calories"),
-                        React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2 rounded-sm", style: { background: T.green } }), "Protein"),
-                        React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2 rounded-sm", style: { background: T.red } }), "Calories Over Target"))) : React.createElement("button", { onClick: () => setTargetOpen(true), className: "w-full mt-3 py-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2", style: { background: T.surf, color: T.gold, border: `1px dashed ${hex(T.gold, .5)}` } },
+                        React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2", style: { borderRadius: 2, background: T.gold } }), "Calories"),
+                        React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2", style: { borderRadius: 2, background: T.green } }), "Protein"),
+                        React.createElement("span", { className: "inline-flex items-center gap-1" }, React.createElement("span", { className: "w-2 h-2", style: { borderRadius: 2, background: T.red } }), "Calories Over Target"))) : React.createElement("button", { onClick: () => setTargetOpen(true), className: "w-full mt-3 py-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2", style: { background: T.surf, color: T.gold, border: `1px dashed ${hex(T.gold, .5)}` } },
                     React.createElement(Target, { size: 15 }),
                     "Set Calories and Protein targets to view the 7-day trend")),
             targetOpen && React.createElement(NutritionTargetSheet, { nutriTargets, onSave: setNutriTargets, onClose: () => setTargetOpen(false) }),
@@ -10360,7 +10368,7 @@ try {
                             React.createElement("div", { className: "flex gap-0.5 flex-1" }, week.map(dayItem => {
                                 const v = Number(dayItem.values[field]) || 0;
                                 const ok = target ? (dayItem.logged && (["min"].includes(mode) ? v >= target : v <= target)) : dayItem.logged;
-                                return React.createElement("div", { key: dayItem.k, className: "flex-1 rounded-sm", style: { height: 8, background: !dayItem.logged ? T.surf2 : ok ? hex(color, .85) : hex(T.red, .55) } });
+                                return React.createElement("div", { key: dayItem.k, className: "flex-1", style: { borderRadius: 2, height: 8, background: !dayItem.logged ? T.surf2 : ok ? hex(color, .85) : hex(T.red, .55) } });
                             })),
                             React.createElement("span", { className: "text-[11px] font-extrabold whitespace-nowrap shrink-0 text-right", style: { width: 88, color: avgOk ? T.text : T.red } }, `เฉลี่ย ${avg}${unit}`),
                             React.createElement("span", { className: "text-[10px] font-bold whitespace-nowrap shrink-0 text-right", style: { width: 46, color: target ? (hit >= Math.ceil(loggedDays.length / 2) ? T.green : T.orange) : T.muted } }, target ? `${hit}/${loggedDays.length} วัน` : "—"));
@@ -10823,7 +10831,7 @@ try {
             sub === "week" && React.createElement("div", { className: "text-[10px] text-center pb-2", style: { color: T.muted } }, "\u0E15\u0E32\u0E23\u0E32\u0E07\u0E19\u0E35\u0E49\u0E0B\u0E49\u0E33\u0E17\u0E38\u0E01\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C\u0E42\u0E14\u0E22\u0E44\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E25\u0E48\u0E27\u0E07\u0E2B\u0E19\u0E49\u0E32 \u2014 \u0E1E\u0E2D\u0E16\u0E36\u0E07\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C\u0E43\u0E2B\u0E21\u0E48\u0E21\u0E32\u0E01\u0E14\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E23\u0E49\u0E32\u0E07 event \u0E08\u0E23\u0E34\u0E07\u0E40\u0E02\u0E49\u0E32 Calendar")));
     }
     const Section = ({ title, icon: Icon, dot, action, children }) => (React.createElement("div", null,
-        React.createElement("div", { className: "flex items-center gap-2.5 mb-2.5 px-1 min-h-9" },
+        React.createElement("div", { className: "flex items-center gap-2.5 mb-2.5 px-1", style: { minHeight: 36 } },
             Icon && React.createElement(Icon, { size: 17, style: { color: T.sub } }),
             dot && React.createElement("span", { className: "w-2.5 h-2.5 rounded-full", style: { background: dot } }),
             React.createElement("h2", { className: "text-sm font-extrabold tracking-wide", style: { color: T.sub } }, title),
@@ -10831,7 +10839,7 @@ try {
         children));
     const Stat = ({ label, value, color }) => (React.createElement(Glass, { className: "p-3" },
         React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, label),
-        React.createElement("div", { className: "text-xl font-extrabold leading-tight mt-0.5", style: { color: color || T.text } }, value)));
+        React.createElement("div", { className: "text-xl font-extrabold mt-0.5", style: { lineHeight: 1.25, color: color || T.text } }, value)));
     const Empty = ({ text }) => (React.createElement(Glass, { className: "py-8 flex items-center justify-center" },
         React.createElement("span", { className: "text-xs", style: { color: T.muted } }, text)));
     const Label = ({ children }) => React.createElement("div", { className: "text-[11px] font-semibold mb-1", style: { color: T.sub } }, children);
