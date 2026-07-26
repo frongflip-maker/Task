@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-26-hold-timer-120";
+window.__TASKROUTINE_BUILD__="2026-07-26-card-height-121";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3439,7 +3439,7 @@ try {
                                         e.location && React.createElement("button", { onClick: () => openMaps(e.location), className: "inline-flex items-center gap-0.5 text-[10px] font-semibold", style: { color: T.blue } },
                                             React.createElement(MapPin, { size: 11 }),
                                             e.location))),
-                                React.createElement("div", { className: "flex flex-col gap-1.5 shrink-0" },
+                                React.createElement("div", { className: "flex items-center gap-1.5 shrink-0" },
                                     React.createElement("button", { onClick: () => props.toggleEvent(e.id), "aria-label": "\u0E17\u0E33\u0E40\u0E2A\u0E23\u0E47\u0E08", className: "w-8 h-8 rounded-lg flex items-center justify-center active:scale-90", style: { background: done ? ET.color : "transparent", border: `2px solid ${done ? ET.color : T.border}` } }, done && React.createElement(Check, { size: 15, color: "#000" })),
                                     e.startTime && React.createElement("button", { onClick: () => exportEventICS(e), "aria-label": e.icsAdded ? "ส่งออกปฏิทินแล้ว" : "ส่งออกไปยังปฏิทิน", className: "w-8 h-8 rounded-lg flex items-center justify-center active:scale-90", style: { background: e.icsAdded ? hex(T.green, .22) : T.surf2, color: T.green, border: `1px solid ${e.icsAdded ? T.green : T.border}` } }, e.icsAdded ? React.createElement(Check, { size: 14 }) : React.createElement(CalendarPlus, { size: 14 })),
                                     React.createElement("button", { onClick: () => e.bookingId ? props.openStudioBooking(e.bookingId) : setEditEv(e), "aria-label": e.bookingId ? "แก้ไขที่ Studio" : "แก้ไข event", className: "w-8 h-8 rounded-lg flex items-center justify-center active:scale-90", style: { background: T.surf2, color: e.bookingId ? T.purple : T.sub, border: `1px solid ${T.border}` } },
