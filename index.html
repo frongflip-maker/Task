@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-batch-merge-130";
+window.__TASKROUTINE_BUILD__="2026-07-27-ledger-merge-131";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -8409,6 +8409,27 @@ try {
                             });
                             const categories = availableTxCategories;
                             const query = txSearch.trim().toLocaleLowerCase("th");
+                            /* Payments taken together in one transfer share a batchId.
+                               The bank shows one line, so show one line here too — the
+                               underlying payments stay separate per job. */
+                            const batchHeads = new globalThis.Map();
+                            ledger = ledger.filter(row => {
+                                const batchId = row.paymentRaw?.batchId;
+                                if (!batchId)
+                                    return true;
+                                const head = batchHeads.get(batchId);
+                                if (!head) {
+                                    row.batchId = batchId;
+                                    row.batchParts = [row.title];
+                                    batchHeads.set(batchId, row);
+                                    return true;
+                                }
+                                head.amount = (Number(head.amount) || 0) + (Number(row.amount) || 0);
+                                head.batchParts.push(row.title);
+                                head.title = `รับรวม ${head.batchParts.length} งาน`;
+                                head.detailSummary = head.batchParts.join(" · ");
+                                return false;
+                            });
                             const filtered = ledger.filter(l => txFilter === "all" || l.accountId === txFilter)
                                 .filter(l => txKind === "all" || (l.raw?.kind === "transfer" ? "transfer" : l.dir) === txKind)
                                 .filter(l => txCategory === "all" || (l.allocationCategories?.length ? l.allocationCategories.includes(txCategory) : l.tag === txCategory))
