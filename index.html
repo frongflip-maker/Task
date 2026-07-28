@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-27-bulk-reimburse-140";
+window.__TASKROUTINE_BUILD__="2026-07-27-bulkpay-scope-141";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -7797,6 +7797,7 @@ try {
         const [dueSel, setDueSel] = useState([]);
         const [bulkPayOpen, setBulkPayOpen] = useState(false);
         const [bulkPay, setBulkPay] = useState(null);
+        const dueRowKey = (row) => `${row.kind}:${row.id}`;
         const toggleDueSel = (id) => setDueSel(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
         const toggleDueSection = sectionKey => setDueSectionsOpen(current => {
             const next = { ...current, [sectionKey]: current[sectionKey] === false };
@@ -8703,7 +8704,7 @@ try {
                     React.createElement("div", { className: "flex-1 min-w-0 text-center" },
                         React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, `เลือก ${picked.length} งาน`),
                         React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.green } }, fmtBaht(total))),
-                    React.createElement("button", { onClick: () => { setBulkPay({ date: TK, accountId: accounts[0]?.id || null, payer: picked[0]?.raw?.customerName || "", amounts: Object.fromEntries(picked.map(row => [rowKey(row), String(row.amount)])), tips: {} }); setBulkPayOpen(true); }, className: "shrink-0 px-3 rounded-xl text-xs font-extrabold active:scale-95", style: { minHeight: 38, background: T.green, color: "#16200f" } }, "รับเงินรวม"));
+                    React.createElement("button", { onClick: () => { setBulkPay({ date: TK, accountId: accounts[0]?.id || null, payer: picked[0]?.raw?.customerName || "", amounts: Object.fromEntries(picked.map(row => [dueRowKey(row), String(row.amount)])), tips: {} }); setBulkPayOpen(true); }, className: "shrink-0 px-3 rounded-xl text-xs font-extrabold active:scale-95", style: { minHeight: 38, background: T.green, color: "#16200f" } }, "รับเงินรวม"));
             })(),
             sub === "due" && (React.createElement(React.Fragment, null,
                 React.createElement(Glass, { className: "p-4", glowColor: overdueDue.length ? T.orange : T.green },
@@ -8734,13 +8735,12 @@ try {
                 }))),
             bulkPayOpen && bulkPay && (() => {
                 const picked = dueInScope.filter(row => !row.paid && dueSel.includes(`${row.kind}:${row.id}`));
-                const rowKey = (row) => `${row.kind}:${row.id}`;
                 const amountOf = (id) => Math.max(0, Number(bulkPay.amounts[id]) || 0);
                 const tipOf = (id) => Math.max(0, Number((bulkPay.tips || {})[id]) || 0);
-                const principalTotal = picked.reduce((sum, row) => sum + amountOf(rowKey(row)), 0);
-                const tipTotal = picked.reduce((sum, row) => sum + tipOf(rowKey(row)), 0);
+                const principalTotal = picked.reduce((sum, row) => sum + amountOf(dueRowKey(row)), 0);
+                const tipTotal = picked.reduce((sum, row) => sum + tipOf(dueRowKey(row)), 0);
                 const total = principalTotal + tipTotal;
-                const overpaid = picked.filter(row => amountOf(rowKey(row)) > (Number(row.amount) || 0));
+                const overpaid = picked.filter(row => amountOf(dueRowKey(row)) > (Number(row.amount) || 0));
                 const valid = total > 0 && overpaid.length === 0;
                 const fieldStyle = { background: T.surf, color: T.text, border: `1px solid ${T.border}` };
                 const submit = () => {
@@ -8749,8 +8749,8 @@ try {
                     let done = 0;
                     const batchId = picked.length > 1 ? `b${uid()}` : null;
                     picked.forEach(row => {
-                        const amount = amountOf(rowKey(row));
-                        const tip = tipOf(rowKey(row));
+                        const amount = amountOf(dueRowKey(row));
+                        const tip = tipOf(dueRowKey(row));
                         if (amount <= 0 && tip <= 0)
                             return;
                         if (row.kind === "reimbursement") {
@@ -8779,21 +8779,21 @@ try {
                         React.createElement("select", { value: bulkPay.accountId || "", onChange: e => setBulkPay({ ...bulkPay, accountId: e.target.value || null }), className: "flex-1 min-w-0 px-3 rounded-xl text-sm outline-none", style: { ...fieldStyle, minHeight: 42, colorScheme: "light" } }, accounts.map(account => React.createElement("option", { key: account.id, value: account.id }, account.name)))),
                     React.createElement("input", { value: bulkPay.payer, onChange: e => setBulkPay({ ...bulkPay, payer: e.target.value }), placeholder: "ผู้จ่าย (ไม่บังคับ)", className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-3", style: fieldStyle }),
                     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, picked.map(row => {
-                        const over = amountOf(rowKey(row)) > (Number(row.amount) || 0);
-                        return React.createElement("div", { key: rowKey(row), className: "flex items-center gap-2 p-2.5 rounded-xl", style: { background: T.surf2, border: `1px solid ${over ? T.red : T.border}` } },
+                        const over = amountOf(dueRowKey(row)) > (Number(row.amount) || 0);
+                        return React.createElement("div", { key: dueRowKey(row), className: "flex items-center gap-2 p-2.5 rounded-xl", style: { background: T.surf2, border: `1px solid ${over ? T.red : T.border}` } },
                             React.createElement("div", { className: "flex-1 min-w-0" },
                                 React.createElement("div", { className: "text-xs font-bold truncate" }, row.title),
                                 React.createElement("div", { className: "text-[10px]", style: { color: over ? T.red : T.muted } }, over ? `เกินยอดค้าง ${fmtBaht(row.amount)}` : `ค้าง ${fmtBaht(row.amount)} · ${shortDate(row.date)}`)),
                             React.createElement("div", { className: "shrink-0 flex items-center", style: { gap: 5 } },
                                 React.createElement("div", null,
                                     React.createElement("div", { className: "font-bold text-center", style: { fontSize: 8, color: T.muted, marginBottom: 2 } }, "ยอดหลัก"),
-                                    React.createElement("input", { type: "number", inputMode: "decimal", value: bulkPay.amounts[row.id] ?? "", onChange: e => setBulkPay({ ...bulkPay, amounts: { ...bulkPay.amounts, [rowKey(row)]: e.target.value } }), className: "px-2 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 80, ...fieldStyle } })),
+                                    React.createElement("input", { type: "number", inputMode: "decimal", value: bulkPay.amounts[row.id] ?? "", onChange: e => setBulkPay({ ...bulkPay, amounts: { ...bulkPay.amounts, [dueRowKey(row)]: e.target.value } }), className: "px-2 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 80, ...fieldStyle } })),
                                 row.kind !== "reimbursement" && React.createElement("div", null,
                                     React.createElement("div", { className: "font-bold text-center", style: { fontSize: 8, color: T.gold, marginBottom: 2 } }, "ทิป"),
-                                    React.createElement("input", { type: "number", inputMode: "decimal", placeholder: "0", value: (bulkPay.tips || {})[rowKey(row)] ?? "", onChange: e => setBulkPay({ ...bulkPay, tips: { ...(bulkPay.tips || {}), [rowKey(row)]: e.target.value } }), className: "px-2 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 68, ...fieldStyle, borderColor: hex(T.gold, .45) } }))));
+                                    React.createElement("input", { type: "number", inputMode: "decimal", placeholder: "0", value: (bulkPay.tips || {})[dueRowKey(row)] ?? "", onChange: e => setBulkPay({ ...bulkPay, tips: { ...(bulkPay.tips || {}), [dueRowKey(row)]: e.target.value } }), className: "px-2 py-2 rounded-lg text-sm font-bold text-right outline-none", style: { width: 68, ...fieldStyle, borderColor: hex(T.gold, .45) } }))));
                     })),
                     React.createElement("div", { className: "flex items-center justify-between mt-3 mb-2" },
-                        React.createElement("button", { onClick: () => setBulkPay({ ...bulkPay, amounts: Object.fromEntries(picked.map(row => [rowKey(row), String(row.amount)])) }), className: "text-[11px] font-bold", style: { color: T.blue } }, "เติมยอดค้างทั้งหมด"),
+                        React.createElement("button", { onClick: () => setBulkPay({ ...bulkPay, amounts: Object.fromEntries(picked.map(row => [dueRowKey(row), String(row.amount)])) }), className: "text-[11px] font-bold", style: { color: T.blue } }, "เติมยอดค้างทั้งหมด"),
                         React.createElement("div", { className: "text-right" },
                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, tipTotal > 0 ? `หลัก ${fmtBaht(principalTotal)} + ทิป ${fmtBaht(tipTotal)}` : "รวมที่จะบันทึก"),
                             React.createElement("div", { className: "text-lg font-extrabold", style: { color: valid ? T.green : T.red } }, fmtBaht(total)))),
