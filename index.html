@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-28-bulkpay-key-142";
+window.__TASKROUTINE_BUILD__="2026-07-28-refund-cat-143";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -7798,6 +7798,14 @@ try {
         const [bulkPayOpen, setBulkPayOpen] = useState(false);
         const [bulkPay, setBulkPay] = useState(null);
         const dueRowKey = (row) => `${row.kind}:${row.id}`;
+        /* Reuse whichever income category past repayments were filed under instead of
+           guessing — the user names it themselves (e.g. "คืนเงิน"). */
+        const refundCategoryGuess = useMemo(() => {
+            const counts = {};
+            transactions.filter(t => t.kind === "in" && t.moneyType === "reimbursement" && t.category).forEach(t => { counts[t.category] = (counts[t.category] || 0) + 1; });
+            const ranked = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            return ranked[0] || (txnCategories.income || []).find(c => String(c).includes("คืน")) || txnCategories.income?.[0] || "อื่นๆ";
+        }, [transactions, txnCategories]);
         const toggleDueSel = (id) => setDueSel(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
         const toggleDueSection = sectionKey => setDueSectionsOpen(current => {
             const next = { ...current, [sectionKey]: current[sectionKey] === false };
@@ -8704,7 +8712,7 @@ try {
                     React.createElement("div", { className: "flex-1 min-w-0 text-center" },
                         React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, `เลือก ${picked.length} งาน`),
                         React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.green } }, fmtBaht(total))),
-                    React.createElement("button", { onClick: () => { setBulkPay({ date: TK, accountId: accounts[0]?.id || null, payer: picked[0]?.raw?.customerName || "", amounts: Object.fromEntries(picked.map(row => [dueRowKey(row), String(row.amount)])), tips: {} }); setBulkPayOpen(true); }, className: "shrink-0 px-3 rounded-xl text-xs font-extrabold active:scale-95", style: { minHeight: 38, background: T.green, color: "#16200f" } }, "รับเงินรวม"));
+                    React.createElement("button", { onClick: () => { setBulkPay({ date: TK, accountId: accounts[0]?.id || null, payer: picked[0]?.raw?.customerName || "", amounts: Object.fromEntries(picked.map(row => [dueRowKey(row), String(row.amount)])), tips: {}, refundCategory: refundCategoryGuess }); setBulkPayOpen(true); }, className: "shrink-0 px-3 rounded-xl text-xs font-extrabold active:scale-95", style: { minHeight: 38, background: T.green, color: "#16200f" } }, "รับเงินรวม"));
             })(),
             sub === "due" && (React.createElement(React.Fragment, null,
                 React.createElement(Glass, { className: "p-4", glowColor: overdueDue.length ? T.orange : T.green },
@@ -8756,7 +8764,7 @@ try {
                         if (row.kind === "reimbursement") {
                             /* Money a friend pays back is an income transaction linked to the
                                original expense — same shape as recording it one by one. */
-                            addTxn({ title: `รับคืน: ${row.raw?.title || row.title}`, amount, kind: "in", date: bulkPay.date, accountId: bulkPay.accountId, category: txnCategories.income?.[0] || "อื่นๆ", taxable: false, payer: bulkPay.payer, moneyType: "reimbursement", linkedExpenseId: row.id, batchId, note: picked.length > 1 ? `รับคืนรวม ${picked.length} รายการ` : "" });
+                            addTxn({ title: `รับคืน: ${row.raw?.title || row.title}`, amount, kind: "in", date: bulkPay.date, accountId: bulkPay.accountId, category: bulkPay.refundCategory || refundCategoryGuess, taxable: false, payer: bulkPay.payer, moneyType: "reimbursement", linkedExpenseId: row.id, batchId, note: picked.length > 1 ? `รับคืนรวม ${picked.length} รายการ` : "" });
                             done += 1;
                             return;
                         }
@@ -8778,6 +8786,10 @@ try {
                         React.createElement("input", { type: "date", value: bulkPay.date, onChange: e => setBulkPay({ ...bulkPay, date: e.target.value }), className: "flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm outline-none", style: fieldStyle }),
                         React.createElement("select", { value: bulkPay.accountId || "", onChange: e => setBulkPay({ ...bulkPay, accountId: e.target.value || null }), className: "flex-1 min-w-0 px-3 rounded-xl text-sm outline-none", style: { ...fieldStyle, minHeight: 42, colorScheme: "light" } }, accounts.map(account => React.createElement("option", { key: account.id, value: account.id }, account.name)))),
                     React.createElement("input", { value: bulkPay.payer, onChange: e => setBulkPay({ ...bulkPay, payer: e.target.value }), placeholder: "ผู้จ่าย (ไม่บังคับ)", className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-3", style: fieldStyle }),
+                    picked.some(row => row.kind === "reimbursement") && React.createElement("div", { className: "mb-3" },
+                        React.createElement("div", { className: "text-[10px] font-bold mb-1", style: { color: T.muted } }, "หมวดของเงินที่รับคืน"),
+                        React.createElement("select", { value: bulkPay.refundCategory || "", onChange: e => setBulkPay({ ...bulkPay, refundCategory: e.target.value }), className: "w-full px-3 rounded-xl text-sm outline-none", style: { ...fieldStyle, minHeight: 42, colorScheme: "light" } },
+                            (txnCategories.income || []).map(category => React.createElement("option", { key: category, value: category }, category)))),
                     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, picked.map(row => {
                         const over = amountOf(dueRowKey(row)) > (Number(row.amount) || 0);
                         return React.createElement("div", { key: dueRowKey(row), className: "flex items-center gap-2 p-2.5 rounded-xl", style: { background: T.surf2, border: `1px solid ${over ? T.red : T.border}` } },
