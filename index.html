@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-07-28-tpl-qty-146";
+window.__TASKROUTINE_BUILD__="2026-08-04-edit-expected-148";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2776,6 +2776,19 @@ try {
             setCustomerProfiles(profiles => { const next = { ...profiles }; delete next[customerId]; return next; });
             return true;
         };
+        /* A gig sometimes ends up worth less than agreed (fewer sets played), so the
+           agreed figure must be editable — but never below what was already paid. */
+        const updateIncomeSourceExpected = (sourceId, nextAmount) => {
+            const source = incomeSources.find(item => item.id === sourceId);
+            if (!source)
+                return false;
+            const received = incomeSourceReceivedAmount(sourceId, payments);
+            const amount = Math.max(0, Number(nextAmount) || 0);
+            if (amount < received)
+                return false;
+            setIncomeSources(list => list.map(item => item.id === sourceId ? { ...item, expectedAmount: amount, status: amount <= received ? "paid" : (item.status === "paid" ? "open" : item.status) } : item));
+            return true;
+        };
         const addIncomeSourcePayment = (incomeSourceId, payment) => {
             const source = incomeSources.find(item => item.id === incomeSourceId);
             if (!source)
@@ -3103,7 +3116,7 @@ try {
             workouts, updateWorkouts: setWorkouts,
             nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, taxTypeMap, setTaxTypeMap,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
-            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab, todos, addTodo, toggleTodo, delTodo };
+            toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab, todos, addTodo, toggleTodo, delTodo, updateIncomeSourceExpected };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
         if (!authUser) {
             const waiting = cloudState === "checking";
@@ -7795,6 +7808,7 @@ try {
             }
         });
         const [dueSel, setDueSel] = useState([]);
+        const [editExpected, setEditExpected] = useState(null);
         const [bulkPayOpen, setBulkPayOpen] = useState(false);
         const [bulkPay, setBulkPay] = useState(null);
         const dueRowKey = (row) => `${row.kind}:${row.id}`;
@@ -8425,11 +8439,9 @@ try {
                     };
                     const totalAll = accounts.reduce((s, a) => s + balanceOf(a.id), 0);
                     const mkNow = monthKey(TK);
-                    const pendingReceivable = items.filter(it => it.paid === false && Number(it.amount) > 0).reduce((s, it) => s + (Number(it.amount) || 0), 0);
-                    const unpaidFixed = (fixedCosts || []).filter(fc => fc.kind !== "installment" || fixedCostPaidCount(fc) < Number(fc.installmentTotal || 0)).map(fc => ({ fc, remaining: Math.max(0, (Number(fc.amount) || 0) - fixedCostPaidAmountForMonth(fc, mkNow)) })).filter(x => x.remaining > 0.009);
+                                const unpaidFixed = (fixedCosts || []).filter(fc => fc.kind !== "installment" || fixedCostPaidCount(fc) < Number(fc.installmentTotal || 0)).map(fc => ({ fc, remaining: Math.max(0, (Number(fc.amount) || 0) - fixedCostPaidAmountForMonth(fc, mkNow)) })).filter(x => x.remaining > 0.009);
                     const fixedRemaining = unpaidFixed.reduce((s, x) => s + x.remaining, 0);
-                    const projected = totalAll + pendingReceivable - fixedRemaining;
-                    const nearTarget = expenseCategoryRows.filter(row => row.target > 0 && row.spent / row.target >= 0.8);
+                                const nearTarget = expenseCategoryRows.filter(row => row.target > 0 && row.spent / row.target >= 0.8);
                     return (React.createElement(React.Fragment, null,
                         React.createElement(Glass, { className: "p-0 overflow-hidden", style: { order: 1 } },
                             React.createElement("button", { onClick: () => setShowAccounts(s => !s), className: "w-full flex items-center justify-between p-4 active:scale-[.99]" },
@@ -8461,10 +8473,6 @@ try {
                                 React.createElement("button", { onClick: () => setEditAcc({ id: null, name: "", startBalance: 0 }), className: "w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[.98] mt-2", style: { background: T.surf2, color: T.purple, border: `1px dashed ${hex(T.purple, .5)}` } },
                                     React.createElement(Plus, { size: 15 }),
                                     " \u0E40\u0E1E\u0E34\u0E48\u0E21\u0E1A\u0E31\u0E0D\u0E0A\u0E35")))),
-                        React.createElement(Glass, { className: "p-4", style: { order: 1 } },
-                            React.createElement("div", { className: "text-[11px]", style: { color: T.muted } }, "คาดการณ์เงินสิ้นเดือน"),
-                            React.createElement("div", { className: "text-2xl font-extrabold mt-0.5", style: { color: projected >= 0 ? T.green : T.red } }, fmtBaht(projected)),
-                            React.createElement("div", { className: "text-[10px] mt-1.5", style: { color: T.muted } }, `ยอดตอนนี้ ${fmtBaht(totalAll)} + ค้างรับ ${fmtBaht(pendingReceivable)} − ประจำที่ยังไม่จ่าย ${fmtBaht(fixedRemaining)}`)),
                         nearTarget.length > 0 && React.createElement("div", { className: "px-3 py-2.5 rounded-xl text-[11px] font-semibold", style: { order: 1, background: hex(T.gold, .12), border: `1px solid ${hex(T.gold, .4)}`, color: T.text } },
                             "⚠ ใกล้เกินเป้า: ",
                             nearTarget.map((row, i2) => React.createElement("span", { key: row.category, style: { color: row.spent > row.target ? T.red : T.gold } }, `${i2 > 0 ? " · " : ""}${row.category} ${Math.round((row.spent / row.target) * 100)}%`))),
@@ -8738,9 +8746,22 @@ try {
                                     selectable && React.createElement("button", { onClick: () => toggleDueSel(selId), "aria-label": picked ? "เอาออกจากรายการรับเงิน" : "เลือกเพื่อรับเงินรวม", className: "shrink-0 flex items-center justify-center active:scale-90", style: { width: 22, height: 22, borderRadius: 7, background: picked ? T.green : "transparent", border: `1.5px solid ${picked ? T.green : T.border}`, color: "#fff" } }, picked ? React.createElement(Check, { size: 13, strokeWidth: 3 }) : null),
                                     React.createElement("div", { className: "w-11 text-center shrink-0" }, React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_D[dt.getDay()].slice(0, 3)), React.createElement("div", { className: "font-extrabold leading-none", style: { fontSize: 19, color } }, dt.getDate()), React.createElement("div", { className: "font-bold", style: { fontSize: 11, color: T.muted } }, EN_M_SHORT[dt.getMonth()])),
                                     React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-semibold text-sm truncate" }, it.title), React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5" }, React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(tag.c, .16), color: tag.c } }, tag.t)), Number(it.receivedAmount) > 0 && React.createElement("div", { className: "text-[9px] mt-1", style: { color: T.green } }, `รับแล้ว ${fmtBaht(it.receivedAmount)} · เหลือ ${fmtBaht(it.amount)}`)),
-                                    React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("div", { className: "flex items-center gap-1.5 mt-1 justify-end" }, it.kind === "incomeSource" && React.createElement("button", { onClick: () => deleteIncomeSourceOnly?.(it.id), className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { background: hex(T.red, .1), color: T.red, border: `1px solid ${hex(T.red, .3)}` } }, React.createElement(Trash2, { size: 13 })), React.createElement("button", { onClick: () => tickDue(it), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน"))));
+                                    React.createElement("div", { className: "text-right shrink-0" }, React.createElement("div", { className: "font-extrabold", style: { color: T.gold } }, fmtBaht(it.amount)), React.createElement("div", { className: "flex items-center gap-1.5 mt-1 justify-end" }, it.kind === "incomeSource" && React.createElement("button", { onClick: () => setEditExpected({ id: it.id, title: it.title, value: String(Number(it.raw?.expectedAmount) || 0), received: Math.max(0, (Number(it.raw?.expectedAmount) || 0) - (Number(it.amount) || 0)) }), "aria-label": "แก้ยอดที่ตกลงไว้", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, React.createElement(Pencil, { size: 13 })),
+                                        it.kind === "incomeSource" && React.createElement("button", { onClick: () => deleteIncomeSourceOnly?.(it.id), className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { background: hex(T.red, .1), color: T.red, border: `1px solid ${hex(T.red, .3)}` } }, React.createElement(Trash2, { size: 13 })), React.createElement("button", { onClick: () => tickDue(it), className: "px-2.5 py-1.5 rounded-lg text-[10px] font-bold", style: { background: T.green, color: "#fff" } }, "รับเงิน"))));
                             })));
                 }))),
+            editExpected && (() => {
+                const next = Math.max(0, Number(editExpected.value) || 0);
+                const tooLow = next < editExpected.received;
+                return React.createElement(Sheet, { title: "แก้ยอดที่ตกลงไว้", onClose: () => setEditExpected(null) },
+                    React.createElement("div", { className: "text-sm font-extrabold mb-1 truncate" }, editExpected.title),
+                    React.createElement("div", { className: "text-[11px] mb-3", style: { color: T.muted } }, `รับมาแล้ว ${fmtBaht(editExpected.received)} · ใช้เมื่อเล่นไม่ครบเบรกแล้วค่าตัวลดลง`),
+                    React.createElement("input", { type: "number", inputMode: "decimal", autoFocus: true, value: editExpected.value, onChange: event => setEditExpected(current => ({ ...current, value: event.target.value })), className: "w-full px-3 py-3 rounded-xl text-lg font-extrabold text-right outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${tooLow ? T.red : T.border}` } }),
+                    React.createElement("div", { className: "text-[10px] mt-2 mb-4", style: { color: tooLow ? T.red : T.muted } }, tooLow ? `ต่ำกว่ายอดที่รับมาแล้ว (${fmtBaht(editExpected.received)})` : next <= editExpected.received ? "ตั้งเท่ายอดที่รับแล้ว · งานนี้จะถือว่าปิดยอด" : `จะเหลือค้างรับ ${fmtBaht(next - editExpected.received)}`),
+                    React.createElement("div", { className: "flex gap-2" },
+                        React.createElement("button", { onClick: () => setEditExpected(current => ({ ...current, value: String(current.received) })), className: "flex-1 py-3 rounded-xl text-sm font-bold", style: { background: T.surf2, color: T.sub, border: `1px solid ${T.border}` } }, "เท่าที่รับมาแล้ว"),
+                        React.createElement("button", { onClick: () => { if (props.updateIncomeSourceExpected(editExpected.id, next)) { fireToast("แก้ยอดที่ตกลงไว้แล้ว"); setEditExpected(null); } else fireToast("แก้ไม่สำเร็จ", "err"); }, disabled: tooLow, className: "flex-1 py-3 rounded-xl text-sm font-bold", style: { background: T.green, color: "#16200f", opacity: tooLow ? .4 : 1 } }, "บันทึก")));
+            })(),
             bulkPayOpen && bulkPay && (() => {
                 const picked = dueInScope.filter(row => !row.paid && dueSel.includes(`${row.kind}:${row.id}`));
                 const amountOf = (id) => Math.max(0, Number(bulkPay.amounts[id]) || 0);
