@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-08-04-edit-expected-148";
+window.__TASKROUTINE_BUILD__="2026-08-04-suggest-150";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3737,6 +3737,10 @@ try {
             React.createElement(SaveBtn, { disabled: !targetDate || (!!firstConflict && !allowConflict), onClick: save }, mode === "series" ? "เลื่อนครั้งนี้และรายการอนาคต" : "เลื่อนเฉพาะรายการนี้")));
     }
     function EventModal({ onClose, onSave, onSaveSeries, mode = "add", eventKind = null, initial = null, defaultDate = null, events = [], txnCategories, setTxnCategories, onRenameCategory, onDeleteCategory, onDelete, onDeleteSeries }) {
+        /* Titles typed before, newest first — most events repeat with the same name. */
+        const titleOptions = useMemo(() => [...events]
+            .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+            .map(event => event.title), [events]);
         const [f, setF] = useState(initial
             ? { isGoal: !!initial.isGoal, remind: Array.isArray(initial.remind) ? initial.remind : [], title: initial.title || "", type: initial.type || "work", date: initial.date || defaultDate || TK, startTime: initial.startTime || "09:00", endTime: initial.endTime || "10:00", timeMode: initial.timeMode || (initial.durationHours ? "duration" : "end"), durationHours: initial.durationHours || hoursBetween(initial.startTime || "09:00", initial.endTime || "10:00") || 1, location: initial.location || "", note: initial.note || "", energyCost: initial.energyCost ?? 2, incomeEnabled: initial.incomeEnabled ?? ((Number(initial.income) || 0) > 0), income: initial.income || "", category: initial.category || (EVENT_TYPES[initial.type || "work"] || EVENT_TYPES.work).label, incomeSubtype: initial.incomeSubtype || "", customerName: initial.customerName || "", fitKind: initial.fitKind || "weight", fitParts: initial.fitParts || [], fitSport: initial.fitSport || "", fitRun: initial.fitRun || { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } }
             : { isGoal: false, remind: [0], title: "", type: "work", date: defaultDate || TK, startTime: "09:00", endTime: "10:00", timeMode: "duration", durationHours: 1, location: "", note: "", energyCost: 2, incomeEnabled: eventKind === "income", income: "", category: normalizeIncomeCategory((txnCategories?.income || EVENT_CATEGORY_DEFAULTS)[0] || EVENT_TYPES.work.label), incomeSubtype: "", customerName: "", fitKind: "weight", fitParts: [], fitSport: "", fitRun: { tKm: "", tPace: "", tTime: "", aKm: "", aPace: "", aTime: "" } });
@@ -3796,7 +3800,7 @@ try {
             React.createElement("div", { className: "mb-3" },
                 React.createElement(Label, null, "\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48"),
                 React.createElement("input", { type: "date", value: f.date, onChange: e => setF({ ...f, date: e.target.value }), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}`, colorScheme: "dark" } })),
-            React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D", value: f.title, onChange: v => setF({ ...f, title: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E2D\u0E19\u0E01\u0E25\u0E2D\u0E07" }),
+            React.createElement(SuggestInput, { label: "\u0E0A\u0E37\u0E48\u0E2D", value: f.title, onChange: v => setF({ ...f, title: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E2A\u0E2D\u0E19\u0E01\u0E25\u0E2D\u0E07", options: titleOptions, listLabel: "เคยใช้แล้ว" }),
             !f.incomeEnabled && React.createElement("div", { className: "mb-3" },
                 React.createElement(Label, null, "\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17"),
                 React.createElement("div", { className: "flex gap-1.5 flex-wrap" }, Object.entries(EVENT_TYPES).map(([k, v]) => {
@@ -4010,6 +4014,9 @@ try {
        and one payment split into categories afterwards (t.splits). Reports and
        statement matching must show them the way the bank does — one line — while
        the underlying records stay separate so category maths keeps working.      */
+    /* Subtracting two decimal amounts leaves float dust (99.99999999999999),
+       so every derived money figure gets rounded to satang. */
+    const round2 = (value) => Math.round(((Number(value) || 0) + Number.EPSILON) * 100) / 100;
     const bankLineKey = (row) => {
         if (row?.batchId)
             return `batch:${row.batchId}`;
@@ -6617,9 +6624,11 @@ try {
                                 ...f,
                                 personalAmount: v,
                                 reimbursableAmount: String(
-                                  Math.max(
-                                    0,
-                                    (Number(f.amount) || 0) - (Number(v) || 0),
+                                  round2(
+                                    Math.max(
+                                      0,
+                                      (Number(f.amount) || 0) - (Number(v) || 0),
+                                    ),
                                   ),
                                 ),
                               }),
@@ -6634,9 +6643,11 @@ try {
                                 ...f,
                                 reimbursableAmount: v,
                                 personalAmount: String(
-                                  Math.max(
-                                    0,
-                                    (Number(f.amount) || 0) - (Number(v) || 0),
+                                  round2(
+                                    Math.max(
+                                      0,
+                                      (Number(f.amount) || 0) - (Number(v) || 0),
+                                    ),
                                   ),
                                 ),
                               }),
@@ -7595,6 +7606,10 @@ try {
     }
     function BookingModal({ onClose, onSave, initial = null, bookings = [], events = [], loyaltyCustomer = null, defaultDate = null }) {
         const loyaltyMode = !!(loyaltyCustomer || initial?.loyaltyFree);
+        /* Everyone who has booked before, newest first so regulars surface early. */
+        const bandNameOptions = useMemo(() => [...bookings]
+            .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+            .map(booking => booking.bandName), [bookings]);
         const [f, setF] = useState(() => {
             if (initial) {
                 const free = !!initial.loyaltyFree;
@@ -7726,7 +7741,7 @@ try {
                 React.createElement(Label, null, "ประเภท Studio"),
                 React.createElement("div", { className: "grid grid-cols-2 gap-2" }, [["room", "ห้องซ้อม"], ["teaching", "สอน"]].map(([value, label]) => React.createElement("button", { key: value, type: "button", onClick: () => changeStudioService(value), className: "py-2.5 rounded-xl text-sm font-bold", style: { background: f.studioService === value ? T.blue : T.surf2, color: f.studioService === value ? "#fff" : T.sub, border: `1px solid ${f.studioService === value ? T.blue : T.border}` } }, label))),
                 Number(f.ratePerHour) !== recommendedRate && React.createElement("button", { type: "button", onClick: () => setF(current => ({ ...current, ratePerHour: recommendedRate })), className: "w-full mt-2 py-2 rounded-lg text-[10px] font-bold", style: { background: hex(T.blue, .1), color: T.blue, border: `1px solid ${hex(T.blue, .35)}` } }, `ใช้เรทแนะนำ ${studioServiceLabel(f.studioService)} · ฿${recommendedRate}/ชม.`)));
-            children.push(React.createElement(Input, { key: "name", label: f.studioService === "teaching" ? "ชื่อนักเรียน / รายการสอน" : "ชื่อวง / ลูกค้า", value: f.bandName, onChange: value => setF(current => ({ ...current, bandName: value })), placeholder: f.studioService === "teaching" ? "เช่น สอนกลอง — น้องเอ" : "เช่น วง ABC" }));
+            children.push(React.createElement(SuggestInput, { key: "name", label: f.studioService === "teaching" ? "ชื่อนักเรียน / รายการสอน" : "ชื่อวง / ลูกค้า", value: f.bandName, onChange: value => setF(current => ({ ...current, bandName: value })), placeholder: f.studioService === "teaching" ? "เช่น สอนกลอง — น้องเอ" : "เช่น วง ABC", options: bandNameOptions, listLabel: "เคยมาแล้ว" }));
         }
         children.push(React.createElement(TimeRangePicker, { key: "time", startTime: f.startTime, endTime: effectiveEndTime, timeMode: loyaltyMode ? "duration" : f.timeMode, durationHours: loyaltyMode ? 1 : f.durationHours, onChange: changeTime }));
         if (!loyaltyMode) {
@@ -11220,6 +11235,23 @@ try {
         return React.createElement("div", { className: "mb-3" },
             React.createElement(Label, null, label),
             React.createElement("input", { type: type, value: value, onChange: e => onChange(e.target.value), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }));
+    }
+    /* Same look as Input, plus suggestions from whatever the user typed before.
+       The list button shows every past entry; typing narrows it down. */
+    function SuggestInput({ label, value, onChange, placeholder, options = [], listLabel = "เลือกจากรายการเดิม" }) {
+        const [open, setOpen] = useState(false);
+        const [showAll, setShowAll] = useState(false);
+        const pool = useMemo(() => [...new Set((options || []).map(o => String(o || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")), [options]);
+        const query = String(value || "").trim().toLocaleLowerCase("th");
+        const matches = showAll ? pool : (query ? pool.filter(o => o.toLocaleLowerCase("th").includes(query) && o.toLocaleLowerCase("th") !== query) : []);
+        const pick = (option) => { onChange(option); setOpen(false); setShowAll(false); };
+        return React.createElement("div", { className: "mb-3", style: { position: "relative" } },
+            React.createElement("div", { className: "flex items-center justify-between" },
+                React.createElement(Label, null, label),
+                pool.length > 0 && React.createElement("button", { type: "button", onClick: () => { setShowAll(current => !(current && open)); setOpen(current => !(current && showAll)); }, className: "text-[10px] font-bold", style: { color: T.blue, marginBottom: 4 } }, `${listLabel} (${pool.length})`)),
+            React.createElement("input", { value: value, onChange: e => { onChange(e.target.value); setShowAll(false); setOpen(true); }, onFocus: () => setOpen(true), onBlur: () => setTimeout(() => { setOpen(false); setShowAll(false); }, 150), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+            open && matches.length > 0 && React.createElement("div", { className: "rounded-xl overflow-hidden", style: { position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 30, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 12px 30px rgba(83,67,43,.16)", maxHeight: 216, overflowY: "auto" } },
+                matches.slice(0, 40).map((option, index) => React.createElement("button", { key: option, type: "button", onMouseDown: e => e.preventDefault(), onClick: () => pick(option), className: "w-full px-3 py-2.5 text-left text-sm active:scale-[.99]", style: { borderTop: index ? `1px solid ${T.border}` : "none" } }, option))));
     }
     function TimeInput({ value, onChange }) {
         return React.createElement("input", { type: "time", value: value, onChange: e => onChange(e.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } });
