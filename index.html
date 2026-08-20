@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-08-04-suggest-150";
+window.__TASKROUTINE_BUILD__="2026-08-04-rest-autostart-151";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -9674,6 +9674,11 @@ try {
                 openFinish();
                 return;
             }
+            /* Mid-round in a superset there is no rest by design (you move straight to
+               the paired exercise). Everywhere else a finished set starts the clock —
+               falling back to the exercise's own rest, then the last duration used. */
+            if (restSec === null && !inGroup)
+                restSec = exercises[exIdx].rest ?? null;
             if (restSec !== null)
                 startRest(restSec || undefined);
         };
