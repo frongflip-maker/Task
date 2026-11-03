@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-deposit-purpose-v20";
+window.__TASKROUTINE_BUILD__="2026-11-04-simple-finance-v21";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -5552,55 +5552,21 @@ try {
     }
     function ExpensePresetPicker({ presets = [], value, onPick, onAddPreset, onUpdatePreset, onReorder, onRenamePreset, onDeletePreset, onUseRecent, hasRecent = false, smartSaved = false, rememberAmount = false, onRememberAmountChange, title = "รายการ", recentTitles = [] }) {
         const [reorderOpen, setReorderOpen] = useState(false);
-        const [typingMode, setTypingMode] = useState(false);
-        const [showSuggest, setShowSuggest] = useState(true);
-        const isPreset = presets.includes(value) && !typingMode;
-        const suggestions = (() => {
-            const query = String(value || "").trim().toLocaleLowerCase("th");
-            if (!query)
-                return [];
-            const seen = new Set();
-            const pool = [...presets, ...recentTitles];
-            const out = [];
-            for (const name of pool) {
-                const clean = String(name || "").trim();
-                const key = clean.toLocaleLowerCase("th");
-                if (!clean || seen.has(key))
-                    continue;
-                seen.add(key);
-                if (key === query)
-                    continue;
-                if (key.includes(query))
-                    out.push({ name: clean, isPreset: presets.includes(clean) });
-                if (out.length >= 6)
-                    break;
-            }
-            return out;
-        })();
-        return (React.createElement("div", { className: "mb-3" },
-            React.createElement("div", { className: "flex items-center justify-between gap-2" },
-                React.createElement(Label, null, title),
-                React.createElement("div", { className: "flex items-center gap-2 mb-1" },
-                    smartSaved && React.createElement("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(T.green, .13), color: T.green } }, "SMART"),
-                    presets.length > 0 && onReorder && React.createElement("button", { type: "button", onClick: () => setReorderOpen(true), className: "text-[10px] font-bold", style: { color: T.orange } }, "จัดการ"))),
-            React.createElement("select", { value: isPreset ? value : "__custom", onChange: event => { if (event.target.value === "__custom") { setTypingMode(true); onPick(""); } else { setTypingMode(false); onPick(event.target.value); } }, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${isPreset ? hex(T.blue, .45) : T.border}` } },
-                presets.length === 0 && React.createElement("option", { value: "__custom" }, "พิมพ์รายการใหม่"),
-                presets.map(preset => React.createElement("option", { key: preset, value: preset }, preset)),
-                presets.length > 0 && React.createElement("option", { value: "__custom" }, "+ รายการใหม่ / พิมพ์เอง")),
-            !isPreset && React.createElement("div", { className: "mt-2" },
-                React.createElement("div", { className: "flex gap-2" },
-                    React.createElement("input", { value: value, onChange: event => { setTypingMode(true); setShowSuggest(true); onPick(event.target.value, true); }, placeholder: "ชื่อรายการ", className: "flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
-                    onAddPreset && React.createElement("button", { type: "button", disabled: !value.trim(), onClick: () => onAddPreset(value.trim(), rememberAmount), className: "px-3 py-2 rounded-xl text-[10px] font-bold shrink-0", style: { background: value.trim() ? T.blue : T.border, color: value.trim() ? "#fff" : T.muted } }, "บันทึก Template")),
-                showSuggest && suggestions.length > 0 && React.createElement("div", { className: "mt-1.5 rounded-xl overflow-hidden", style: { border: `1px solid ${T.border}` } }, suggestions.map((item, idx) => React.createElement("button", { key: item.name, type: "button", onClick: () => { setShowSuggest(false); setTypingMode(false); onPick(item.name); }, className: "w-full px-3 py-2.5 flex items-center gap-2 text-left active:scale-[.98]", style: { background: "#FFFDF8", borderTop: idx > 0 ? `1px solid ${T.border}` : "none" } },
-                    React.createElement(Search, { size: 13, style: { color: T.muted, flexShrink: 0 } }),
-                    React.createElement("span", { className: "flex-1 min-w-0 truncate text-sm" }, item.name),
-                    item.isPreset && React.createElement("span", { className: "shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full", style: { background: hex(T.blue, .14), color: T.blue } }, "Template")))),
-                hasRecent && onUseRecent && React.createElement("button", { type: "button", onClick: () => onUseRecent(value.trim()), className: "w-full mt-2 py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1", style: { background: hex(T.cyan, .12), color: T.cyan, border: `1px solid ${hex(T.cyan, .35)}` } }, React.createElement(History, { size: 12 }), "ใช้หมวดและบัญชีจากครั้งล่าสุด")),
-            isPreset && onUpdatePreset && React.createElement("button", { type: "button", onClick: () => onUpdatePreset(value, rememberAmount), className: "w-full mt-2 py-2 rounded-lg text-[10px] font-bold", style: { background: hex(T.blue, .11), color: T.blue, border: `1px solid ${hex(T.blue, .35)}` } }, smartSaved ? "อัปเดต Smart Template จากค่าปัจจุบัน" : "บันทึกค่าปัจจุบันเป็น Smart Template"),
-            (onAddPreset || onUpdatePreset) && React.createElement("button", { type: "button", onClick: () => onRememberAmountChange?.(!rememberAmount), className: "mt-2 flex items-center gap-2 text-[10px] font-semibold", style: { color: T.sub } },
-                React.createElement("span", { className: "w-4 h-4 rounded flex items-center justify-center shrink-0", style: { background: rememberAmount ? T.green : T.surf, border: `1px solid ${rememberAmount ? T.green : T.border}`, color: rememberAmount ? "#fff" : "transparent" } }, React.createElement(Check, { size: 11 })),
-                "จำจำนวนเงินใน Template ด้วย"),
-            reorderOpen && React.createElement(ManageListSheet, { title: title, items: presets, allowRename: true, onRename: onRenamePreset, onDelete: onDeletePreset, onClose: () => setReorderOpen(false), onSave: (newList) => { onReorder(newList); setReorderOpen(false); } })));
+        const [focused, setFocused] = useState(false);
+        const query = String(value || "").trim().toLocaleLowerCase("th");
+        const suggestions = [...new Set([...presets, ...recentTitles].filter(Boolean))].filter(name => !query || (name.toLocaleLowerCase("th").includes(query) && name.toLocaleLowerCase("th") !== query)).slice(0,4);
+        return React.createElement("div", { style: { marginBottom: 14 } },
+            React.createElement(Label, null, "ชื่อรายการ"),
+            React.createElement("input", { "aria-label": "ชื่อรายการ", value, onFocus: () => setFocused(true), onBlur: () => setFocused(false), onChange: e => onPick(e.target.value, true), placeholder: "เช่น ค่าอาหาร / ดอกเบี้ย", style: { width: "100%", padding: "11px 12px", borderRadius: 12, background: T.surf2, color: T.text, border: `1px solid ${T.border}`, fontSize: 16, outline: "none" } }),
+            focused && suggestions.length > 0 && React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingTop: 7 } }, suggestions.map(name => React.createElement("button", { key: name, type: "button", onPointerDown: e => e.preventDefault(), onClick: () => { onPick(name); setFocused(false); }, style: { flexShrink: 0, maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "7px 10px", borderRadius: 9, border: `1px solid ${T.border}`, color: T.sub, background: T.surf, fontSize: 12 } }, name))),
+            (onAddPreset || onReorder) && React.createElement("details", { style: { marginTop: 7, fontSize: 11, color: T.muted } },
+                React.createElement("summary", { style: { cursor: "pointer", padding: "4px 0" } }, "รายการที่ใช้บ่อย"),
+                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 } }, presets.map(name => React.createElement("button", { key: name, type: "button", onClick: () => onPick(name), style: { padding: "7px 9px", borderRadius: 8, background: T.surf2, border: `1px solid ${T.border}`, color: T.sub, fontSize: 12 } }, name))),
+                value.trim() && onAddPreset && React.createElement("button", { type: "button", onClick: () => (presets.includes(value) && onUpdatePreset ? onUpdatePreset : onAddPreset)(value.trim(), rememberAmount), style: { padding: "9px 0", color: T.blue, fontWeight: 700 } }, smartSaved ? "อัปเดตค่าที่จำไว้" : "จำรายการนี้ไว้ใช้ครั้งหน้า"),
+                onRememberAmountChange && React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, padding: "5px 0" } }, React.createElement("input", { type: "checkbox", checked: rememberAmount, onChange: e => onRememberAmountChange(e.target.checked) }), "จำจำนวนเงินด้วย"),
+                hasRecent && onUseRecent && React.createElement("button", { type: "button", onClick: () => onUseRecent(value.trim()), style: { padding: "8px 0", color: T.blue, display: "block" } }, "ใช้หมวดและบัญชีจากครั้งล่าสุด"),
+                presets.length > 0 && onReorder && React.createElement("button", { type: "button", onClick: () => setReorderOpen(true), style: { padding: "8px 0", color: T.orange, display: "block" } }, "จัดการรายการที่ใช้บ่อย")),
+            reorderOpen && React.createElement(ManageListSheet, { title, items: presets, allowRename: true, onRename: onRenamePreset, onDelete: onDeletePreset, onClose: () => setReorderOpen(false), onSave: list => { onReorder(list); setReorderOpen(false); } }));
     }
     const incomePaymentSubject = (category, studioService = "room") => {
         const normalized = normalizeIncomeCategory(category || "Work");
@@ -5615,7 +5581,8 @@ try {
         if (!stage || !base) return base;
         return `${stage === "deposit" ? "มัดจำ" : "ส่วนที่เหลือ"}${incomePaymentSubject(category, studioService)}: ${base}`;
     };
-    function TxnSectionCard({ title, subtitle, color, children }) {
+    function TxnSectionCard({ title, subtitle, color, children, bare = false }) {
+        if (bare) return React.createElement("div", { style: { marginBottom: 12 } }, children);
         return React.createElement(
           "div",
           {
@@ -6165,6 +6132,10 @@ try {
           initial.taxable === false)
       );
       const [advancedOpen, setAdvancedOpen] = useState(initialAdvancedOpen);
+      const [dateOpen, setDateOpen] = useState(false);
+      const CompactDate = () => React.createElement("div", { style: { marginBottom: 12 } },
+        React.createElement("button", { type: "button", onClick: () => setDateOpen(v => !v), style: { display: "flex", alignItems: "center", gap: 7, padding: "8px 0", color: T.sub, fontSize: 12 } }, React.createElement(CalendarDays, { size: 15 }), f.date === TK ? "วันนี้" : shortDate(f.date), React.createElement(ChevronDown, { size: 13 })),
+        dateOpen && React.createElement(DateInput, { value: f.date, onChange: v => { setF(current => ({ ...current, date: v })); setDateOpen(false); } }));
       const txnColor = isTransfer ? TRANSFER_COLOR : f.kind === "in" ? T.green : T.red;
       const accountName = (id) =>
         accounts.find((account) => account.id === id)?.name || "ยังไม่เลือกบัญชี";
@@ -6362,7 +6333,7 @@ try {
             type: "button",
             onClick: () => setAdvancedOpen((value) => !value),
             className:
-              "w-full flex items-center gap-3 p-3.5 rounded-2xl mb-3 text-left active:scale-[.99]",
+              "w-full flex items-center gap-2 p-2.5 rounded-xl mb-3 text-left active:scale-[.99]",
             style: {
               background: advancedOpen ? hex(T.orange, 0.11) : T.surf2,
               border: `1px solid ${advancedOpen ? hex(T.orange, 0.45) : T.border}`,
@@ -6372,7 +6343,7 @@ try {
             "span",
             {
               className:
-                "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
               style: { background: hex(T.orange, 0.14), color: T.orange },
             },
             React.createElement(Settings, { size: 16 }),
@@ -6383,14 +6354,14 @@ try {
             React.createElement(
               "div",
               { className: "text-sm font-bold" },
-              "รายละเอียดเพิ่มเติม",
+              "ตัวเลือกเพิ่มเติม",
             ),
             React.createElement(
               "div",
               { className: "text-[10px] mt-0.5", style: { color: T.muted } },
               advancedActiveCount
                 ? `กำลังใช้ตัวเลือกพิเศษ ${advancedActiveCount} รายการ`
-                : "แยกรายการ เงินสำรอง ภาษี Statement และหมายเหตุ",
+                : f.kind === "out" ? "แบ่งค่าใช้จ่าย · สำรองจ่าย · หมายเหตุ" : "ผู้จ่าย · แบ่งเงิน · ภาษี · หมายเหตุ",
             ),
           ),
           advancedActiveCount > 0 &&
@@ -6558,20 +6529,19 @@ try {
               ? "ทำซ้ำธุรกรรม"
               : studioMode
               ? "เพิ่มรายจ่ายห้องซ้อม"
-              : "เพิ่มรายรับ-รายจ่าย",
+              : f.kind === "in" ? "เพิ่มรายรับ" : f.kind === "transfer" ? "เพิ่มการโอนย้าย" : "เพิ่มรายจ่าย",
         },
         React.createElement(
           TxnSectionCard,
           {
             title: "ข้อมูลหลัก",
+            bare: !isTransfer && !linkedIncomeSource,
             subtitle: studioMode
               ? "กรอกยอดบิลเต็ม แล้วแบ่งส่วนห้องซ้อมและส่วนตัวด้านล่าง"
               : "เลือกประเภท ใส่ยอด และวันที่",
             color: txnColor,
           },
-          !linkedIncomeSource && React.createElement("div", { className: "mb-3" },
-            React.createElement(Label, null, studioBookingLinkActive ? "วันที่รับเงิน" : "วันที่"),
-            React.createElement(DateInput, { value: f.date, onChange: (v) => setF({ ...f, date: v }) })),
+          isTransfer && React.createElement(CompactDate, null),
           !studioMode &&
             React.createElement(
               "div",
@@ -6616,12 +6586,13 @@ try {
                 );
               }),
             ),
-          !studioMode && f.kind === "in" && !editMode && !duplicateMode && !paymentEditMode && React.createElement("div", { className: "mb-3" },
+          !studioMode && f.kind === "in" && !editMode && !duplicateMode && !paymentEditMode && activeIncomeSources.length > 0 && React.createElement("details", { open: linkedIncomeSource ? true : undefined, style: { marginBottom: 8, fontSize: 12 } },
+            React.createElement("summary", { style: { color: T.blue, padding: "8px 0", cursor: "pointer" } }, linkedIncomeSource ? "งานค้างรับที่เลือก" : "+ รับเงินจากงานค้างรับ"),
             React.createElement(Label, null, "เลือกงานค้างรับ (ถ้ามี)"),
             React.createElement("select", { value: linkedIncomeSourceId, onChange: event => selectLinkedIncomeSource(event.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: linkedIncomeSource ? hex(T.green, .14) : T.surf2, color: linkedIncomeSource ? T.green : T.text, fontWeight: linkedIncomeSource ? 800 : 400, border: `${linkedIncomeSource ? 2 : 1}px solid ${linkedIncomeSource ? T.green : T.border}` } },
               React.createElement("option", { value: "" }, "— ไม่เลือกงาน —"),
               activeIncomeSources.map(source => React.createElement("option", { key: source.id, value: source.id }, `${shortDate(source.dueDate)} · ${source.title} · เหลือ ${fmtBaht(incomeSourceRemainingAmount(source, payments))}`))),
-            React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, linkedIncomeSource ? "รายการนี้จะบันทึกเป็น Payment และไม่สร้าง Transaction ซ้ำ" : "เลือกงานเมื่อต้องการตัดยอดค้างรับ")),
+            React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, linkedIncomeSource ? "บันทึกครั้งนี้จะตัดยอดค้างรับของงานที่เลือก" : "เลือกเมื่อต้องการตัดยอดค้างรับ")),
           linkedIncomeSource ? AmountField() : null,
           linkedIncomeSource ? React.createElement("div", { className: "grid gap-2 mb-1", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))", alignItems: "end" } },
             React.createElement("div", { className: "min-w-0" },
@@ -6786,6 +6757,7 @@ try {
                 TxnSectionCard,
                 {
                   title: "ข้อมูลรายการ",
+                  bare: true,
                   subtitle: "เลือกรายการเดิมหรือพิมพ์ชื่อใหม่",
                   color: txnColor,
                 },
@@ -6793,6 +6765,7 @@ try {
                   React.createElement("div", { className: "text-[10px] font-bold", style: { color: T.green } }, "เชื่อมจากงานค้างรับ"),
                   React.createElement("div", { className: "text-sm font-bold mt-1" }, linkedIncomeSource.title),
                   React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, `${normalizeIncomeCategory(linkedIncomeSource.category || "Work")} · ${shortDate(linkedIncomeSource.dueDate)}`)),
+                !linkedIncomeSource && AmountField(),
                 !linkedIncomeSource && React.createElement(ExpensePresetPicker, {
                   title: "รายการ",
                   value: f.title,
@@ -6819,30 +6792,16 @@ try {
                   recentTitles: studioMode ? [] : [...new Set(transactions.filter(t => t.kind === f.kind && String(t.title || "").trim()).map(t => String(t.title).trim()))],
                 }),
                 templateHint && React.createElement("div", { className: "text-[10px] font-semibold -mt-1 mb-1", style: { color: T.green } }, templateHint),
-                !linkedIncomeSource && AmountField(),
-                renderManualIncomeAllocation(),
+                (advancedOpen || linkedAllocations.length > 1) && renderManualIncomeAllocation(),
               ),
               React.createElement(
                 TxnSectionCard,
                 {
                   title: "เส้นทางเงิน",
+                  bare: true,
                   subtitle: "กำหนดบัญชีและหมวดให้ตรงกับเงินจริง",
                   color: txnColor,
                 },
-                !(splitAccounts && f.kind === "in" && !studioMode) && React.createElement(AccPicker, { transactions, payments,
-                  label: studioMode
-                    ? "จ่ายจากบัญชี"
-                    : f.kind === "in"
-                      ? "เงินเข้าบัญชี"
-                      : "เงินออกบัญชี",
-                  accounts: accounts,
-                  value: f.accountId,
-                  allowForeign: f.kind === "in" && !studioMode && !linkedIncomeSource && !studioBookingLinkActive && !f.sharedIncome && !splitAccounts && linkedAllocations.length <= 1,
-                  onChange: (v) => setF({ ...f, accountId: v }),
-                }),
-                foreignIncome && React.createElement(React.Fragment, null,
-                    React.createElement(Input, { label: `เรทอ้างอิง · 1 ${incomeCurrency} = กี่บาท (ไม่บังคับ)`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF(current => ({ ...current, sourceRateTHB: v })), placeholder: "เว้นว่างได้ เพิ่มภายหลังได้" }),
-                    React.createElement("p", { style: { fontSize: 12, lineHeight: 1.7, color: T.sub, marginBottom: 12 } }, Number(f.sourceRateTHB)>0 ? `เข้าบัญชี ${moneyIn(f.amount,incomeCurrency)} · มูลค่ารายรับ ${moneyIn(foreignIncomeTHB)}` : `เข้าบัญชีเป็น ${incomeCurrency} · ยังไม่ระบุมูลค่าเงินบาท จึงยังไม่รวมรายงานบาท`)),
                 !studioMode && !linkedIncomeSource &&
                   React.createElement(CatPicker, {
                     label: "หมวด",
@@ -6870,6 +6829,138 @@ try {
                     onDelete: (name) => onDeleteCategory?.(catKey(f.kind), name),
                     lockedItems: f.kind === "in" ? CORE_INCOME_CATEGORIES : [],
                   }),
+                !(splitAccounts && f.kind === "in" && !studioMode) && React.createElement(AccPicker, { transactions, payments,
+                  label: studioMode
+                    ? "จ่ายจากบัญชี"
+                    : f.kind === "in"
+                      ? "เงินเข้าบัญชี"
+                      : "เงินออกบัญชี",
+                  accounts: accounts,
+                  value: f.accountId,
+                  allowForeign: f.kind === "in" && !studioMode && !linkedIncomeSource && !studioBookingLinkActive && !f.sharedIncome && !splitAccounts && linkedAllocations.length <= 1,
+                  onChange: (v) => setF({ ...f, accountId: v }),
+                }),
+                !linkedIncomeSource && React.createElement(CompactDate, null),
+                !studioMode && f.kind === "in" && !linkedIncomeSource && React.createElement(React.Fragment, null,
+                      React.createElement(
+                        "div",
+                        { className: "mb-3" },
+                        React.createElement(Label, null, "ประเภทเงินเข้า"),
+                        React.createElement(
+                          "select",
+                          {
+                            value: f.moneyType,
+                            onChange: (e) => {
+                              const moneyType = e.target.value;
+                              setF({
+                                ...f,
+                                moneyType,
+                                paymentStage:
+                                  moneyType === "work_income" ? f.paymentStage : "",
+                                taxable: moneyType === "work_income",
+                                linkedExpenseId:
+                                  moneyType === "reimbursement"
+                                    ? f.linkedExpenseId
+                                    : "",
+                              });
+                            },
+                            className:
+                              "w-full px-3 py-2.5 rounded-xl text-sm outline-none",
+                            style: {
+                              background: T.surf2,
+                              color: T.text,
+                              border: `1px solid ${T.border}`,
+                              
+                            },
+                          },
+                          React.createElement(
+                            "option",
+                            { value: "work_income" },
+                            "รายได้จากงาน",
+                          ),
+                          React.createElement(
+                            "option",
+                            { value: "reimbursement" },
+                            "เงินคืนค่าใช้จ่ายที่สำรองจ่าย",
+                          ),
+                          React.createElement(
+                            "option",
+                            { value: "refund" },
+                            "เงินคืนจากร้าน / Refund",
+                          ),
+                          React.createElement(
+                            "option",
+                            { value: "personal" },
+                            "เงินส่วนตัว/อื่น ๆ",
+                          ),
+                        ),
+                      ),
+                      f.moneyType === "reimbursement" &&
+                        React.createElement(
+                          "div",
+                          { className: "mb-3" },
+                          React.createElement(
+                            Label,
+                            null,
+                            "เชื่อมกับรายจ่ายที่สำรองไว้",
+                          ),
+                          React.createElement(
+                            "select",
+                            {
+                              value: f.linkedExpenseId,
+                              onChange: (e) => {
+                                const linkedExpenseId = e.target.value;
+                                const expense = outstandingExpenses.find(
+                                  (item) => item.id === linkedExpenseId,
+                                );
+                                const remaining = expense
+                                  ? Math.max(
+                                      0,
+                                      Number(expense.reimbursableAmount) -
+                                        reimbursementReceived(
+                                          expense.id,
+                                          transactions,
+                                        ),
+                                    )
+                                  : 0;
+                                setF({
+                                  ...f,
+                                  linkedExpenseId,
+                                  title: expense
+                                    ? `รับคืน: ${expense.title}`
+                                    : f.title,
+                                  amount: expense ? String(remaining) : f.amount,
+                                  payer: expense?.owedBy || f.payer,
+                                });
+                              },
+                              className:
+                                "w-full px-3 py-2.5 rounded-xl text-sm outline-none",
+                              style: {
+                                background: T.surf2,
+                                color: T.text,
+                                border: `1px solid ${T.border}`,
+                                
+                              },
+                            },
+                            React.createElement(
+                              "option",
+                              { value: "" },
+                              "ไม่เชื่อมรายการ",
+                            ),
+                            outstandingExpenses.map((expense) =>
+                              React.createElement(
+                                "option",
+                                { key: expense.id, value: expense.id },
+                                `${expense.title} · เหลือ ${fmtBaht(Math.max(0, Number(expense.reimbursableAmount) - reimbursementReceived(expense.id, transactions)))}`,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+                foreignIncome && React.createElement("details", { open: Number(f.sourceRateTHB) > 0 ? true : undefined, style: { marginBottom: 12 } },
+                    React.createElement("summary", { style: { cursor: "pointer", fontSize: 12, color: T.sub, padding: "8px 0" } }, "เรทอ้างอิงเงินบาท (ไม่บังคับ)"),
+                    React.createElement(Input, { label: `เรทอ้างอิง · 1 ${incomeCurrency} = กี่บาท (ไม่บังคับ)`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF(current => ({ ...current, sourceRateTHB: v })), placeholder: "เว้นว่างได้ เพิ่มภายหลังได้" }),
+                    React.createElement("p", { style: { fontSize: 12, lineHeight: 1.7, color: T.sub, marginBottom: 12 } }, Number(f.sourceRateTHB)>0 ? `เข้าบัญชี ${moneyIn(f.amount,incomeCurrency)} · มูลค่ารายรับ ${moneyIn(foreignIncomeTHB)}` : `เข้าบัญชีเป็น ${incomeCurrency} · ยังไม่ระบุมูลค่าเงินบาท จึงยังไม่รวมรายงานบาท`)),
                 !studioMode &&
                   f.kind === "in" &&
                   normalizeIncomeCategory(f.category) === "Studio" &&
@@ -7356,41 +7447,14 @@ try {
                               "จัดการ",
                             ),
                         ),
-                        payerOptions.length > 0 &&
-                          React.createElement(
-                            "select",
-                            {
-                              value: payerOptions.includes(f.payer) ? f.payer : "",
-                              onChange: (event) => {
-                                if (event.target.value)
-                                  setF({ ...f, payer: event.target.value });
-                              },
-                              className:
-                                "w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-2",
-                              style: {
-                                background: T.surf2,
-                                color: T.text,
-                                border: `1px solid ${T.border}`,
-                              },
-                            },
-                            React.createElement(
-                              "option",
-                              { value: "" },
-                              "เลือกชื่อที่เคยบันทึก…",
-                            ),
-                            payerOptions.map((name) =>
-                              React.createElement(
-                                "option",
-                                { key: name, value: name },
-                                name,
-                              ),
-                            ),
-                          ),
+                        React.createElement("datalist", { id: "txn-payer-suggestions" }, payerOptions.map(name => React.createElement("option", { key: name, value: name }))),
                         React.createElement("input", {
+                          list: "txn-payer-suggestions",
+                          "aria-label": "ผู้จ่าย/ผู้โอน",
                           value: f.payer,
                           onChange: (event) =>
                             setF({ ...f, payer: event.target.value }),
-                          placeholder: "หรือพิมพ์ชื่อใหม่",
+                          placeholder: "เลือกชื่อเดิมหรือพิมพ์ชื่อใหม่",
                           className:
                             "w-full px-3 py-2.5 rounded-xl text-sm outline-none",
                           style: {
@@ -7399,14 +7463,6 @@ try {
                             border: `1px solid ${T.border}`,
                           },
                         }),
-                        React.createElement(
-                          "div",
-                          {
-                            className: "text-[10px] mt-1",
-                            style: { color: T.muted },
-                          },
-                          "เมื่อบันทึกธุรกรรม ชื่อนี้จะขึ้นใน dropdown ครั้งต่อไป",
-                        ),
                         payerManageOpen &&
                           React.createElement(ManageListSheet, {
                             title: "ผู้จ่าย/ผู้โอน",
@@ -7419,161 +7475,7 @@ try {
                             },
                           }),
                       ),
-                      React.createElement(
-                        "div",
-                        { className: "mb-3" },
-                        React.createElement(Label, null, "ลักษณะเงินเข้า"),
-                        React.createElement(
-                          "select",
-                          {
-                            value: f.moneyType,
-                            onChange: (e) => {
-                              const moneyType = e.target.value;
-                              setF({
-                                ...f,
-                                moneyType,
-                                paymentStage:
-                                  moneyType === "work_income" ? f.paymentStage : "",
-                                taxable: moneyType === "work_income",
-                                linkedExpenseId:
-                                  moneyType === "reimbursement"
-                                    ? f.linkedExpenseId
-                                    : "",
-                              });
-                            },
-                            className:
-                              "w-full px-3 py-2.5 rounded-xl text-sm outline-none",
-                            style: {
-                              background: T.surf2,
-                              color: T.text,
-                              border: `1px solid ${T.border}`,
-                              colorScheme: "dark",
-                            },
-                          },
-                          React.createElement(
-                            "option",
-                            { value: "work_income" },
-                            "รายได้จากงาน",
-                          ),
-                          React.createElement(
-                            "option",
-                            { value: "reimbursement" },
-                            "เงินคืนค่าใช้จ่ายที่สำรองจ่าย",
-                          ),
-                          React.createElement(
-                            "option",
-                            { value: "refund" },
-                            "เงินคืนจากร้าน / Refund",
-                          ),
-                          React.createElement(
-                            "option",
-                            { value: "personal" },
-                            "เงินส่วนตัว/อื่น ๆ",
-                          ),
-                        ),
-                      ),
-                      f.moneyType === "reimbursement" &&
-                        React.createElement(
-                          "div",
-                          { className: "mb-3" },
-                          React.createElement(
-                            Label,
-                            null,
-                            "เชื่อมกับรายจ่ายที่สำรองไว้",
-                          ),
-                          React.createElement(
-                            "select",
-                            {
-                              value: f.linkedExpenseId,
-                              onChange: (e) => {
-                                const linkedExpenseId = e.target.value;
-                                const expense = outstandingExpenses.find(
-                                  (item) => item.id === linkedExpenseId,
-                                );
-                                const remaining = expense
-                                  ? Math.max(
-                                      0,
-                                      Number(expense.reimbursableAmount) -
-                                        reimbursementReceived(
-                                          expense.id,
-                                          transactions,
-                                        ),
-                                    )
-                                  : 0;
-                                setF({
-                                  ...f,
-                                  linkedExpenseId,
-                                  title: expense
-                                    ? `รับคืน: ${expense.title}`
-                                    : f.title,
-                                  amount: expense ? String(remaining) : f.amount,
-                                  payer: expense?.owedBy || f.payer,
-                                });
-                              },
-                              className:
-                                "w-full px-3 py-2.5 rounded-xl text-sm outline-none",
-                              style: {
-                                background: T.surf2,
-                                color: T.text,
-                                border: `1px solid ${T.border}`,
-                                colorScheme: "dark",
-                              },
-                            },
-                            React.createElement(
-                              "option",
-                              { value: "" },
-                              "ไม่เชื่อมรายการ",
-                            ),
-                            outstandingExpenses.map((expense) =>
-                              React.createElement(
-                                "option",
-                                { key: expense.id, value: expense.id },
-                                `${expense.title} · เหลือ ${fmtBaht(Math.max(0, Number(expense.reimbursableAmount) - reimbursementReceived(expense.id, transactions)))}`,
-                              ),
-                            ),
-                          ),
-                        ),
-                      React.createElement(
-                        "div",
-                        { className: "mb-3" },
-                        React.createElement(Label, null, "สถานะตรวจ Statement"),
-                        React.createElement(
-                          "select",
-                          {
-                            value: f.reconcileStatus,
-                            onChange: (e) =>
-                              setF({ ...f, reconcileStatus: e.target.value }),
-                            className:
-                              "w-full px-3 py-2.5 rounded-xl text-sm outline-none",
-                            style: {
-                              background: T.surf2,
-                              color: T.text,
-                              border: `1px solid ${T.border}`,
-                              colorScheme: "dark",
-                            },
-                          },
-                          React.createElement(
-                            "option",
-                            { value: "unchecked" },
-                            "ยังไม่ตรวจ",
-                          ),
-                          React.createElement(
-                            "option",
-                            { value: "matched" },
-                            "ตรงกับ Statement แล้ว",
-                          ),
-                          React.createElement(
-                            "option",
-                            { value: "mismatch" },
-                            "ยอด/ข้อมูลไม่ตรง",
-                          ),
-                          React.createElement(
-                            "option",
-                            { value: "missing" },
-                            "ไม่พบใน Statement",
-                          ),
-                        ),
-                      ),
+
                     ),
                   React.createElement(Input, {
                     label: "หมายเหตุ (ไม่บังคับ)",
@@ -7709,15 +7611,14 @@ try {
                     ),
                 ),
             ),
-        !isTransfer && f.kind==="out" && React.createElement(TxnSectionCard,{title:"แบ่งส่วนค่าใช้จ่าย",subtitle:"บันทึกบิลเต็มครั้งเดียว แล้วเลือกส่วนของเงินที่ใช้จ่าย",color:T.purple},
-            React.createElement(FinanceSelect,{label:"หักเงินจากส่วนไหน",value:expensePocket,options:{personal:"ส่วนตัวทั้งหมด",studio:"ห้องซ้อมทั้งหมด",mixed:"แบ่งห้องซ้อม + ส่วนตัว"},onChange:setExpensePocket}),
-            expensePocket==="mixed"&&React.createElement(Input,{label:"ค่าใช้จ่ายส่วนห้องซ้อม (บาท)",type:"number",value:studioPart,onChange:setStudioPart,placeholder:"เช่น 600"}),
-            React.createElement("div",{className:"text-xs leading-relaxed",style:{color:pocketValid?T.sub:T.red}},pocketValid?`บิลรวม ${moneyIn(f.amount)} · ห้องซ้อม ${moneyIn(billStudio)} · ส่วนตัว ${moneyIn(billPersonal)}`:"ส่วนห้องซ้อมต้องอยู่ระหว่าง 0 ถึงยอดบิลรวม"),
-            expensePocket==="mixed"&&React.createElement("p",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.muted}},"หากรับเงินคืนที่เชื่อมกับบิลนี้ ระบบแบ่งคืนตามสัดส่วนห้องซ้อมและส่วนตัวเดิม"),
-            !accounts.find(a=>a.id===f.accountId)?.pocketEnabled&&React.createElement("p",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.muted}},"แยกต้นทุนได้ทันที หากต้องการดูเงินคงเหลือแยกกระเป๋า ให้เปิดแยกกระเป๋าในหน้าบัญชีด้วย")),
+        !isTransfer && f.kind === "out" && (advancedOpen || studioMode || expensePocket !== "personal" || accounts.find(a => a.id === f.accountId)?.pocketEnabled) && React.createElement("div", { style: { marginBottom: 14 } },
+            React.createElement(Label, null, "หักเงินจากส่วนไหน"),
+            React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 8 } }, [["personal", "ส่วนตัว"], ["studio", "ห้องซ้อม"], ["mixed", "แบ่งกัน"]].map(([value, label]) => React.createElement("button", { key: value, type: "button", onClick: () => setExpensePocket(value), style: { flex: 1, padding: "10px 5px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: expensePocket === value ? hex(T.purple,.12) : T.surf2, color: expensePocket === value ? T.purple : T.sub, border: `1px solid ${expensePocket === value ? T.purple : T.border}` } }, label))),
+            expensePocket === "mixed" && React.createElement(Input, { label: "ส่วนห้องซ้อม (บาท)", type: "number", value: studioPart, onChange: setStudioPart, placeholder: "เช่น 600" }),
+            expensePocket === "mixed" && React.createElement("p", { style: { color: pocketValid ? T.sub : T.red, fontSize: 11 } }, pocketValid ? `ห้องซ้อม ${moneyIn(billStudio)} · ส่วนตัว ${moneyIn(billPersonal)}` : "ส่วนห้องซ้อมต้องอยู่ระหว่าง 0 ถึงยอดบิลรวม")),
         pocketRouting && f.kind === "in" && React.createElement("p",{className:"text-[11px] mb-3 leading-relaxed",style:{color:T.muted}},"บัญชีนี้แยกกระเป๋าอยู่ หากต้องโอนต่อ ให้บันทึกรับเงินก่อน แล้วใช้เมนูโอนย้ายเพื่อเลือกว่าส่วนตัวหรือห้องซ้อม"),
         isTransfer && (fromAcc?.pocketEnabled||toAcc?.pocketEnabled||initial?.pocketOwner==="studio")&&React.createElement(TxnSectionCard,{title:"ส่วนของเงินที่โอน",subtitle:"ย้ายเงินจริงระหว่างบัญชี โดยรักษาว่าเงินเป็นของส่วนไหน",color:T.purple},React.createElement(FinanceSelect,{label:"เงินโอนเป็นของ",value:transferPocket,options:{personal:"ส่วนตัว",studio:"Blurryroom Studio"},onChange:setTransferPocket})),
-        !linkedIncomeSource && React.createElement(TxnSummary, null),
+        !linkedIncomeSource && (isTransfer || f.sharedExpense || f.splitExpense || f.sharedIncome || transferOnward || linkedAllocations.length > 1) && React.createElement(TxnSummary, null),
         React.createElement(
           "div",
           {
@@ -8307,7 +8208,7 @@ try {
         return result;
     }
     const ledgerMoney = (value,currency) => `${new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0)} ${currency}`;
-    function StatementMoney({ children }) {
+    function StatementMoney({ children, inline = false }) {
         const box = React.useRef(null), content = React.useRef(null);
         useEffect(() => {
             const fit = () => {
@@ -8321,7 +8222,7 @@ try {
             if (box.current) observer.observe(box.current);
             return () => observer.disconnect();
         }, [children]);
-        return React.createElement("div", { ref: box, style: { width: "100%", minWidth: 0, whiteSpace: "nowrap", marginTop: 7, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
+        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "0 1 auto" : undefined, minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 7, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
             React.createElement("span", { ref: content, style: { display: "inline-flex", alignItems: "baseline", gap: 5, fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.5 } }, children));
     }
     function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
@@ -8347,19 +8248,23 @@ try {
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
                         React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 14, style: { color, flexShrink: 0 } }),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 750, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, transfer ? TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี" : row.title),
+                        !transfer && row.tag === row.title && React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`)),
                         flow !== "none" && INVESTMENT_FLOWS[flow] !== TRANSFER_PURPOSES[t.transferPurpose] && React.createElement("span", { style: { color: T.blue, fontSize: 10, flexShrink: 0 } }, INVESTMENT_FLOWS[flow]),
                         React.createElement(ChevronRight, { size: 13, style: { color: T.muted, flexShrink: 0 } })),
-                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 6 } },
-                        transfer ? React.createElement(React.Fragment, null,
+                    transfer ? React.createElement(React.Fragment, null,
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 6 } },
                             React.createElement(AccountBadge, { account: from, accounts }),
                             React.createElement("span", { style: { color: T.muted, fontSize: 12 } }, "→"),
-                            React.createElement(AccountBadge, { account: to, accounts })) :
-                            React.createElement(React.Fragment, null, row.tag !== row.title && React.createElement("span", { style: { color: T.muted, fontSize: 10 } }, row.tag), React.createElement(AccountBadge, { account, accounts }))),
-                    React.createElement(StatementMoney, null, transfer ? [
-                        React.createElement("span", { key: "sent", style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
-                        React.createElement("span", { key: "arrow", style: { color: T.muted } }, "→"),
-                        React.createElement("span", { key: "received", style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`)
-                    ] : React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`)),
+                            React.createElement(AccountBadge, { account: to, accounts })),
+                        React.createElement(StatementMoney, null,
+                            React.createElement("span", { style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
+                            React.createElement("span", { style: { color: T.muted } }, "→"),
+                            React.createElement("span", { style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`))) :
+                        React.createElement(React.Fragment, null,
+                            row.tag !== row.title && React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginTop: 6, minWidth: 0 } },
+                                React.createElement("span", { style: { color: T.muted, fontSize: 11, flex: "0 1 38%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag || "อื่นๆ"),
+                                React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`))),
+                            React.createElement("div", { style: { marginTop: 5 } }, React.createElement(AccountBadge, { account, accounts }))),
                     transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
                     !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
                     !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
