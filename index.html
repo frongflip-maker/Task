@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-03-investment-funding-v1";
+window.__TASKROUTINE_BUILD__="2026-11-03-investment-plans-v2";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -858,7 +858,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 15;
+    const SCHEMA_VERSION = 16;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1081,6 +1081,7 @@ try {
         s.statementTotals ?? (s.statementTotals = {});
         s.statementImports ?? (s.statementImports = {});
         s.expenseTargets ?? (s.expenseTargets = {});
+        s.investmentPlans ?? (s.investmentPlans = []);
         s.taxTypeMap ?? (s.taxTypeMap = {});
         delete s.quests;
         delete s.questTemplates;
@@ -1515,7 +1516,62 @@ try {
             React.createElement("select", { value, disabled, "aria-label": label, onChange: e => onChange(e.target.value), className: "w-full px-3 py-3 rounded-xl text-sm outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.border}` } },
                 Object.entries(options).map(([key, name]) => React.createElement("option", { key, value: key }, name))));
     }
-    function InvestmentOverview({ accounts, transactions, payments, month, setMonth, onAddAccount, onTransfer }) {
+
+    function planFunding(plan, transactions, accounts) {
+        let added = 0, withdrawn = 0;
+        transactions.filter(t => t.kind === "transfer" && String(t.date).startsWith(plan.month)).forEach(t => {
+            const from = accounts.find(a => a.id === t.fromAccountId), to = accounts.find(a => a.id === t.toAccountId);
+            const fi = t.fromInvestment ?? isInvestmentAccount(from), ti = t.toInvestment ?? isInvestmentAccount(to);
+            if (fi === ti) return;
+            const account = ti ? to : from;
+            const platform = (ti ? t.toPlatform : t.fromPlatform) || account?.platform || account?.name || "";
+            const currency = (ti ? t.toCurrency : t.fromCurrency) || accountCurrency(account);
+            if (platform !== plan.platform || currency !== plan.currency) return;
+            if (ti) added += transferReceived(t); else withdrawn += Number(t.amount) || 0;
+        });
+        const net = added - withdrawn;
+        return { added, withdrawn, net, remaining: Math.max(0, Number(plan.target) - net), percent: Math.max(0, Math.min(100, net / Number(plan.target) * 100)) };
+    }
+    function InvestmentPlans({ plans, setPlans, accounts, transactions, month }) {
+        const [editing, setEditing] = useState(null);
+        const [error, setError] = useState("");
+        const [removeId, setRemoveId] = useState(null);
+        const options = [...new Map(accounts.filter(a => isInvestmentAccount(a) && !a.archived).map(a => {
+            const platform = a.platform || a.name, currency = accountCurrency(a);
+            return [JSON.stringify([platform, currency]), { platform, currency }];
+        })).values()];
+        const rows = plans.filter(p => p.month === month);
+        const save = () => {
+            const target = Number(editing.target);
+            if (!editing.platform || !Number.isFinite(target) || target <= 0) { setError("เลือกแพลตฟอร์มและระบุเป้าหมายมากกว่า 0"); return; }
+            if (plans.some(p => p.id !== editing.id && p.month === month && p.platform === editing.platform && p.currency === editing.currency)) { setError("เดือนนี้มีแผนของแพลตฟอร์มและสกุลเงินนี้แล้ว กรุณาแก้แผนเดิม"); return; }
+            setPlans(list => [...list.filter(p => p.id !== editing.id), { ...editing, id: editing.id || uid(), month, target }]); setEditing(null); setError("");
+        };
+        return React.createElement("div", { className: "mt-4 p-3 rounded-xl", style: { border: `1px solid ${T.border}`, background: T.surf2 } },
+            React.createElement("div", { className: "flex items-center justify-between gap-2" }, React.createElement("div", { className: "text-sm font-extrabold" }, "แผนลงทุนรายเดือน"),
+                React.createElement("button", { onClick: () => { setEditing({ ...(options[0] || { platform: "", currency: "THB" }), target: "" }); setError(""); }, className: "px-3 py-2 rounded-lg text-xs font-bold", style: { background: T.purple, color: "#fff" } }, "+ ตั้งเป้า")),
+            React.createElement("p", { className: "text-[10px] mt-2 leading-relaxed", style: { color: T.muted } }, `${monthLabel(month)} · วัดจากยอดเติมสุทธิ ไม่รวมค่าธรรมเนียมและการย้ายระหว่างบัญชีลงทุน เป้าของแต่ละเดือนปรับแยกกันได้`),
+            rows.length === 0 && React.createElement("p", { className: "text-xs py-3", style: { color: T.sub } }, "ยังไม่ได้ตั้งเป้าสำหรับเดือนนี้"),
+            rows.map(plan => {
+                const flow = planFunding(plan, transactions, accounts);
+                return React.createElement("div", { key: plan.id, className: "p-3 rounded-xl mt-3", style: { background: T.surf } },
+                    React.createElement("div", { className: "flex items-center justify-between gap-2" }, React.createElement("strong", { className: "text-sm" }, `${plan.platform} · ${plan.currency}`),
+                        React.createElement("button", { onClick: () => { setEditing(plan); setError(""); }, className: "text-xs px-2 py-2", style: { color: T.blue }, "aria-label": `แก้แผน ${plan.platform}` }, "แก้ไข")),
+                    React.createElement("div", { className: "text-xs mt-2" }, `เป้า ${moneyIn(plan.target, plan.currency)} · เติมสุทธิ ${moneyIn(flow.net, plan.currency)}`),
+                    React.createElement("div", { role: "progressbar", "aria-label": `ความคืบหน้า ${plan.platform}`, "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(flow.percent), style: { background: T.surf2, height: 7, borderRadius: 9, marginTop: 10, overflow: "hidden" } }, React.createElement("div", { style: { width: `${flow.percent}%`, height: "100%", background: flow.remaining === 0 ? T.green : T.purple } })),
+                    React.createElement("div", { className: "text-[11px] mt-2", style: { color: T.sub } }, `เติม ${moneyIn(flow.added, plan.currency)} · ถอน ${moneyIn(flow.withdrawn, plan.currency)}`),
+                    React.createElement("div", { className: "text-xs font-bold mt-2", style: { color: flow.remaining === 0 ? T.green : T.orange } }, flow.remaining === 0 ? "เติมเงินครบเป้าแล้ว · ยังไม่ได้ยืนยันการซื้อสินทรัพย์" : `ยังขาด ${moneyIn(flow.remaining, plan.currency)}`),
+                    removeId === plan.id ? React.createElement("div", { className: "flex gap-3 mt-2" }, React.createElement("button", { onClick: () => { setPlans(list => list.filter(p => p.id !== plan.id)); setRemoveId(null); }, className: "text-xs py-2", style: { color: T.red } }, "ยืนยันลบเฉพาะเป้าหมาย"), React.createElement("button", { onClick: () => setRemoveId(null), className: "text-xs py-2" }, "ยกเลิก")) : React.createElement("button", { onClick: () => setRemoveId(plan.id), className: "text-[10px] mt-2 py-2", style: { color: T.muted } }, "ลบเป้าหมาย · เก็บรายการโอนไว้"));
+            }),
+            editing && React.createElement(Sheet, { title: `เป้าลงทุน · ${monthLabel(month)}`, onClose: () => setEditing(null) },
+                !options.length && React.createElement("p", { className: "text-xs mb-3", style: { color: T.orange } }, "เพิ่มบัญชีประเภทเงินลงทุนในภาพรวมก่อนตั้งเป้าหมาย"),
+                React.createElement(FinanceSelect, { label: "แพลตฟอร์ม / สกุลเงิน", value: JSON.stringify([editing.platform, editing.currency]), options: Object.fromEntries([...options, ...(editing.platform ? [editing] : [])].map(o => [JSON.stringify([o.platform, o.currency]), `${o.platform} · ${o.currency}`])), onChange: value => { const [platform, currency] = JSON.parse(value); setEditing({ ...editing, platform, currency }); } }),
+                React.createElement(Input, { label: `เป้าหมาย (${editing.currency})`, type: "number", value: String(editing.target), onChange: value => setEditing({ ...editing, target: value }), placeholder: "เช่น 400" }),
+                error && React.createElement("p", { role: "alert", className: "text-xs mb-3", style: { color: T.red } }, error),
+                React.createElement(SaveBtn, { onClick: save }, "บันทึกเป้าหมาย")));
+    }
+
+    function InvestmentOverview({ accounts, transactions, payments, month, setMonth, investmentPlans = [], setInvestmentPlans, onAddAccount, onTransfer }) {
         const funding = investmentFunding(transactions, accounts, month);
         const investmentAccounts = accounts.filter(isInvestmentAccount);
         const grouped = {};
@@ -1537,6 +1593,7 @@ try {
             React.createElement("div", { className: "mt-2" }, React.createElement(Stat, { label: "รายจ่ายใช้ชีวิตเดือนนี้ · ไม่รวมค่าธรรมเนียมโอน", value: moneyIn(transactions.filter(t => t.kind === "out" && !t.investmentFeeFor && String(t.date).startsWith(month)).reduce((sum, t) => sum + actualPersonalExpenseAmount(t, transactions), 0)), color: T.sub })),
             Object.entries(funding.platforms).map(([name, flow]) => React.createElement("div", { key: name, className: "flex items-center justify-between gap-2 mt-3 text-xs" }, React.createElement("span", null, name), React.createElement("span", { className: "font-bold" }, `เติม ${moneyIn(flow.added)} · ถอน ${moneyIn(flow.withdrawn)}`))),
             React.createElement("p", { className: "text-[10px] leading-relaxed mt-3", style: { color: T.muted } }, "เวอร์ชัน 1 ติดตามยอดโอนเข้า–ออก ไม่หักการซื้อหุ้น/คริปโต จึงยังไม่ใช่เงินสดคงเหลือจริงหรือมูลค่าพอร์ต ไม่รวมกำไร–ขาดทุน ยอดบาทใช้เรท ณ วันโอน ไม่ใช่เรทปัจจุบัน"),
+            React.createElement(InvestmentPlans, { key: month, plans: investmentPlans, setPlans: setInvestmentPlans, accounts, transactions, month }),
             !investmentAccounts.length && React.createElement("p", { className: "text-xs mt-2", style: { color: T.sub } }, "เริ่มด้วยบัญชี Binance TH (THB) หรือ Dime US (USD) แล้วเลือกประเภทเงินลงทุน"),
             React.createElement("button", { onClick: onTransfer, className: "w-full py-3 rounded-xl font-bold text-sm mt-3", style: { background: T.purple, color: "#fff" } }, "โอน / เติม / ถอนเงินลงทุน"));
     }
@@ -1576,6 +1633,7 @@ try {
         const [payerNames, setPayerNames] = useState([]);
         const [txnTemplateDefaults, setTxnTemplateDefaults] = useState({});
         const [expenseTargets, setExpenseTargets] = useState({});
+        const [investmentPlans, setInvestmentPlans] = useState([]);
         const [taxTypeMap, setTaxTypeMap] = useState({});
         const [accounts, setAccounts] = useState([]);
         const [txnCategories, setTxnCategories] = useState({ income: [], expense: [] });
@@ -1683,7 +1741,7 @@ try {
                 return changed ? next : imports;
             });
         };
-        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
+        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
         const reportLocalSaveError = (label, error) => {
             const message = `${label}: ${error?.message || "พื้นที่จัดเก็บอาจเต็มหรือ Safari ปฏิเสธการบันทึก"}`;
             setLocalSaveError(message);
@@ -1928,6 +1986,7 @@ try {
                 setPayerNames(s.payerNames);
             if (s.txnTemplateDefaults)
                 setTxnTemplateDefaults(s.txnTemplateDefaults);
+            setInvestmentPlans(s.investmentPlans || []);
             if (s.expenseTargets)
                 setExpenseTargets(s.expenseTargets);
             if (s.taxTypeMap)
@@ -2228,7 +2287,7 @@ try {
                 setLocalSaveError(current => current.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ") ? "" : current);
                 localErrorShown.current = false;
             }
-        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             if (!loaded || !authUser || !sb)
                 return;
@@ -2349,7 +2408,7 @@ try {
             cloudTimer.current = setTimeout(() => cloudSyncFn.current?.(), 2500);
             return () => { if (cloudTimer.current)
                 clearTimeout(cloudTimer.current); };
-        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             const flush = () => { if (cloudDirty.current) cloudSyncFn.current?.(); };
             const pull = () => { cloudPullFn.current?.(); };
@@ -2421,6 +2480,7 @@ try {
             setIncomePresets([]);
             setPayerNames([]);
             setExpenseTargets({});
+            setInvestmentPlans([]);
             setTaxTypeMap({});
             setTxnTemplateDefaults({});
             setDataMsg("ล้างข้อมูลแล้ว — เริ่มจากศูนย์ ✓");
@@ -3219,7 +3279,7 @@ try {
             exportEventICS, exportDayICS, exportWeekICS, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase,
             fitnessSplit, saveFitnessSplit, fitnessStartDay, setFitnessStartDay, fitnessConfirmed, confirmFitnessWeek,
             workouts, updateWorkouts: setWorkouts,
-            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, taxTypeMap, setTaxTypeMap,
+            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, taxTypeMap, setTaxTypeMap,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
             toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab, todos, addTodo, toggleTodo, delTodo, updateIncomeSourceExpected };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
@@ -7946,7 +8006,7 @@ try {
             React.createElement(SaveBtn, { disabled: !valid, onClick: () => onSave({ ...f, recipientName: String(f.recipientName || "").trim(), amount: Number(f.amount) || 0 }) }, "บันทึกการส่งต่อ"));
     }
     function Budget(props) {
-        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, offerUndo, fireToast } = props;
+        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, offerUndo, fireToast } = props;
         const [mode, setMode] = useState("total");
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
@@ -8612,7 +8672,7 @@ try {
                                 React.createElement("button", { onClick: () => setEditAcc({ id: null, name: "", startBalance: 0 }), className: "w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[.98] mt-2", style: { background: T.surf2, color: T.purple, border: `1px dashed ${hex(T.purple, .5)}` } },
                                     React.createElement(Plus, { size: 15 }),
                                     " \u0E40\u0E1E\u0E34\u0E48\u0E21\u0E1A\u0E31\u0E0D\u0E0A\u0E35")))),
-                        React.createElement(InvestmentOverview, { accounts, transactions, payments, month: mk, setMonth: setMk, onAddAccount: () => setEditAcc({ id: null, name: "", startBalance: 0, accountType: "investment", currency: "THB", spendable: false }), onTransfer: () => { setTxnKind("transfer"); setTxnOpen(true); } }),
+                        React.createElement(InvestmentOverview, { accounts, transactions, payments, month: mk, setMonth: setMk, investmentPlans, setInvestmentPlans, onAddAccount: () => setEditAcc({ id: null, name: "", startBalance: 0, accountType: "investment", currency: "THB", spendable: false }), onTransfer: () => { setTxnKind("transfer"); setTxnOpen(true); } }),
                         nearTarget.length > 0 && React.createElement("div", { className: "px-3 py-2.5 rounded-xl text-[11px] font-semibold", style: { order: 1, background: hex(T.gold, .12), border: `1px solid ${hex(T.gold, .4)}`, color: T.text } },
                             "⚠ ใกล้เกินเป้า: ",
                             nearTarget.map((row, i2) => React.createElement("span", { key: row.category, style: { color: row.spent > row.target ? T.red : T.gold } }, `${i2 > 0 ? " · " : ""}${row.category} ${Math.round((row.spent / row.target) * 100)}%`))),
@@ -11609,6 +11669,17 @@ try {
         const investmentSnapshot = migrate(JSON.parse(JSON.stringify({ version: SCHEMA_VERSION, accounts: fundingAccounts, transactions: funded })));
         check("ลงทุน: ส่งออกนำเข้ารักษายอดรับ USD", investmentSnapshot.transactions.find(t => t.id === "fund").receivedAmount, 100);
         check("ลงทุน: ส่งออกนำเข้ารักษาประเภทบัญชี", investmentSnapshot.accounts.find(a => a.id === "us").accountType, "investment");
+
+        const plan = {month:"2026-11",platform:"Dime",currency:"USD",target:100};
+        check("แผน: เติมข้ามสกุลนับยอดรับ USD", planFunding(plan, funded, fundingAccounts).added, 100);
+        check("แผน: ถึงเป้าแสดงยอดขาดศูนย์", planFunding(plan, funded, fundingAccounts).remaining, 0);
+        check("แผน: ถอนหักตามสกุลต้นทาง", planFunding(plan, withdrawn, fundingAccounts).net, 90);
+        check("แผน: ถอนแล้วต้องเติมเพิ่ม", planFunding(plan, withdrawn, fundingAccounts).remaining, 10);
+        check("แผน: การย้ายระหว่างพอร์ตไม่ซ้ำ", planFunding(plan, [...funded,moved], fundingAccounts).added, 100);
+        check("แผน: คนละเดือนไม่รวมกัน", planFunding({...plan,month:"2026-12"},funded,fundingAccounts).added, 0);
+        check("แผน: คนละสกุลไม่รวมกัน", planFunding({...plan,currency:"THB"},funded,fundingAccounts).added, 0);
+        const planSnapshot = migrate(JSON.parse(JSON.stringify({version:SCHEMA_VERSION,investmentPlans:[plan]})));
+        check("แผน: ส่งออกนำเข้าคงเป้าหมาย", planSnapshot.investmentPlans[0].target,100);
         window.__TASKROUTINE_TEST_RESULTS__ = results;
         console.table(results);
         return results;
