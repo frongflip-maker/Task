@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-statement-order-broker-v7";
+window.__TASKROUTINE_BUILD__="2026-11-04-account-colors-v9";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1480,6 +1480,23 @@ try {
         return "";
     }
     const accountCurrency = account => account?.currency || "THB";
+    const ACCOUNT_COLORS = ["#EAE4D7", "#DDE8CF", "#D8E7F3", "#E8DEF1", "#F3DFCC", "#F0DDE1", "#D1E8E1", "#F1E8BC", "#4A6FA5", "#627744", "#73548A", "#424B55"];
+    const accountBackground = account => /^#[0-9a-f]{6}$/i.test(account?.backgroundColor || "") ? account.backgroundColor : ACCOUNT_COLORS[0];
+    const accountForeground = account => {
+        const color = accountBackground(account);
+        const channels = [1,3,5].map(i => { const v = parseInt(color.slice(i,i+2),16)/255; return v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4; });
+        return channels[0]*.2126 + channels[1]*.7152 + channels[2]*.0722 > .179 ? "#20231E" : "#FFFFFF";
+    };
+    function AccountBadge({ account, accounts = [] }) {
+        return React.createElement("span", { title: accountLabel(account,accounts), style: { display: "inline-flex", alignItems: "center", maxWidth: "100%", padding: "5px 9px", borderRadius: 9, background: accountBackground(account), color: accountForeground(account), fontSize: 11, fontWeight: 700, lineHeight: 1.6, overflowWrap: "anywhere", border: "1px solid rgba(0,0,0,.07)" } }, account?.name || "ไม่ระบุบัญชี");
+    }
+    function AccountColorPicker({ account, onChange }) {
+        return React.createElement("div", { style: { marginBottom: 16 } },
+            React.createElement(Label, null, "สีพื้นหลังบัญชี"),
+            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 9, margin: "8px 0 12px" } }, ACCOUNT_COLORS.map(color => React.createElement("button", { key: color, type: "button", "aria-label": `เลือกสี ${color}`, "aria-pressed": accountBackground(account) === color, onClick: () => onChange(color), style: { width: 36, height: 36, borderRadius: 11, background: color, color: accountForeground({ backgroundColor: color }), display: "flex", alignItems: "center", justifyContent: "center", border: accountBackground(account) === color ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,.13)", boxShadow: accountBackground(account) === color ? `0 0 0 3px ${T.surf2}` : "none" } }, accountBackground(account) === color && React.createElement(Check, { size: 16 })))),
+            React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: T.sub, marginBottom: 12 } }, React.createElement("input", { type: "color", "aria-label": "เลือกสีบัญชีเอง", value: accountBackground(account), onChange: e => onChange(e.target.value), style: { width: 40, height: 32, border: 0, padding: 0, background: "transparent" } }), "เลือกสีเอง"),
+            React.createElement(AccountBadge, { account: { ...account, name: account.name || "ตัวอย่างชื่อบัญชี" } }));
+    }
     const isInvestmentAccount = account => ["investment", "broker"].includes(account?.accountType);
     const isSpendableAccount = account => account?.spendable ?? !isInvestmentAccount(account);
     const nativeAmount = transaction => Number(transaction?.accountAmount ?? transaction?.amount) || 0;
@@ -5407,11 +5424,56 @@ try {
                     React.createElement("button", { onClick: () => { setAdding(false); setNv(""); }, className: "px-3 py-2 rounded-lg text-xs font-bold", style: { color: T.muted } }, "ยกเลิก"))),
             manageOpen && React.createElement(ManageListSheet, { title: label, items: options, allowRename: !!onRename, onRename, onDelete, lockedItems, onClose: () => setManageOpen(false), onSave: (newList) => { onReorder(lockedItems.length ? normalizeIncomeCategories(newList) : newList); } })));
     }
-    function AccPicker({ label, accounts, value, onChange, exclude, allowForeign = false, allowArchived = false }) {
+    function AccPicker({ label, accounts, value, onChange, exclude, allowForeign = false, allowArchived = false, transactions, payments }) {
+        const [open, setOpen] = useState(false);
+        const [query, setQuery] = useState("");
+        const trigger = React.useRef(null), search = React.useRef(null);
         const list = orderedAccounts(accounts).filter(a => a.id !== exclude && (!a.archived || (allowArchived && a.id === value)) && (allowForeign || accountCurrency(a) === "THB"));
+        const selected = list.find(a => a.id === value);
+        const close = () => { setOpen(false); trigger.current?.focus(); };
+        useEffect(() => {
+            if (!open) return;
+            const previous = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            search.current?.focus();
+            const keydown = e => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); close(); } };
+            document.addEventListener("keydown", keydown, true);
+            return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", keydown, true); };
+        }, [open]);
+        const parent = accountParent(selected, accounts);
+        const badge = account => React.createElement("span", { className: "text-[10px] font-extrabold px-2 py-1 rounded-lg shrink-0", style: { background: accountCurrency(account) === "USD" ? hex(T.blue,.12) : T.surf2, color: accountCurrency(account) === "USD" ? T.blue : T.sub, letterSpacing: ".04em" } }, accountCurrency(account));
+        const groups = [];
+        list.forEach(account => {
+            const root = accountParent(account, accounts) || account;
+            let group = groups.find(g => g.root.id === root.id);
+            if (!group) { group = { root, rows: [] }; groups.push(group); }
+            group.rows.push(account);
+        });
+        const q = query.trim().toLocaleLowerCase("th");
+        const visible = groups.map(group => ({ ...group, rows: group.rows.filter(a => !q || [a.name,group.root.name,a.platform,accountCurrency(a)].some(v => String(v || "").toLocaleLowerCase("th").includes(q))) })).filter(g => g.rows.length);
         return (React.createElement("div", { className: "mb-3" },
             React.createElement(Label, null, label),
-            list.length === 0 ? React.createElement("div", { className: "text-xs p-2.5 rounded-lg", style: { background: T.surf2, color: T.muted } }, "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E1A\u0E31\u0E0D\u0E0A\u0E35 \u2014 \u0E44\u0E1B\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E17\u0E35\u0E48 Budget \u2192 \u0E1A\u0E31\u0E0D\u0E0A\u0E35 \u0E01\u0E48\u0E2D\u0E19") : React.createElement("select", { "aria-label": label, value: list.some(account => account.id === value) ? value : "", onChange: event => onChange(event.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm font-semibold outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${value ? hex(T.purple, .45) : T.border}` } }, React.createElement("option", { value: "" }, "เลือกบัญชี"), list.map(account => React.createElement("option", { key: account.id, value: account.id }, `${accountLabel(account, accounts)}${account.platform ? " · " + account.platform : ""} · ${accountCurrency(account)}${account.archived ? " · เก็บถาวร" : ""}`)))));
+            React.createElement("button", { ref: trigger, type: "button", "aria-label": label, "aria-haspopup": "dialog", "aria-expanded": open, disabled: !list.length, onClick: () => { setQuery(""); setOpen(true); }, className: "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left", style: { minHeight: 58, background: T.surf2, color: T.text, border: `1px solid ${selected ? hex(T.purple,.4) : T.border}` } },
+                React.createElement(Wallet, { size: 18, style: { color: T.sub, flexShrink: 0 } }),
+                React.createElement("span", { className: "flex-1 min-w-0" }, selected ? React.createElement(AccountBadge, { account: selected, accounts }) : React.createElement("span", { className: "text-sm font-bold" }, list.length ? "เลือกบัญชี" : "ยังไม่มีบัญชีที่เลือกได้"), parent && React.createElement("span", { className: "text-[11px]", style: { display: "block", marginTop: 3, color: T.muted } }, parent.name)),
+                selected && badge(selected), React.createElement(ChevronDown, { size: 16, style: { color: T.muted, flexShrink: 0 } })),
+            open && ReactDOM.createPortal(React.createElement("div", { role: "presentation", onClick: close, style: { position: "fixed", inset: 0, zIndex: 120, background: "rgba(35,32,26,.48)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingTop: "max(24px, env(safe-area-inset-top))" } },
+                React.createElement("section", { role: "dialog", "aria-modal": true, "aria-label": label, onClick: e => e.stopPropagation(), style: { width: "min(100%, 460px)", maxHeight: "85dvh", display: "flex", flexDirection: "column", background: T.surf, color: T.text, borderRadius: "26px 26px 0 0", boxShadow: "0 -12px 48px rgba(35,32,26,.2)", paddingBottom: "max(12px, env(safe-area-inset-bottom))" } },
+                    React.createElement("div", { style: { width: 38, height: 4, background: T.border, borderRadius: 5, margin: "10px auto 0", flexShrink: 0 } }),
+                    React.createElement("div", { className: "flex items-center justify-between", style: { padding: "16px 20px 12px" } }, React.createElement("h3", { className: "text-lg font-extrabold" }, label || "เลือกบัญชี"), React.createElement("button", { type: "button", "aria-label": "ปิดตัวเลือกบัญชี", onClick: close, className: "w-10 h-10 rounded-full flex items-center justify-center", style: { background: T.surf2 } }, React.createElement(X, { size: 18 }))),
+                    React.createElement("div", { style: { padding: "0 20px 12px" } }, React.createElement("input", { ref: search, type: "search", "aria-label": "ค้นหาบัญชี", placeholder: "ค้นหาชื่อบัญชี หรือสกุลเงิน", value: query, onChange: e => setQuery(e.target.value), className: "w-full px-4 py-3 rounded-xl outline-none", style: { fontSize: 16, background: T.surf2, color: T.text, border: `1px solid ${T.border}` } })),
+                    React.createElement("div", { style: { padding: "0 20px 16px", overflowY: "auto", overscrollBehavior: "contain" } },
+                        visible.length === 0 && React.createElement("p", { className: "text-sm py-5 text-center", style: { color: T.muted } }, "ไม่พบบัญชีที่ค้นหา"),
+                        visible.map(group => React.createElement("div", { key: group.root.id, className: "mb-4" },
+                            React.createElement("div", { className: "text-xs font-bold px-1 pt-2 pb-2", style: { color: T.sub } }, group.root.name),
+                            React.createElement("div", { className: "rounded-2xl", style: { border: `1px solid ${T.border}`, overflow: "hidden" } }, group.rows.map((a, index) => {
+                                const checked = a.id === value, child = a.id !== group.root.id;
+                                const hasChildren = accounts.some(other => other.parentAccountId === a.id);
+                                return React.createElement("button", { key: a.id, type: "button", "aria-label": accountLabel(a, accounts) + " · " + accountCurrency(a), "aria-pressed": checked, onClick: () => { onChange(a.id); close(); }, className: "w-full flex items-center gap-3 px-3 py-3 text-left", style: { minHeight: 68, background: checked ? hex(T.green,.1) : T.surf, color: T.text, borderTop: index ? `1px solid ${T.border}` : "none" } },
+                                    React.createElement("span", { style: { width: 22, flexShrink: 0, color: checked ? T.green : T.muted } }, React.createElement(checked ? Check : child ? ChevronRight : Wallet, { size: 17 })),
+                                    React.createElement("span", { className: "flex-1 min-w-0" }, React.createElement(AccountBadge, { account: hasChildren && !child ? { ...a, name: "บัญชีหลัก" } : a, accounts }),
+                                        React.createElement("span", { className: "text-[11px]", style: { display: "block", marginTop: 4, color: T.muted, lineHeight: 1.6 } }, [a.archived ? "เก็บถาวร" : ACCOUNT_TYPES[a.accountType || "bank"], transactions && payments ? `ยอดคงเหลือ ${moneyIn(nativeAccountBalance(a, transactions, payments), accountCurrency(a))}` : ""].filter(Boolean).join(" · "))), badge(a));
+                            }))))))), document.body)));
     }
     function FixedCostForm({ initial, onSave, txnCategories, setTxnCategories, onRenameCategory, onDeleteCategory }) {
         const isEdit = !!initial.id;
@@ -6559,14 +6621,14 @@ try {
                   color: TRANSFER_COLOR,
                 },
                 AmountField(),
-                React.createElement(AccPicker, {
+                React.createElement(AccPicker, { transactions, payments,
                   label: "บัญชีออก",
                   accounts: accounts,
                   value: f.fromAccountId,
                   allowForeign: true, allowArchived: editMode,
                   onChange: (v) => setF({ ...f, fromAccountId: v, receivedAmount: "", sourceRateTHB: "", transferPurpose: "general" }),
                 }),
-                React.createElement(AccPicker, {
+                React.createElement(AccPicker, { transactions, payments,
                   label: "บัญชีเข้า",
                   accounts: accounts,
                   value: f.toAccountId,
@@ -6657,7 +6719,7 @@ try {
                         React.createElement(
                           "div",
                           { className: "mt-3 space-y-2.5" },
-                          React.createElement(AccPicker, {
+                          React.createElement(AccPicker, { transactions, payments,
                             label: "โอนต่อไปบัญชีไหน",
                             accounts: accounts,
                             value: onwardAccountId,
@@ -6724,7 +6786,7 @@ try {
                   subtitle: "กำหนดบัญชีและหมวดให้ตรงกับเงินจริง",
                   color: txnColor,
                 },
-                !(splitAccounts && f.kind === "in" && !studioMode) && React.createElement(AccPicker, {
+                !(splitAccounts && f.kind === "in" && !studioMode) && React.createElement(AccPicker, { transactions, payments,
                   label: studioMode
                     ? "จ่ายจากบัญชี"
                     : f.kind === "in"
@@ -7531,7 +7593,7 @@ try {
                         React.createElement(
                           "div",
                           { className: "mt-3 space-y-2.5" },
-                          React.createElement(AccPicker, {
+                          React.createElement(AccPicker, { transactions, payments,
                             label:
                               "\u0E42\u0E2D\u0E19\u0E15\u0E48\u0E2D\u0E44\u0E1B\u0E1A\u0E31\u0E0D\u0E0A\u0E35\u0E44\u0E2B\u0E19",
                             accounts: accounts,
@@ -8205,7 +8267,7 @@ try {
             const currency = accountCurrency(accounts.find(a => a.id === row.accountId));
             const fromCurrency = t.fromCurrency || accountCurrency(accounts.find(a => a.id === t.fromAccountId));
             const toCurrency = t.toCurrency || accountCurrency(accounts.find(a => a.id === t.toAccountId));
-            const fromName = accountLabel(accounts.find(a => a.id === t.fromAccountId),accounts), toName = accountLabel(accounts.find(a => a.id === t.toAccountId),accounts);
+            const fromAccount = accounts.find(a => a.id === t.fromAccountId), toAccount = accounts.find(a => a.id === t.toAccountId);
             const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
             return React.createElement("div", { key: row.id, ...dnd.rowProps(index), className: "flex items-stretch rounded-2xl mb-2", style: { ...dnd.itemStyle(index), touchAction: "auto", cursor: "default", background: T.surf, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .6) : T.border}`, boxShadow: active ? `0 12px 28px ${hex(T.blue, .24)}` : armed ? `0 6px 16px ${hex(T.blue, .18)}` : "none", overflow: "hidden" } },
                 React.createElement("span", { ...dnd.handleProps(index), role: "button", "aria-label": `กดค้างเพื่อลาก ${row.title}`, title: "กดค้างแล้วลากเพื่อจัดลำดับ", className: "shrink-0 flex items-center justify-center", style: { width: 36, touchAction: "none", cursor: active ? "grabbing" : "grab", color: active || armed ? T.blue : T.muted, background: active || armed ? hex(T.blue, .08) : T.surf2, borderRight: `1px solid ${T.border}` } }, React.createElement(GripVertical, { size: 17 })),
@@ -8214,7 +8276,9 @@ try {
                         React.createElement("span",{className:"shrink-0 rounded-xl flex items-center justify-center",style:{width:34,height:34,background:hex(color,.1),color}},React.createElement(transfer?RefreshCw:row.dir==="in"?TrendingUp:TrendingDown,{size:16})),
                         React.createElement("div",{className:"flex-1 min-w-0"},
                             React.createElement("div",{className:"flex items-start justify-between gap-2"},React.createElement("span",{className:"text-sm font-bold",style:{overflowWrap:"anywhere",lineHeight:1.5}},transfer?TRANSFER_PURPOSES[t.transferPurpose]||"โอนย้ายบัญชี":row.title),React.createElement(ChevronRight,{size:15,style:{color:T.muted,flexShrink:0,marginTop:3}})),
-                            React.createElement("div",{className:"text-[11px] mt-1 leading-relaxed",style:{color:T.muted,overflowWrap:"anywhere"}},transfer?`${fromName} → ${toName}`:`${row.tag} · ${accountLabel(accounts.find(a=>a.id===row.accountId),accounts)}`),
+                            React.createElement("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 8 } }, transfer ? React.createElement(React.Fragment, null,
+                                React.createElement(AccountBadge, { account: fromAccount, accounts }), React.createElement("span", { style: { color: T.muted, fontSize: 13 } }, "→"), React.createElement(AccountBadge, { account: toAccount, accounts })) : React.createElement(React.Fragment, null,
+                                React.createElement("span", { style: { color: T.muted, fontSize: 11 } }, row.tag), React.createElement(AccountBadge, { account: accounts.find(a => a.id === row.accountId), accounts }))),
                             transfer ? React.createElement(React.Fragment,null,
                                 React.createElement("div",{className:"flex flex-wrap items-center gap-2 mt-2 tabular-nums",style:{fontSize:14,fontWeight:800}},React.createElement("span",{style:{color:T.text}},`−${ledgerMoney(t.amount,fromCurrency)}`),React.createElement("span",{style:{color:T.muted}},"→"),React.createElement("span",{style:{color:TRANSFER_COLOR}},`+${ledgerMoney(transferReceived(t),toCurrency)}`)),
                                 Number(t.transferFee)>0 && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.sub}},`ค่าธรรมเนียม ${ledgerMoney(t.transferFee,fromCurrency)} · ต้นทางออกจริง ${ledgerMoney((Number(t.amount)||0)+Number(t.transferFee),fromCurrency)}`)):
@@ -8241,8 +8305,8 @@ try {
         const toCurrency = t.toCurrency || accountCurrency(accounts.find(a=>a.id===t.toAccountId));
         const line = (label,value) => React.createElement("div",{key:label,className:"flex items-start justify-between gap-3 py-2 text-xs",style:{borderBottom:`1px solid ${T.border}`}},React.createElement("span",{style:{color:T.muted}},label),React.createElement("span",{className:"font-semibold text-right",style:{maxWidth:"70%",overflowWrap:"anywhere"}},value));
         return React.createElement("div",{className:"mb-4"},
-            line("จากบัญชี",accountLabel(accounts.find(a=>a.id===t.fromAccountId),accounts)),
-            line("ไปบัญชี",accountLabel(accounts.find(a=>a.id===t.toAccountId),accounts)),
+            line("จากบัญชี",React.createElement(AccountBadge, { account: accounts.find(a=>a.id===t.fromAccountId), accounts })),
+            line("ไปบัญชี",React.createElement(AccountBadge, { account: accounts.find(a=>a.id===t.toAccountId), accounts })),
             line("ส่วนของเงิน",t.pocketOwner==="studio"?"Blurryroom Studio":"ส่วนตัว"),
             line("ยอดโอน",ledgerMoney(t.amount,fromCurrency)),
             line("รับจริง",ledgerMoney(transferReceived(t),toCurrency)),
@@ -9354,6 +9418,7 @@ try {
                 React.createElement(FinanceSelect, { label: "อยู่ใต้บัญชีหลัก", value: editAcc.parentAccountId || "", disabled: accounts.some(a => a.parentAccountId === editAcc.id), options: { "": "ไม่มี · เป็นบัญชีหลัก", ...Object.fromEntries(accounts.filter(a => a.id !== editAcc.id && !a.parentAccountId && !a.archived).map(a => [a.id, a.name])), ...(editAcc.parentAccountId && !accounts.some(a => a.id === editAcc.parentAccountId && !a.archived) ? { [editAcc.parentAccountId]: accounts.find(a => a.id === editAcc.parentAccountId)?.name || "บัญชีหลักเดิม" } : {}) }, onChange: v => { const parent = accounts.find(a => a.id === v); setEditAcc({ ...editAcc, parentAccountId: v || null, platform: editAcc.platform || parent?.platform || parent?.name || "" }); } }),
                 React.createElement("p", { className: "text-[10px] mb-3 leading-relaxed", style: { color: T.muted } }, "เลือกบัญชีหลักเพื่อจัดเป็นบัญชีย่อย ยอดเงินและประวัติยังเป็นของบัญชีนี้ บัญชีหลักเก็บเฉพาะเงินของตัวเอง ไม่ต้องบวกยอดลูกเข้าไปอีก"),
                 React.createElement(FinanceSelect, { label: "ประเภทบัญชี", value: editAcc.accountType || "bank", options: ACCOUNT_TYPES, onChange: v => setEditAcc({ ...editAcc, accountType: v, spendable: !["investment", "broker"].includes(v) }) }),
+                React.createElement(AccountColorPicker, { account: editAcc, onChange: backgroundColor => setEditAcc({ ...editAcc, backgroundColor }) }),
                 React.createElement(Input, { label: "กลุ่มแพลตฟอร์ม (เพิ่ม / เปลี่ยนชื่อได้)", value: editAcc.platform || "", onChange: v => setEditAcc({ ...editAcc, platform: v }), placeholder: "เช่น Dime, Binance TH, KBank" }),
                 React.createElement(FinanceSelect, { label: "สกุลเงิน · บัญชีมีประวัติแล้วเปลี่ยนไม่ได้", value: accountCurrency(editAcc), options: { THB: "THB · บาท", USD: "USD · ดอลลาร์สหรัฐ" }, disabled: !!editAcc.id && accountUsageCount(editAcc.id) > 0, onChange: v => setEditAcc({ ...editAcc, currency: v }) }),
                 React.createElement("label", { className: "flex items-center gap-3 mb-3 text-sm" }, React.createElement("input", { type: "checkbox", checked: isSpendableAccount(editAcc), onChange: e => setEditAcc({ ...editAcc, spendable: e.target.checked }) }), "นับบัญชีนี้เป็นเงินใช้ได้"),
