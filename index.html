@@ -373,7 +373,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-03-investment-plans-v2";
+window.__TASKROUTINE_BUILD__="2026-11-03-investment-plans-v2-fix1";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1536,7 +1536,7 @@ try {
         const [editing, setEditing] = useState(null);
         const [error, setError] = useState("");
         const [removeId, setRemoveId] = useState(null);
-        const options = [...new Map(accounts.filter(a => isInvestmentAccount(a) && !a.archived).map(a => {
+        const options = [...new window.Map(accounts.filter(a => isInvestmentAccount(a) && !a.archived).map(a => {
             const platform = a.platform || a.name, currency = accountCurrency(a);
             return [JSON.stringify([platform, currency]), { platform, currency }];
         })).values()];
