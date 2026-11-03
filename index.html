@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-03-studio-pockets-v6";
+window.__TASKROUTINE_BUILD__="2026-11-04-statement-order-broker-v7";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -862,7 +862,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 18;
+    const SCHEMA_VERSION = 19;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1084,6 +1084,7 @@ try {
         s.closedMonths ?? (s.closedMonths = {});
         s.statementTotals ?? (s.statementTotals = {});
         s.statementImports ?? (s.statementImports = {});
+        s.statementOrder ?? (s.statementOrder = {});
         s.expenseTargets ?? (s.expenseTargets = {});
         s.investmentPlans ?? (s.investmentPlans = []);
         s.taxTypeMap ?? (s.taxTypeMap = {});
@@ -1180,7 +1181,7 @@ try {
                 }
             });
         }
-        s.accounts = (s.accounts || []).map(a => ({ accountType: "bank", currency: "THB", parentAccountId: null, ...a, spendable: a.spendable ?? (a.accountType !== "investment") }));
+        s.accounts = (s.accounts || []).map(a => ({ accountType: "bank", currency: "THB", parentAccountId: null, ...a, spendable: a.spendable ?? !["investment", "broker"].includes(a.accountType) }));
         s.version = SCHEMA_VERSION;
         return s;
     }
@@ -1460,7 +1461,7 @@ try {
     };
 
     // Investment funding v1: native-currency balances, historical THB cash flows.
-    const ACCOUNT_TYPES = { bank: "ธนาคาร", cash: "เงินสด", investment: "เงินลงทุน / เงินรอลงทุน" };
+    const ACCOUNT_TYPES = { bank: "ธนาคาร", cash: "เงินสด", investment: "เงินลงทุน / เงินรอลงทุน", broker: "Broker / โบรกเกอร์" };
     const TRANSFER_PURPOSES = { general: "โอนทั่วไป", invest: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน", exchange: "แลกสกุลเงิน" };
     const accountParent = (account, accounts) => accounts.find(a => a.id === account?.parentAccountId && a.id !== account?.id) || null;
     const accountLabel = (account, accounts) => { const parent = accountParent(account, accounts); return parent ? `${parent.name} › ${account.name}` : account?.name || "—"; };
@@ -1479,7 +1480,7 @@ try {
         return "";
     }
     const accountCurrency = account => account?.currency || "THB";
-    const isInvestmentAccount = account => account?.accountType === "investment";
+    const isInvestmentAccount = account => ["investment", "broker"].includes(account?.accountType);
     const isSpendableAccount = account => account?.spendable ?? !isInvestmentAccount(account);
     const nativeAmount = transaction => Number(transaction?.accountAmount ?? transaction?.amount) || 0;
     const transferReceived = transaction => Number(transaction?.receivedAmount ?? transaction?.amount) || 0;
@@ -1702,6 +1703,7 @@ try {
         const [closedMonths, setClosedMonths] = useState({});
         const [statementTotals, setStatementTotals] = useState({});
         const [statementImports, setStatementImports] = useState({});
+        const [statementOrder, setStatementOrder] = useState({});
         const [expensePresets, setExpensePresets] = useState(["ค่าไฟ", "ค่าน้ำ", "ค่าเช่า", "ซ่อมอุปกรณ์", "ซื้อของ", "ค่าอินเทอร์เน็ต", "ค่าโทรศัพท์"]);
         const [incomePresets, setIncomePresets] = useState([]);
         const [payerNames, setPayerNames] = useState([]);
@@ -1815,7 +1817,7 @@ try {
                 return changed ? next : imports;
             });
         };
-        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
+        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
         const reportLocalSaveError = (label, error) => {
             const message = `${label}: ${error?.message || "พื้นที่จัดเก็บอาจเต็มหรือ Safari ปฏิเสธการบันทึก"}`;
             setLocalSaveError(message);
@@ -2052,6 +2054,7 @@ try {
                 setStatementTotals(s.statementTotals);
             if (s.statementImports)
                 setStatementImports(s.statementImports);
+            setStatementOrder(s.statementOrder || {});
             if (s.expensePresets)
                 setExpensePresets(s.expensePresets);
             if (s.incomePresets)
@@ -2361,7 +2364,7 @@ try {
                 setLocalSaveError(current => current.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ") ? "" : current);
                 localErrorShown.current = false;
             }
-        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             if (!loaded || !authUser || !sb)
                 return;
@@ -2482,7 +2485,7 @@ try {
             cloudTimer.current = setTimeout(() => cloudSyncFn.current?.(), 2500);
             return () => { if (cloudTimer.current)
                 clearTimeout(cloudTimer.current); };
-        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             const flush = () => { if (cloudDirty.current) cloudSyncFn.current?.(); };
             const pull = () => { cloudPullFn.current?.(); };
@@ -2550,6 +2553,7 @@ try {
             setClosedMonths({});
             setStatementTotals({});
             setStatementImports({});
+            setStatementOrder({});
             setExpensePresets(["ค่าไฟ", "ค่าน้ำ", "ค่าเช่า", "ซ่อมอุปกรณ์", "ซื้อของ", "ค่าอินเทอร์เน็ต", "ค่าโทรศัพท์"]);
             setIncomePresets([]);
             setPayerNames([]);
@@ -3353,7 +3357,7 @@ try {
             exportEventICS, exportDayICS, exportWeekICS, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase,
             fitnessSplit, saveFitnessSplit, fitnessStartDay, setFitnessStartDay, fitnessConfirmed, confirmFitnessWeek,
             workouts, updateWorkouts: setWorkouts,
-            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, taxTypeMap, setTaxTypeMap,
+            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, taxTypeMap, setTaxTypeMap,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
             toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab, todos, addTodo, toggleTodo, delTodo, updateIncomeSourceExpected };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
@@ -8165,20 +8169,47 @@ try {
         const parents = new Set(rows.filter(r => r.raw?.kind === "transfer").map(r => r.raw.id));
         return rows.filter(r => !r.raw?.investmentFeeFor || !parents.has(r.raw.investmentFeeFor));
     }
+    function applyStatementManualOrder(rows, statementOrder) {
+        const result = [], byDate = new globalThis.Map();
+        rows.forEach(row => {
+            const date = String(row.date || "");
+            if (!byDate.has(date)) byDate.set(date, []);
+            byDate.get(date).push(row);
+        });
+        byDate.forEach((dayRows, date) => {
+            const manual = Array.isArray(statementOrder?.[date]) ? statementOrder[date] : [];
+            if (manual.length > 1) {
+                const rowById = new globalThis.Map(dayRows.map(row => [String(row.id), row]));
+                const ordered = manual.map(id => rowById.get(String(id))).filter(Boolean);
+                const manualIds = new Set(ordered.map(row => String(row.id)));
+                let cursor = 0;
+                dayRows = dayRows.map(row => manualIds.has(String(row.id)) ? ordered[cursor++] : row);
+            }
+            result.push(...dayRows);
+        });
+        return result;
+    }
     const ledgerMoney = (value,currency) => `${new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0)} ${currency}`;
-    function TransactionRows({ rows, accounts, onOpen }) {
-        let previousDate = null;
-        return React.createElement("div",null,rows.map(row => {
-            const showDate = previousDate !== row.date; previousDate = row.date;
+    function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
+        const dnd = useLongPressSort(rows, (from, to) => {
+            const next = reorderListItem(rows, from, to);
+            onReorder(date, next.map(row => String(row.id)));
+        }, `statement-${String(date).replace(/[^a-zA-Z0-9_-]/g, "-")}`);
+        return React.createElement("div", null,
+            React.createElement("div", { className: "flex items-center gap-2 pt-4 pb-2" },
+                React.createElement("div", { className: "text-xs font-bold", style: { color: dnd.dragging ? T.blue : T.sub } }, parseK(date).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })),
+                dnd.dragging && React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.blue } }, "กำลังลาก · ปล่อยเพื่อวาง")),
+            rows.map((row, index) => {
             const transfer = row.raw?.kind === "transfer", t = row.raw || {};
             const color = transfer ? TRANSFER_COLOR : row.dir === "in" ? T.green : T.orange;
             const currency = accountCurrency(accounts.find(a => a.id === row.accountId));
             const fromCurrency = t.fromCurrency || accountCurrency(accounts.find(a => a.id === t.fromAccountId));
             const toCurrency = t.toCurrency || accountCurrency(accounts.find(a => a.id === t.toAccountId));
             const fromName = accountLabel(accounts.find(a => a.id === t.fromAccountId),accounts), toName = accountLabel(accounts.find(a => a.id === t.toAccountId),accounts);
-            return React.createElement(React.Fragment,{key:row.id},
-                showDate && React.createElement("div",{className:"text-xs font-bold pt-4 pb-2",style:{color:T.sub}},parseK(row.date).toLocaleDateString("th-TH",{weekday:"short",day:"numeric",month:"short",year:"numeric"})),
-                React.createElement("button",{type:"button",onClick:()=>onOpen(row),"aria-label":`ดูรายการ ${row.title}`,className:"w-full text-left p-3 rounded-2xl mb-2",style:{background:T.surf,border:`1px solid ${T.border}`,display:"block"}},
+            const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
+            return React.createElement("div", { key: row.id, ...dnd.rowProps(index), className: "flex items-stretch rounded-2xl mb-2", style: { ...dnd.itemStyle(index), touchAction: "auto", cursor: "default", background: T.surf, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .6) : T.border}`, boxShadow: active ? `0 12px 28px ${hex(T.blue, .24)}` : armed ? `0 6px 16px ${hex(T.blue, .18)}` : "none", overflow: "hidden" } },
+                React.createElement("span", { ...dnd.handleProps(index), role: "button", "aria-label": `กดค้างเพื่อลาก ${row.title}`, title: "กดค้างแล้วลากเพื่อจัดลำดับ", className: "shrink-0 flex items-center justify-center", style: { width: 36, touchAction: "none", cursor: active ? "grabbing" : "grab", color: active || armed ? T.blue : T.muted, background: active || armed ? hex(T.blue, .08) : T.surf2, borderRight: `1px solid ${T.border}` } }, React.createElement(GripVertical, { size: 17 })),
+                React.createElement("button",{type:"button",onClick:()=>onOpen(row),"aria-label":`ดูรายการ ${row.title}`,className:"flex-1 min-w-0 text-left p-3",style:{background:"transparent",display:"block"}},
                     React.createElement("div",{className:"flex items-start gap-3"},
                         React.createElement("span",{className:"shrink-0 rounded-xl flex items-center justify-center",style:{width:34,height:34,background:hex(color,.1),color}},React.createElement(transfer?RefreshCw:row.dir==="in"?TrendingUp:TrendingDown,{size:16})),
                         React.createElement("div",{className:"flex-1 min-w-0"},
@@ -8191,7 +8222,19 @@ try {
                             !transfer && t.kind==="out" && t.pocketSplit && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.purple}},`ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
                             !transfer && row.detailSummary && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.sub,overflowWrap:"anywhere"}},row.detailSummary),
                             !transfer && row.kind==="txn" && passThroughTotal(t)>0 && React.createElement("div",{className:"text-[11px] mt-2",style:{color:T.blue}},`ของฉัน ${fmtBaht(personalIncomeAmount(t))} · เงินผู้อื่น ${fmtBaht(passThroughTotal(t))}`)))));
-        }));
+            }));
+    }
+    function TransactionRows({ rows, accounts, onOpen, onReorder }) {
+        const groups = [];
+        rows.forEach(row => {
+            const last = groups[groups.length - 1];
+            if (!last || last.date !== row.date) groups.push({ date: row.date, rows: [row] });
+            else last.rows.push(row);
+        });
+        const draggable = groups.some(group => group.rows.length > 1);
+        return React.createElement("div", null,
+            draggable && React.createElement("div", { className: "flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1 text-[10px] leading-relaxed", style: { color: T.sub, background: hex(T.blue, .07), border: `1px solid ${hex(T.blue, .22)}` } }, React.createElement(GripVertical, { size: 14, style: { color: T.blue, flexShrink: 0 } }), "กดค้างที่ ≡ แล้วลากเพื่อเรียงรายการภายในวันเดียวกันให้ตรงกับ Statement"),
+            groups.map(group => React.createElement(StatementDayRows, { key: group.date, date: group.date, rows: group.rows, accounts, onOpen, onReorder })));
     }
     function TransferDetail({ transaction: t, accounts }) {
         const fromCurrency = t.fromCurrency || accountCurrency(accounts.find(a=>a.id===t.fromAccountId));
@@ -8211,7 +8254,7 @@ try {
     }
 
     function Budget(props) {
-        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, offerUndo, fireToast } = props;
+        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder = {}, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, offerUndo, fireToast } = props;
         const B_SUBS = ["summary", "transactions", "due", "monthclose"];
         const [sub, setSubRaw] = useState(() => { try {
             const v = localStorage.getItem("dos_budget_sub");
@@ -8998,12 +9041,14 @@ try {
                                 .filter(l => txDirection === "all" || (txDirection === "transfer" ? l.raw?.kind === "transfer" : l.dir === txDirection && l.raw?.kind !== "transfer"))
                                 .filter(l => txCategory === "all" || (l.allocationCategories?.length ? l.allocationCategories.includes(txCategory) : l.tag === txCategory))
                                 .filter(l => !query || [l.title, l.tag, l.allocationSummary, accName(l.accountId), l.raw?.kind === "transfer" ? accName(l.raw.toAccountId) : "", l.raw?.fromCurrency, l.raw?.toCurrency, l.raw?.note, l.paymentRaw?.note].some(v => String(v || "").toLocaleLowerCase("th").includes(query)));
-                            // Newest transaction date first; within the same date, use the real creation timestamp.
-                            const sorted = collapseLedgerFees(filtered).map((item, index) => ({ item, index }))
+                            // Keep the established newest-first order. A saved Statement order only
+                            // replaces the relative slots of rows manually moved within the same day.
+                            const defaultSorted = collapseLedgerFees(filtered).map((item, index) => ({ item, index }))
                                 .sort((a, b) => String(b.item.date || "").localeCompare(String(a.item.date || ""))
                                     || String(b.item.createdAt || "").localeCompare(String(a.item.createdAt || ""))
                                     || b.index - a.index)
                                 .map(entry => entry.item);
+                            const sorted = applyStatementManualOrder(defaultSorted, statementOrder);
                             const filteredIncome = filtered.filter(l => l.dir === "in" && l.raw?.kind !== "transfer").reduce((sum, l) => {
                                 if (txCategory !== "all" && l.allocationTotals)
                                     return sum + (l.allocationTotals[txCategory] || 0);
@@ -9055,7 +9100,7 @@ try {
                                     [["รับเข้า · บาท", filteredIncome, T.green], ["จ่ายออก · บาท", filteredExpense, T.red], ["โอนย้าย", filteredTransfers, TRANSFER_COLOR]].map(([label, value, color], index) => React.createElement("div", { key: label, className: "rounded-xl min-w-0", style: { padding: "11px 12px", background: "#FFFFFF", border: `1px solid ${hex(color, .22)}`, boxShadow: "0 4px 12px rgba(83,67,43,.05)" } },
                                         React.createElement("div", { className: "text-[9px]", style: { marginBottom: 2, color: T.muted } }, label),
                                         React.createElement("div", { className: "font-extrabold truncate", style: { color, fontSize: 14, lineHeight: "18px" } }, index === 2 ? `${value.toLocaleString()} ครั้ง` : fmtBaht(value))))),
-                                slice.length === 0 ? React.createElement(Empty, { text: "ไม่พบรายการตามตัวกรอง · ลองเปลี่ยนเดือนหรือบัญชี" }) : React.createElement(TransactionRows, { rows: slice, accounts, onOpen: row => { setTxnActionItem(row); setTxnActionDeleteArmed(false); } }),
+                                slice.length === 0 ? React.createElement(Empty, { text: "ไม่พบรายการตามตัวกรอง · ลองเปลี่ยนเดือนหรือบัญชี" }) : React.createElement(TransactionRows, { rows: slice, accounts, onOpen: row => { setTxnActionItem(row); setTxnActionDeleteArmed(false); }, onReorder: (date, ids) => { setStatementOrder(current => ({ ...(current || {}), [date]: ids })); fireToast("บันทึกลำดับ Statement แล้ว ✓"); } }),
                                 sorted.length > 0 && React.createElement(Pager, { page: currentLedgerPage, setPage: setLedgerPage, total: sorted.length })));
                         })()));
                 })(),
@@ -9308,7 +9353,7 @@ try {
                 React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D\u0E1A\u0E31\u0E0D\u0E0A\u0E35", value: editAcc.name, onChange: v => setEditAcc({ ...editAcc, name: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E01\u0E2A\u0E34\u0E01\u0E23\u0E44\u0E17\u0E22, \u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14" }),
                 React.createElement(FinanceSelect, { label: "อยู่ใต้บัญชีหลัก", value: editAcc.parentAccountId || "", disabled: accounts.some(a => a.parentAccountId === editAcc.id), options: { "": "ไม่มี · เป็นบัญชีหลัก", ...Object.fromEntries(accounts.filter(a => a.id !== editAcc.id && !a.parentAccountId && !a.archived).map(a => [a.id, a.name])), ...(editAcc.parentAccountId && !accounts.some(a => a.id === editAcc.parentAccountId && !a.archived) ? { [editAcc.parentAccountId]: accounts.find(a => a.id === editAcc.parentAccountId)?.name || "บัญชีหลักเดิม" } : {}) }, onChange: v => { const parent = accounts.find(a => a.id === v); setEditAcc({ ...editAcc, parentAccountId: v || null, platform: editAcc.platform || parent?.platform || parent?.name || "" }); } }),
                 React.createElement("p", { className: "text-[10px] mb-3 leading-relaxed", style: { color: T.muted } }, "เลือกบัญชีหลักเพื่อจัดเป็นบัญชีย่อย ยอดเงินและประวัติยังเป็นของบัญชีนี้ บัญชีหลักเก็บเฉพาะเงินของตัวเอง ไม่ต้องบวกยอดลูกเข้าไปอีก"),
-                React.createElement(FinanceSelect, { label: "ประเภทบัญชี", value: editAcc.accountType || "bank", options: ACCOUNT_TYPES, onChange: v => setEditAcc({ ...editAcc, accountType: v, spendable: v !== "investment" }) }),
+                React.createElement(FinanceSelect, { label: "ประเภทบัญชี", value: editAcc.accountType || "bank", options: ACCOUNT_TYPES, onChange: v => setEditAcc({ ...editAcc, accountType: v, spendable: !["investment", "broker"].includes(v) }) }),
                 React.createElement(Input, { label: "กลุ่มแพลตฟอร์ม (เพิ่ม / เปลี่ยนชื่อได้)", value: editAcc.platform || "", onChange: v => setEditAcc({ ...editAcc, platform: v }), placeholder: "เช่น Dime, Binance TH, KBank" }),
                 React.createElement(FinanceSelect, { label: "สกุลเงิน · บัญชีมีประวัติแล้วเปลี่ยนไม่ได้", value: accountCurrency(editAcc), options: { THB: "THB · บาท", USD: "USD · ดอลลาร์สหรัฐ" }, disabled: !!editAcc.id && accountUsageCount(editAcc.id) > 0, onChange: v => setEditAcc({ ...editAcc, currency: v }) }),
                 React.createElement("label", { className: "flex items-center gap-3 mb-3 text-sm" }, React.createElement("input", { type: "checkbox", checked: isSpendableAccount(editAcc), onChange: e => setEditAcc({ ...editAcc, spendable: e.target.checked }) }), "นับบัญชีนี้เป็นเงินใช้ได้"),
@@ -11831,6 +11876,18 @@ try {
         check("ลงทุน: แก้ไขค่าธรรมเนียมแทนยอดเดิม", nativeAccountBalance(fundingAccounts[0], editedFunding, []), 16490);
         check("ลงทุน: แก้ยอดรับปรับ USD", nativeAccountBalance(fundingAccounts[2], editedFunding, []), 99);
         check("ลงทุน: ล้างค่าธรรมเนียมลบรายจ่ายที่ผูกไว้", withTransferFee(editedFunding, { ...fundingTransfer, transferFee: 0 }).length, 1);
+        const brokerSnapshot = migrate({ version: 18, accounts: [{ id: "broker", name: "Binance TH", accountType: "broker", currency: "THB" }], transactions: [] });
+        check("Broker: migration รักษาประเภทบัญชี", brokerSnapshot.accounts[0].accountType, "broker");
+        check("Broker: ไม่นับเป็นเงินใช้ได้โดยอัตโนมัติ", isSpendableAccount(brokerSnapshot.accounts[0]), false);
+        check("Broker: อยู่ในกลุ่มบัญชีลงทุน", isInvestmentAccount(brokerSnapshot.accounts[0]), true);
+        const statementRows = [
+            { id: "new", date: "2026-11-04" },
+            { id: "middle", date: "2026-11-04" },
+            { id: "old", date: "2026-11-04" },
+            { id: "other", date: "2026-11-03" }
+        ];
+        check("Statement: ลากสลับลำดับภายในวัน", applyStatementManualOrder(statementRows, { "2026-11-04": ["old", "middle", "new"] }).map(row => row.id).join(","), "old,middle,new,other");
+        check("Statement: วันที่อื่นคงตำแหน่งเดิม", applyStatementManualOrder(statementRows, { "2026-11-04": ["middle", "new"] }).at(-1).id, "other");
         const legacyFunding = [{ id: "legacy", kind: "transfer", fromAccountId: "bank", toAccountId: "binance", amount: 3000, date: "2026-11-02" }];
         check("ลงทุน: รายการเก่ายังรับยอดเดิม", nativeAccountBalance(fundingAccounts[1], legacyFunding, []), 3000);
         check("ลงทุน: บัญชีเดิมเป็นเงินบาท", accountCurrency(fundingAccounts[0]), "THB");
