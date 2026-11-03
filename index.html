@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-account-colors-v9";
+window.__TASKROUTINE_BUILD__="2026-11-04-subaccount-style-v10";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1488,7 +1488,13 @@ try {
         return channels[0]*.2126 + channels[1]*.7152 + channels[2]*.0722 > .179 ? "#20231E" : "#FFFFFF";
     };
     function AccountBadge({ account, accounts = [] }) {
-        return React.createElement("span", { title: accountLabel(account,accounts), style: { display: "inline-flex", alignItems: "center", maxWidth: "100%", padding: "5px 9px", borderRadius: 9, background: accountBackground(account), color: accountForeground(account), fontSize: 11, fontWeight: 700, lineHeight: 1.6, overflowWrap: "anywhere", border: "1px solid rgba(0,0,0,.07)" } }, account?.name || "ไม่ระบุบัญชี");
+        const child = !!account?.parentAccountId;
+        const base = accountBackground(account);
+        const soft = "#" + [1,3,5].map(i => Math.round(parseInt(base.slice(i,i+2),16)*.3 + 255*.7).toString(16).padStart(2,"0")).join("");
+        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: 5, maxWidth: "100%", padding: child ? "3px 7px" : "6px 10px", borderRadius: child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: 1.6, overflowWrap: "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
+            child && React.createElement("span", { "aria-hidden": true, style: { fontSize: 13, flexShrink: 0 } }, "↳"),
+            React.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, account?.name || "ไม่ระบุบัญชี"),
+            child && React.createElement("span", { style: { fontSize: 9, fontWeight: 500, opacity: .8, flexShrink: 0 } }, "ย่อย"));
     }
     function AccountColorPicker({ account, onChange }) {
         return React.createElement("div", { style: { marginBottom: 16 } },
