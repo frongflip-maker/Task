@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-simple-finance-v21";
+window.__TASKROUTINE_BUILD__="2026-11-04-statement-inline-accounts-v22";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1495,13 +1495,13 @@ try {
         const channels = [1,3,5].map(i => { const v = parseInt(color.slice(i,i+2),16)/255; return v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4; });
         return channels[0]*.2126 + channels[1]*.7152 + channels[2]*.0722 > .179 ? "#20231E" : "#FFFFFF";
     };
-    function AccountBadge({ account, accounts = [] }) {
+    function AccountBadge({ account, accounts = [], compact = false }) {
         const child = !!account?.parentAccountId;
         const base = accountBackground(account);
         const soft = "#" + [1,3,5].map(i => Math.round(parseInt(base.slice(i,i+2),16)*.3 + 255*.7).toString(16).padStart(2,"0")).join("");
-        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: 5, maxWidth: "100%", padding: child ? "3px 7px" : "6px 10px", borderRadius: child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: 1.6, overflowWrap: "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
+        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: compact ? 4 : 5, maxWidth: "100%", minWidth: 0, padding: compact ? (child ? "2px 6px" : "3px 7px") : child ? "3px 7px" : "6px 10px", borderRadius: compact ? 7 : child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: compact ? (child ? 11 : 11.5) : child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: compact ? 1.5 : 1.6, whiteSpace: compact ? "nowrap" : undefined, overflow: compact ? "hidden" : undefined, overflowWrap: compact ? undefined : "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
             child && React.createElement("span", { "aria-hidden": true, style: { fontSize: 13, flexShrink: 0 } }, "↳"),
-            React.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, account?.name || "ไม่ระบุบัญชี"));
+            React.createElement("span", { style: { minWidth: 0, overflow: compact ? "hidden" : undefined, textOverflow: compact ? "ellipsis" : undefined, overflowWrap: compact ? undefined : "anywhere" } }, account?.name || "ไม่ระบุบัญชี"));
     }
     function AccountColorPicker({ account, onChange }) {
         return React.createElement("div", { style: { marginBottom: 16 } },
@@ -8208,22 +8208,31 @@ try {
         return result;
     }
     const ledgerMoney = (value,currency) => `${new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0)} ${currency}`;
-    function StatementMoney({ children, inline = false }) {
+    function StatementMoney({ children, inline = false, fontSize = 16 }) {
         const box = React.useRef(null), content = React.useRef(null);
         useEffect(() => {
+            let disposed = false;
             const fit = () => {
-                if (!box.current || !content.current) return;
-                content.current.style.fontSize = "14px";
-                const width = content.current.scrollWidth;
-                if (width > box.current.clientWidth && width > 0) content.current.style.fontSize = (14 * box.current.clientWidth / width * .99) + "px";
+                if (disposed || !box.current || !content.current) return;
+                content.current.style.fontSize = `${fontSize}px`;
+                const available = box.current.getBoundingClientRect().width;
+                if (!(available > 0)) return;
+                let fittedSize = fontSize;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    const width = content.current.getBoundingClientRect().width;
+                    if (width <= available || !(width > 0)) break;
+                    fittedSize *= available / width * .98;
+                    content.current.style.fontSize = `${fittedSize}px`;
+                }
             };
             fit();
+            document.fonts?.ready.then(fit);
             const observer = new ResizeObserver(fit);
             if (box.current) observer.observe(box.current);
-            return () => observer.disconnect();
-        }, [children]);
-        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "0 1 auto" : undefined, minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 7, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
-            React.createElement("span", { ref: content, style: { display: "inline-flex", alignItems: "baseline", gap: 5, fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.5 } }, children));
+            return () => { disposed = true; observer.disconnect(); };
+        }, [children, fontSize]);
+        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "0 1 auto" : undefined, maxWidth: inline ? "72%" : "100%", minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
+            React.createElement("span", { ref: content, style: { display: "inline-flex", width: "max-content", alignItems: "baseline", gap: 5, fontSize, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.4 } }, children));
     }
     function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
         const dnd = useLongPressSort(rows, (from, to) => onReorder(date, reorderListItem(rows, from, to).map(row => String(row.id))), `statement-${String(date).replace(/[^a-zA-Z0-9_-]/g, "-")}`, 320, false, true);
@@ -8244,27 +8253,26 @@ try {
                     "aria-label": `ดูรายการ ${row.title}`, title: "แตะเพื่อดูรายละเอียด · กดค้างเพื่อลาก",
                     onContextMenu: e => e.preventDefault(),
                     onClick: e => { if (dnd.suppressClick()) { e.preventDefault(); return; } onOpen(row); },
-                    style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", marginBottom: 7, padding: "10px 12px", borderRadius: 14, background: T.surf, color: T.text, overflow: "hidden", border: `1px solid ${active || armed ? T.blue : T.border}` } },
+                    style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", marginBottom: 7, padding: "10px 11px", borderRadius: 14, background: T.surf, color: T.text, overflow: "hidden", border: `1px solid ${active || armed ? T.blue : T.border}` } },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
-                        React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 14, style: { color, flexShrink: 0 } }),
-                        React.createElement("span", { style: { fontSize: 12, fontWeight: 750, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, transfer ? TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี" : row.title),
-                        !transfer && row.tag === row.title && React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`)),
+                        React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 16, style: { color, flexShrink: 0 } }),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 } },
+                            React.createElement("span", { title: row.title, style: { fontSize: 15, fontWeight: 750, lineHeight: 1.45, flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, transfer ? TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี" : row.title),
+                            !transfer && React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts, compact: true }))),
                         flow !== "none" && INVESTMENT_FLOWS[flow] !== TRANSFER_PURPOSES[t.transferPurpose] && React.createElement("span", { style: { color: T.blue, fontSize: 10, flexShrink: 0 } }, INVESTMENT_FLOWS[flow]),
                         React.createElement(ChevronRight, { size: 13, style: { color: T.muted, flexShrink: 0 } })),
                     transfer ? React.createElement(React.Fragment, null,
-                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 6 } },
-                            React.createElement(AccountBadge, { account: from, accounts }),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 5, minWidth: 0 } },
+                            React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: from, accounts, compact: true })),
                             React.createElement("span", { style: { color: T.muted, fontSize: 12 } }, "→"),
-                            React.createElement(AccountBadge, { account: to, accounts })),
-                        React.createElement(StatementMoney, null,
+                            React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: to, accounts, compact: true }))),
+                        React.createElement(StatementMoney, { fontSize: 15 },
                             React.createElement("span", { style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
                             React.createElement("span", { style: { color: T.muted } }, "→"),
                             React.createElement("span", { style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`))) :
-                        React.createElement(React.Fragment, null,
-                            row.tag !== row.title && React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginTop: 6, minWidth: 0 } },
-                                React.createElement("span", { style: { color: T.muted, fontSize: 11, flex: "0 1 38%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag || "อื่นๆ"),
-                                React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`))),
-                            React.createElement("div", { style: { marginTop: 5 } }, React.createElement(AccountBadge, { account, accounts }))),
+                        React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 4, paddingLeft: 23, minWidth: 0 } },
+                            React.createElement("span", { style: { color: T.sub, fontSize: 13, lineHeight: 1.5, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag !== row.title ? row.tag || "อื่นๆ" : ""),
+                            React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`))),
                     transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
                     !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
                     !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
