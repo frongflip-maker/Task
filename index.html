@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-default-account-transfer-v18";
+window.__TASKROUTINE_BUILD__="2026-11-04-deposit-purpose-v20";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1462,7 +1462,7 @@ try {
 
     // Investment funding v1: native-currency balances, historical THB cash flows.
     const ACCOUNT_TYPES = { bank: "ธนาคาร", cash: "เงินสด", investment: "เงินลงทุน / เงินรอลงทุน", broker: "Broker / โบรกเกอร์" };
-    const TRANSFER_PURPOSES = { general: "โอนย้ายบัญชี", invest: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน", exchange: "แลกสกุลเงิน" };
+    const TRANSFER_PURPOSES = { general: "โอนย้ายบัญชี", deposit: "ฝากเงิน", invest: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน", exchange: "แลกสกุลเงิน" };
     const INVESTMENT_FLOWS = { none: "ไม่ระบุเงินลงทุน", add: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน" };
     function investmentDirection(t, accounts) {
         if (Object.hasOwn(t, "investmentFlow")) return ["add", "withdraw"].includes(t.investmentFlow) ? t.investmentFlow : "none";
@@ -6669,7 +6669,8 @@ try {
                   onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", transferPurpose: "general" }),
                   exclude: f.fromAccountId,
                 }),
-                React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนย้ายบัญชี", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
+                React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนย้ายบัญชี", deposit: "ฝากเงิน", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
+                transferPurpose === "deposit" && React.createElement("p", { style: { fontSize: 11, color: T.sub, lineHeight: 1.7, marginBottom: 12 } }, "เช่น ฝากเงินสดเข้าธนาคาร: เลือกต้นทางเป็นบัญชีเงินสด และปลายทางเป็นบัญชีที่รับฝาก ยอดฝากไม่ถูกนับเป็นรายรับเพิ่ม"),
                 !purposeValid && React.createElement("p", { className: "text-xs mb-3", style: { color: T.red } }, "แลกสกุลเงิน: เลือกบัญชีคนละสกุล"),
                 React.createElement("fieldset", { style: { padding: 12, marginBottom: 16, border: `1px solid ${T.border}`, borderRadius: 14, background: T.surf } },
                     React.createElement("legend", { style: { fontSize: 12, fontWeight: 700, color: T.sub, padding: "0 5px" } }, "กำกับเงินลงทุน (ไม่บังคับ)"),
@@ -9206,19 +9207,6 @@ try {
                                     React.createElement(History, { size: 15, style: { color: T.sub } }),
                                     React.createElement("span", { className: "font-bold text-sm" }, "\u0E18\u0E38\u0E23\u0E01\u0E23\u0E23\u0E21\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"),
                                     React.createElement("span", { className: "text-[10px] ml-auto px-2 py-1 rounded-full", style: { color: T.sub, background: T.surf2, border: `1px solid ${T.border}` } }, `${sorted.length} รายการ`)),
-                                (() => {
-                                    const since = dkey(addDays(today, -30));
-                                    const usage = {};
-                                    transactions.forEach(t => { if (t.date >= since && t.kind !== "transfer") { const k = `${t.kind}:${String(t.title || "").trim().toLocaleLowerCase("th")}`; usage[k] = (usage[k] || 0) + 1; } });
-                                    const chips = Object.entries(txnTemplateDefaults || {}).filter(([, dft]) => dft && dft.rememberAmount && Number(dft.amount) > 0).map(([key, dft]) => { const sep = key.indexOf(":"); const kind = key.slice(0, sep); const titleKey = key.slice(sep + 1); const recent = transactions.filter(t => t.kind === kind && String(t.title || "").trim().toLocaleLowerCase("th") === titleKey).sort((a, b) => (b.date + (b.createdAt || "")).localeCompare(a.date + (a.createdAt || "")))[0]; return { key, kind, title: recent ? String(recent.title).trim() : titleKey, dft, uses: usage[key] || 0 }; }).filter(chip => chip.kind === "in" || chip.kind === "out").sort((a, b) => b.uses - a.uses).slice(0, 6);
-                                    const lastTransfer = transactions.filter(t => t.kind === "transfer" && t.fromAccountId && t.toAccountId).sort((a, b) => (b.date + (b.createdAt || "")).localeCompare(a.date + (a.createdAt || "")))[0];
-                                    const accShort = id => (accounts.find(a => a.id === id)?.name || "?");
-                                    if (!chips.length && !lastTransfer)
-                                        return null;
-                                    return React.createElement("div", { className: "flex gap-1.5 mb-3 overflow-x-auto no-scrollbar", style: { WebkitOverflowScrolling: "touch" } },
-                                        chips.map(chip => React.createElement("button", { key: chip.key, onClick: () => { addTxn({ kind: chip.kind, title: chip.title, amount: Number(chip.dft.amount) || 0, date: TK, accountId: chip.dft.accountId || accounts[0]?.id || null, category: chip.dft.category || (chip.kind === "in" ? "Work" : "อื่นๆ"), taxable: chip.dft.taxable !== false, moneyType: (chip.dft.moneyType || (chip.kind === "in" ? "work_income" : "personal")), payer: chip.dft.payer || "", note: chip.dft.note || "", studioService: chip.dft.studioService || undefined, reconcileStatus: "unchecked" }); fireToast(`บันทึก ${chip.title} ${fmtBaht(Number(chip.dft.amount) || 0)} ✓`); }, className: "shrink-0 font-bold active:scale-95 whitespace-nowrap", style: { minHeight: 38, padding: "8px 12px", borderRadius: 12, fontSize: 11, background: chip.kind === "in" ? hex(T.green, .14) : hex(T.red, .1), color: chip.kind === "in" ? T.green : T.red, border: `1px solid ${chip.kind === "in" ? hex(T.green, .45) : hex(T.red, .35)}` } }, `${chip.kind === "in" ? "+" : "−"} ${chip.title} ${fmtBaht(Number(chip.dft.amount) || 0)}`)),
-                                        lastTransfer && React.createElement("button", { key: "qt", onClick: () => setDuplicateTxn({ ...lastTransfer, id: lastTransfer.id, amount: "", date: TK, note: "" }), className: "shrink-0 font-bold active:scale-95 whitespace-nowrap", style: { minHeight: 38, padding: "8px 12px", borderRadius: 12, fontSize: 11, background: hex("#4A6FA5", .12), color: "#4A6FA5", border: `1px solid ${hex("#4A6FA5", .4)}` } }, `⇄ โอนด่วน ${accShort(lastTransfer.fromAccountId)}→${accShort(lastTransfer.toAccountId)}`));
-                                })(),
                                 React.createElement("div", { className: "flex items-center gap-2 mb-3" },
                                     React.createElement("select", { "aria-label": "ช่วงเวลาธุรกรรม", value: txPeriod, onChange: e => { setTxPeriod(e.target.value); setLedgerPage(0); }, className: "text-xs py-3 px-2 rounded-xl", style: { background: T.surf2, color: T.text, minWidth: 0, flex: 1 } }, React.createElement("option", { value: "month" }, "เลือกเดือน"), React.createElement("option", { value: "all" }, "ทุกช่วงเวลา")),
                                     txPeriod === "month" && React.createElement("input", { type: "month", "aria-label": "เดือนธุรกรรม", value: txMonth, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setTxMonth(e.target.value); setLedgerPage(0); } }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setTxMonth(e.target.value); setLedgerPage(0); } }, style: { border: `1px solid ${T.border}`, padding: "10px 8px", borderRadius: 12, color: T.text, background: T.surf, minWidth: 0, maxWidth: "58%", fontSize: 12 } })),
@@ -12001,6 +11989,10 @@ try {
         ];
         const fundingTransfer = { id: "fund", kind: "transfer", fromAccountId: "bank", toAccountId: "us", date: "2026-11-03", amount: 3500, receivedAmount: 100, fromCurrency: "THB", toCurrency: "USD", amountTHB: 3500, sourceRateTHB: 1, transferFee: 20, transferPurpose: "invest", fromInvestment: false, toInvestment: true };
         const funded = withTransferFee([], fundingTransfer);
+        const overdrawnTransfer = withTransferFee([], {id:"overdrawn",kind:"transfer",fromAccountId:"empty",toAccountId:"receiver",amount:500,receivedAmount:500});
+        check("เงินไม่พอ: โอนแล้วต้นทางติดลบตามจริง",nativeAccountBalance({id:"empty",startBalance:0},overdrawnTransfer,[]),-500);
+        check("เงินไม่พอ: ไม่มีรายรับชดเชยอัตโนมัติ",overdrawnTransfer.filter(t=>t.kind==="in").length,0);
+        check("เงินไม่พอ: มีเพียงรายการโอนหนึ่งรายการ",overdrawnTransfer.length,1);
         check("ลงทุน: ต้นทางหักเงินบาทรวมค่าธรรมเนียม", nativeAccountBalance(fundingAccounts[0], funded, []), 16480);
         check("ลงทุน: ปลายทางรับ USD ไม่ใช่ยอด THB", nativeAccountBalance(fundingAccounts[2], funded, []), 100);
         check("ลงทุน: ค่าธรรมเนียมเป็นรายจ่ายเพียงครั้งเดียว", funded.filter(t => t.kind === "out").reduce((n, t) => n + t.amount, 0), 20);
