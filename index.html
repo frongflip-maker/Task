@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-03-transactions-v5";
+window.__TASKROUTINE_BUILD__="2026-11-03-studio-pockets-v6";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -862,7 +862,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 17;
+    const SCHEMA_VERSION = 18;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1490,7 +1490,7 @@ try {
     };
     function investmentFeeRow(transfer) {
         if (transfer.kind !== "transfer" || !(Number(transfer.transferFee) > 0)) return null;
-        return { id: `investment-fee-${transfer.id}`, investmentFeeFor: transfer.id, title: `ค่าธรรมเนียม · ${TRANSFER_PURPOSES[transfer.transferPurpose] || "โอนย้าย"}`,
+        return { id: `investment-fee-${transfer.id}`, investmentFeeFor: transfer.id, studioExpense: transfer.pocketOwner === "studio", title: `ค่าธรรมเนียม · ${TRANSFER_PURPOSES[transfer.transferPurpose] || "โอนย้าย"}`,
             kind: "out", category: "ค่าธรรมเนียมการลงทุน/โอนเงิน", accountId: transfer.fromAccountId,
             amount: Math.round(Number(transfer.transferFee) * (Number(transfer.sourceRateTHB) || 1) * 100) / 100, accountAmount: Number(transfer.transferFee), currency: transfer.fromCurrency || "THB",
             date: transfer.date, note: "ค่าธรรมเนียมจ่ายเพิ่มจากยอดโอน · แก้ไขพร้อมรายการโอนต้นทาง", createdAt: transfer.createdAt, taxable: false };
@@ -1614,6 +1614,62 @@ try {
             React.createElement(InvestmentPlans, { key: month, plans: investmentPlans, setPlans: setInvestmentPlans, accounts, transactions, month }),
             !investmentAccounts.length && React.createElement("p", { className: "text-xs mt-2", style: { color: T.sub } }, "เริ่มด้วยบัญชี Binance TH (THB) หรือ Dime US (USD) แล้วเลือกประเภทเงินลงทุน"),
             React.createElement("button", { onClick: onTransfer, className: "w-full py-3 rounded-xl font-bold text-sm mt-3", style: { background: T.purple, color: "#fff" } }, "โอน / เติม / ถอนเงินลงทุน"));
+    }
+
+
+    const studioBillPart = t => t?.kind === "out" ? t.pocketSplit ? Math.max(0,Math.min(nativeAmount(t),Number(t.pocketSplit.studio)||0)) : t.studioExpense ? nativeAmount(t) : 0 : 0;
+    const studioExpenseAmount = (t,transactions) => t?.kind === "out" ? actualPersonalExpenseAmount(t,transactions) * (t.pocketSplit && Number(t.amount)>0 ? Math.max(0,Math.min(1,(Number(t.pocketSplit.studio)||0)/Number(t.amount))) : t.studioExpense ? 1 : 0) : 0;
+    function studioPocketFlow(accountId,transactions,payments,sources) {
+        let value = 0;
+        transactions.forEach(t => {
+            if (t.kind === "transfer") {
+                if (t.pocketOwner !== "studio") return;
+                if (t.fromAccountId === accountId) value -= Number(t.amount)||0;
+                if (t.toAccountId === accountId) value += transferReceived(t);
+            } else if (t.accountId === accountId) {
+                if (t.kind === "out") value -= studioBillPart(t);
+                else if (t.kind === "in") {
+                    if (t.moneyType === "reimbursement" && t.linkedExpenseId) {
+                        const original = transactions.find(x=>x.id===t.linkedExpenseId);
+                        value += (Number(t.amount)||0) * (Number(original?.amount)>0 ? studioBillPart(original)/Number(original.amount) : 0);
+                    } else if (isStudioRevenue(t)) value += personalIncomeAmount(t);
+                }
+            }
+        });
+        payments.filter(p=>p.accountId===accountId).forEach(payment => {
+            const source = sources.find(x=>x.id===payment.incomeSourceId);
+            const allocations = paymentAllocationRows(payment,source?.category||"Work");
+            value += allocations.filter(a=>a.role!=="pass_through" && (source?.sourceType==="studio" || normalizeIncomeCategory(a.category)==="Studio" || (source?.category==="Studio" && a.role==="tip"))).reduce((sum,a)=>sum+(Number(a.amount)||0),0);
+        });
+        return Math.round(value*100)/100;
+    }
+    function accountPocketBalances(account,transactions,payments,sources) {
+        const total = nativeAccountBalance(account,transactions,payments);
+        const studio = studioPocketFlow(account.id,transactions,payments,sources)+(Number(account.studioPocketAdjustment)||0);
+        let held = 0;
+        payments.filter(p=>p.accountId===account.id).forEach(p=> { held += paymentAllocationRows(p).filter(a=>a.role==="pass_through"&&!a.settled).reduce((n,a)=>n+(Number(a.amount)||0),0); });
+        transactions.filter(t=>t.kind==="in"&&t.accountId===account.id).forEach(t=> { held += (t.recipientSplits||[]).filter(a=>!a.settled).reduce((n,a)=>n+(Number(a.amount)||0),0); });
+        return {total,studio:Math.round(studio*100)/100,held:Math.round(held*100)/100,personal:Math.round((total-studio-held)*100)/100};
+    }
+    function setupAccountPockets(account,target,transactions,payments,sources) {
+        const value=Number(target), balances=accountPocketBalances(account,transactions,payments,sources);
+        if (accountCurrency(account)!=="THB" || isInvestmentAccount(account) || !Number.isFinite(value) || value<0 || value>balances.total-balances.held+.009) return null;
+        return {...account,pocketEnabled:true,studioPocketAdjustment:Math.round((value-studioPocketFlow(account.id,transactions,payments,sources))*100)/100};
+    }
+    function PocketSummary({accounts,transactions,payments,sources=[],studioOnly=false}) {
+        const list=accounts.filter(a=>a.pocketEnabled&&accountCurrency(a)==="THB");
+        if(!list.length)return null;
+        const rows=list.map(a=>({account:a,...accountPocketBalances(a,transactions,payments,sources)}));
+        return React.createElement(Glass,{className:"finance-panel p-4",style:{order:studioOnly?0:2}},
+            React.createElement("div",{className:"text-sm font-extrabold"},studioOnly?"เงินห้องซ้อมในบัญชี":"กระเป๋าเงินในบัญชี"),
+            React.createElement("p",{className:"text-[11px] mt-1 leading-relaxed",style:{color:T.muted}},"เฉพาะบัญชีที่เปิดแยกกระเป๋า · ยอดนี้รวมอยู่ในยอดบัญชีแล้ว"),
+            studioOnly&&React.createElement("div",{className:"font-extrabold text-2xl mt-3",style:{color:T.purple}},moneyIn(rows.reduce((sum,r)=>sum+r.studio,0))),
+            rows.map(row=>React.createElement("div",{key:row.account.id,className:"mt-3 pt-3",style:{borderTop:`1px solid ${T.border}`}},
+                React.createElement("div",{className:"text-xs font-bold mb-2"},accountLabel(row.account,accounts)),
+                React.createElement("div",{className:"grid grid-cols-2 gap-2"},React.createElement(Stat,{label:"ส่วนตัว",value:moneyIn(row.personal),color:row.personal<0?T.red:T.green}),React.createElement(Stat,{label:"Blurryroom Studio",value:moneyIn(row.studio),color:row.studio<0?T.red:T.purple})),
+                row.held>0&&React.createElement("div",{className:"text-xs mt-2",style:{color:T.orange}},`เงินรอส่งผู้อื่น ${moneyIn(row.held)}`),
+                React.createElement("div",{className:"text-[11px] mt-2",style:{color:T.muted}},`ยอดบัญชีจริง ${moneyIn(row.total)}`),
+                (row.studio<0||row.personal<0)&&React.createElement("p",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.red}},"มีกระเป๋าติดลบ ตรวจยอดตั้งต้นหรือส่วนที่สำรองจ่ายให้กัน"))));
     }
 
     function App() {
@@ -4460,7 +4516,7 @@ try {
                     const personalAmount = t.kind === "in" ? personalIncomeAmount(t) : Number(t.amount) || 0;
                     rows.push({ batchId: t.batchId || null, date: t.date, source: t.studioExpense ? "Studio · รายจ่าย" : isStudioIncome(t) ? `Studio · ${studioServiceLabel(t.studioService)}` : "Budget · บันทึกเอง", title: t.title, category: transactionCategory,
                         allocationCategories: t.kind === "in" ? [transactionCategory] : [], allocationTotals: t.kind === "in" ? { [transactionCategory]: personalAmount } : {}, allocationSummary: t.kind === "in" ? `${transactionCategory} ${fmtBaht(personalAmount)}` : "", paymentType: t.kind === "in" ? "manual" : "",
-                        accountId: t.accountId, accountName: accName(t.accountId), direction: t.kind, nativeAmount: nativeAmount(t), currency: t.currency || accountCurrency(accounts.find(a => a.id === t.accountId)), taxable: t.kind === "in" && t.taxable !== false, payer: t.payer || "", moneyType: t.moneyType || (t.kind === "in" ? "work_income" : ""), reconcileStatus: t.reconcileStatus || (t.kind === "in" ? "unchecked" : ""), linkedExpenseId: t.linkedExpenseId || "", gross: Number(t.amount) || 0, principalAmount: t.kind === "in" ? personalAmount : 0, tipAmount: 0, deduction: sharedTotal, amount: personalAmount, personalAmount: actualPersonal, reimbursableAmount: t.kind === "out" ? Math.max(0, (Number(t.amount) || 0) - actualPersonal) : 0, note: [isStudioIncome(t) ? `Studio: ${studioServiceLabel(t.studioService)}` : "", t.paymentStage === "deposit" ? "เงินมัดจำ" : t.paymentStage === "balance" ? "เงินส่วนที่เหลือจากมัดจำ" : "", t.note, sharedTotal > 0 ? `เงินส่วนของผู้อื่น ${fmtBaht(sharedTotal)} (${(t.recipientSplits || []).map(split => split.name).join(", ")})` : ""].filter(Boolean).join(" · ") });
+                        accountId: t.accountId, accountName: accName(t.accountId), direction: t.kind, studioCost: studioExpenseAmount(t,transactions), personalCost: t.kind==="out"?actualPersonalExpenseAmount(t,transactions)-studioExpenseAmount(t,transactions):0, nativeAmount: nativeAmount(t), currency: t.currency || accountCurrency(accounts.find(a => a.id === t.accountId)), taxable: t.kind === "in" && t.taxable !== false, payer: t.payer || "", moneyType: t.moneyType || (t.kind === "in" ? "work_income" : ""), reconcileStatus: t.reconcileStatus || (t.kind === "in" ? "unchecked" : ""), linkedExpenseId: t.linkedExpenseId || "", gross: Number(t.amount) || 0, principalAmount: t.kind === "in" ? personalAmount : 0, tipAmount: 0, deduction: sharedTotal, amount: personalAmount, personalAmount: actualPersonal, reimbursableAmount: t.kind === "out" ? Math.max(0, (Number(t.amount) || 0) - actualPersonal) : 0, note: [isStudioIncome(t) ? `Studio: ${studioServiceLabel(t.studioService)}` : "", t.paymentStage === "deposit" ? "เงินมัดจำ" : t.paymentStage === "balance" ? "เงินส่วนที่เหลือจากมัดจำ" : "", t.note, sharedTotal > 0 ? `เงินส่วนของผู้อื่น ${fmtBaht(sharedTotal)} (${(t.recipientSplits || []).map(split => split.name).join(", ")})` : ""].filter(Boolean).join(" · ") });
                 }
                 if (t.kind === "in" && Array.isArray(t.recipientSplits))
                     t.recipientSplits.filter(split => split.settled).forEach(split => rows.push({ date: split.settledDate || t.date, source: "Budget · ส่งต่อเงินผู้อื่น", title: `ส่งต่อให้ ${split.name}`, category: "เงินส่วนของผู้อื่น", accountId: split.settledAccountId || t.accountId, accountName: accName(split.settledAccountId || t.accountId), direction: "pass_through", taxable: false, gross: Number(split.amount) || 0, deduction: 0, amount: Number(split.amount) || 0, note: `ส่งต่อจากรายการ ${t.title}` }));
@@ -4543,7 +4599,7 @@ try {
                 rows = [["วันที่รับเงิน", "ชื่อรายการ", "ประเภทรายรับ", "ผู้จ่าย/ผู้โอน", "บัญชี", "ยอดเข้าบัญชี", "เงินต้น", "Allocation", "รายละเอียด/หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.category, r.payer || "", r.accountName, r.gross, r.principalAmount ?? r.amount, r.allocationSummary || "", r.note || ""])];
             }
             else if (type === "out") {
-                rows = [["วันที่จ่าย", "ชื่อรายการ", "หมวด", "จ่ายจากบัญชี", "ยอดสกุลบัญชี", "สกุลเงิน", "มูลค่ารายจ่ายบาท", "เงินคืนจริงบาท", "รายจ่ายสุทธิบาท", "หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.category, r.accountName, r.nativeAmount ?? r.amount, r.currency || "THB", r.amount, r.reimbursableAmount || "", r.personalAmount ?? r.amount, r.note || ""])];
+                rows = [["วันที่จ่าย", "ชื่อรายการ", "หมวด", "จ่ายจากบัญชี", "ยอดสกุลบัญชี", "สกุลเงิน", "มูลค่ารายจ่ายบาท", "เงินคืนจริงบาท", "รายจ่ายสุทธิบาท", "ส่วนห้องซ้อมบาท", "ส่วนตัวบาท", "หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.category, r.accountName, r.nativeAmount ?? r.amount, r.currency || "THB", r.amount, r.reimbursableAmount || "", r.personalAmount ?? r.amount, r.studioCost??0, r.personalCost??r.personalAmount??r.amount, r.note || ""])];
             }
             else {
                 rows = [["วันที่", "ชื่อรายการ", "หมวด/Allocation", "ประเภท", "บัญชี/เส้นทางเงิน", "ยอดเงินจริง", "เงินต้น", "Tips", "Allocation", "หมายเหตุ"], ...finalRows.map(r => [r.date, r.title, r.category, r.direction === "in" ? "รายรับ" : r.direction === "out" ? "รายจ่าย" : r.direction === "pass_through" ? "ส่งต่อเงินผู้อื่น" : "โอนย้ายบัญชี", r.accountName, r.amount, r.principalAmount || "", r.tipAmount || "", r.allocationSummary || "", r.note || ""])];
@@ -4879,7 +4935,7 @@ try {
         const roomIncome = roomBookingIncome + roomManualIncome;
         const teachingIncome = teachingBookingIncome + teachingManualIncome;
         const income = roomIncome + teachingIncome + calendarStudioIncome;
-        const expense = transactions.filter(transaction => transaction.kind === "out" && transaction.studioExpense && inScope(transaction.date)).reduce((sum, transaction) => sum + actualPersonalExpenseAmount(transaction, transactions), 0);
+        const expense = transactions.filter(transaction => transaction.kind === "out" && inScope(transaction.date)).reduce((sum, transaction) => sum + studioExpenseAmount(transaction, transactions), 0);
         const net = income - expense;
         const sourceByPaymentId = new globalThis.Map(incomeSources.map(source => [source.id, source]));
         const allNet = payments.reduce((sum, payment) => {
@@ -4887,7 +4943,7 @@ try {
             return sum + paymentAmountForCategory(payment, "Studio", source?.category || "Studio");
         }, 0)
             + transactions.filter(isStudioRevenue).reduce((sum, transaction) => sum + personalIncomeAmount(transaction), 0)
-            - transactions.filter(transaction => transaction.kind === "out" && transaction.studioExpense).reduce((sum, transaction) => sum + actualPersonalExpenseAmount(transaction, transactions), 0);
+            - transactions.filter(transaction => transaction.kind === "out").reduce((sum, transaction) => sum + studioExpenseAmount(transaction, transactions), 0);
         const balance = capital + allNet;
         const payInfo = (booking) => {
             if (booking.loyaltyFree)
@@ -5000,7 +5056,7 @@ try {
                         React.createElement("div", { className: "p-2 rounded-lg", style: { background: hex(T.blue, .08), border: `1px solid ${hex(T.blue, .25)}` } }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, "งานสอน"), React.createElement("div", { className: "text-xs font-extrabold", style: { color: T.blue } }, fmtBaht(teachingIncome))),
                         React.createElement("div", { className: "p-2 rounded-lg", style: { background: hex(T.cyan, .08), border: `1px solid ${hex(T.cyan, .25)}` } }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, "Calendar Studio"), React.createElement("div", { className: "text-xs font-extrabold", style: { color: T.cyan } }, fmtBaht(calendarStudioIncome)))),
                     React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "รวมการจอง รายรับที่กรอกเอง และ Studio Event จาก Calendar · รายจ่ายแสดงยอดสุทธิหลังเงินคืน"),
-                    React.createElement("div", { className: "mt-3 pt-3 flex items-center justify-between", style: { borderTop: `1px solid ${T.border}` } },
+                    !accounts.some(a=>a.pocketEnabled) && React.createElement("div", { className: "mt-3 pt-3 flex items-center justify-between", style: { borderTop: `1px solid ${T.border}` } },
                         React.createElement("div", { className: "flex items-center gap-2" },
                             React.createElement(Wallet, { size: 14, style: { color: T.gold } }),
                             React.createElement("span", { className: "text-[11px]", style: { color: T.sub } }, "\u0E40\u0E07\u0E34\u0E19\u0E15\u0E49\u0E19"),
@@ -5012,9 +5068,10 @@ try {
                                 " ",
                                 React.createElement(Pencil, { size: 11, style: { color: T.muted } })))),
                         React.createElement("div", { className: "text-right" },
-                            React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "\u0E22\u0E2D\u0E14\u0E04\u0E07\u0E40\u0E2B\u0E25\u0E37\u0E2D"),
+                            React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "เงินต้น + ผลสุทธิสะสม"),
                             React.createElement("div", { className: "text-lg font-extrabold", style: { color: balance >= 0 ? T.gold : T.red } }, fmtBaht(balance)))),
-                    finMode === "month" && React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "* \u0E22\u0E2D\u0E14\u0E04\u0E07\u0E40\u0E2B\u0E25\u0E37\u0E2D\u0E23\u0E27\u0E21\u0E17\u0E38\u0E01\u0E40\u0E14\u0E37\u0E2D\u0E19 (\u0E40\u0E07\u0E34\u0E19\u0E15\u0E49\u0E19 + \u0E2A\u0E38\u0E17\u0E18\u0E34\u0E2A\u0E30\u0E2A\u0E21) \u2014 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E23\u0E32\u0E22\u0E23\u0E31\u0E1A/\u0E08\u0E48\u0E32\u0E22/\u0E2A\u0E38\u0E17\u0E18\u0E34\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19\u0E04\u0E37\u0E2D\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E37\u0E2D\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
+                    !accounts.some(a=>a.pocketEnabled) && finMode === "month" && React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "* \u0E22\u0E2D\u0E14\u0E04\u0E07\u0E40\u0E2B\u0E25\u0E37\u0E2D\u0E23\u0E27\u0E21\u0E17\u0E38\u0E01\u0E40\u0E14\u0E37\u0E2D\u0E19 (\u0E40\u0E07\u0E34\u0E19\u0E15\u0E49\u0E19 + \u0E2A\u0E38\u0E17\u0E18\u0E34\u0E2A\u0E30\u0E2A\u0E21) \u2014 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E23\u0E32\u0E22\u0E23\u0E31\u0E1A/\u0E08\u0E48\u0E32\u0E22/\u0E2A\u0E38\u0E17\u0E18\u0E34\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19\u0E04\u0E37\u0E2D\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E37\u0E2D\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
+            (sub === "overview" || sub === "finance") && React.createElement(PocketSummary,{accounts,transactions,payments,sources:incomeSources,studioOnly:true}),
             React.createElement("div", { className: "flex gap-2" },
                 (sub === "overview" || sub === "finance") && React.createElement("button", { onClick: () => setTxnOpen(true), className: "flex-1 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { minHeight: 50, padding: "12px 16px", background: "#FFFFFF", color: T.red, border: `1px solid ${hex(T.red, .38)}`, boxShadow: "0 8px 20px rgba(182,73,73,.10)" } },
                     React.createElement(TrendingDown, { size: 17 }),
@@ -5145,7 +5202,7 @@ try {
                         const isPaymentRow = t.studioRowKind === "payment";
                         const raw = t.raw || t;
                         const out = !isPaymentRow && raw.kind === "out";
-                        const displayAmount = out ? actualPersonalExpenseAmount(raw, transactions) : Number(raw.amount) || 0;
+                        const displayAmount = out ? studioExpenseAmount(raw, transactions) : Number(raw.amount) || 0;
                         const accName = id => accounts.find(account => account.id === id)?.name || "—";
                         const accountLabel = accName(raw.accountId);
                         return (React.createElement(Glass, { key: t.id, className: "p-3 flex items-center gap-3" },
@@ -5539,6 +5596,9 @@ try {
       onSaveManualIncome = null,
       initialKind = "out",
     }) {
+      const [expensePocket,setExpensePocket]=useState(initial?.pocketSplit ? Number(initial.pocketSplit.studio)===0?"personal":Number(initial.pocketSplit.personal)===0?"studio":"mixed" : initial?.studioExpense||studioMode?"studio":"personal");
+      const [studioPart,setStudioPart]=useState(String(initial?.pocketSplit?.studio??""));
+      const [transferPocket,setTransferPocket]=useState(initial?.pocketOwner||"personal");
       const paymentEditMode = !!initialIncomeSourcePayment;
       const effectiveInitialIncomeSourceId = initialIncomeSourcePayment?.incomeSourceId || initialIncomeSourceId || "";
       const paymentEditSource = incomeSources.find(source => source.id === effectiveInitialIncomeSourceId) || null;
@@ -5816,7 +5876,9 @@ try {
       const transferFee = Number(f.transferFee || 0);
       const transferPurpose = f.transferPurpose || "general";
       const rates = transferRates(fromCurrency, toCurrency, Number(f.amount), receivedAmount, f.sourceRateTHB);
-      const extendedTransfer = fromCurrency !== "THB" || toCurrency !== "THB" || transferPurpose !== "general" || transferFee > 0 || isInvestmentAccount(fromAcc) || isInvestmentAccount(toAcc);
+      const extendedTransfer = transferPocket === "studio" || fromAcc?.pocketEnabled || toAcc?.pocketEnabled || fromCurrency !== "THB" || toCurrency !== "THB" || transferPurpose !== "general" || transferFee > 0 || isInvestmentAccount(fromAcc) || isInvestmentAccount(toAcc);
+      const pocketRouting = !isTransfer && !!accounts.find(a=>a.id===f.accountId)?.pocketEnabled;
+      useEffect(()=>{if(pocketRouting && transferOnward)setTransferOnward(false);},[pocketRouting,transferOnward]);
       const purposeValid = transferPurpose === "invest" ? !isInvestmentAccount(fromAcc) && isInvestmentAccount(toAcc) : transferPurpose === "withdraw" ? isInvestmentAccount(fromAcc) && !isInvestmentAccount(toAcc) : transferPurpose !== "exchange" || crossCurrency;
       useEffect(() => { if (extendedTransfer) setTransferOnward(false); }, [extendedTransfer]);
       const outstandingExpenses = transactions.filter(
@@ -5989,6 +6051,9 @@ try {
               splitValid &&
               recipientValid &&
               onwardValid;
+      const billStudio = expensePocket==="studio"?Number(f.amount)||0:expensePocket==="mixed"?Number(studioPart):0;
+      const billPersonal = (Number(f.amount)||0)-billStudio;
+      const pocketValid = f.kind!=="out" || (Number.isFinite(billStudio)&&billStudio>=0&&billPersonal>=0);
       const initialAdvancedOpen = !!(
         initial &&
         (Number(initial.reimbursableAmount) > 0 ||
@@ -6402,7 +6467,7 @@ try {
           {
             title: "ข้อมูลหลัก",
             subtitle: studioMode
-              ? "รายจ่ายนี้จะนับเป็นต้นทุนห้องซ้อม"
+              ? "กรอกยอดบิลเต็ม แล้วแบ่งส่วนห้องซ้อมและส่วนตัวด้านล่าง"
               : "เลือกประเภท ใส่ยอด และวันที่",
             color: txnColor,
           },
@@ -7418,7 +7483,8 @@ try {
                       React.createElement(
                         "button",
                         {
-                          onClick: () => setTransferOnward((v) => !v),
+                          disabled: pocketRouting,
+                          onClick: () => { if(!pocketRouting) setTransferOnward((v) => !v); },
                           className: "flex items-center gap-3 w-full",
                         },
                         React.createElement(
@@ -7530,6 +7596,14 @@ try {
                     ),
                 ),
             ),
+        !isTransfer && f.kind==="out" && React.createElement(TxnSectionCard,{title:"แบ่งส่วนค่าใช้จ่าย",subtitle:"บันทึกบิลเต็มครั้งเดียว แล้วเลือกส่วนของเงินที่ใช้จ่าย",color:T.purple},
+            React.createElement(FinanceSelect,{label:"หักเงินจากส่วนไหน",value:expensePocket,options:{personal:"ส่วนตัวทั้งหมด",studio:"ห้องซ้อมทั้งหมด",mixed:"แบ่งห้องซ้อม + ส่วนตัว"},onChange:setExpensePocket}),
+            expensePocket==="mixed"&&React.createElement(Input,{label:"ค่าใช้จ่ายส่วนห้องซ้อม (บาท)",type:"number",value:studioPart,onChange:setStudioPart,placeholder:"เช่น 600"}),
+            React.createElement("div",{className:"text-xs leading-relaxed",style:{color:pocketValid?T.sub:T.red}},pocketValid?`บิลรวม ${moneyIn(f.amount)} · ห้องซ้อม ${moneyIn(billStudio)} · ส่วนตัว ${moneyIn(billPersonal)}`:"ส่วนห้องซ้อมต้องอยู่ระหว่าง 0 ถึงยอดบิลรวม"),
+            expensePocket==="mixed"&&React.createElement("p",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.muted}},"หากรับเงินคืนที่เชื่อมกับบิลนี้ ระบบแบ่งคืนตามสัดส่วนห้องซ้อมและส่วนตัวเดิม"),
+            !accounts.find(a=>a.id===f.accountId)?.pocketEnabled&&React.createElement("p",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.muted}},"แยกต้นทุนได้ทันที หากต้องการดูเงินคงเหลือแยกกระเป๋า ให้เปิดแยกกระเป๋าในหน้าบัญชีด้วย")),
+        pocketRouting && f.kind === "in" && React.createElement("p",{className:"text-[11px] mb-3 leading-relaxed",style:{color:T.muted}},"บัญชีนี้แยกกระเป๋าอยู่ หากต้องโอนต่อ ให้บันทึกรับเงินก่อน แล้วใช้เมนูโอนย้ายเพื่อเลือกว่าส่วนตัวหรือห้องซ้อม"),
+        isTransfer && (fromAcc?.pocketEnabled||toAcc?.pocketEnabled||initial?.pocketOwner==="studio")&&React.createElement(TxnSectionCard,{title:"ส่วนของเงินที่โอน",subtitle:"ย้ายเงินจริงระหว่างบัญชี โดยรักษาว่าเงินเป็นของส่วนไหน",color:T.purple},React.createElement(FinanceSelect,{label:"เงินโอนเป็นของ",value:transferPocket,options:{personal:"ส่วนตัว",studio:"Blurryroom Studio"},onChange:setTransferPocket})),
         !linkedIncomeSource && React.createElement(TxnSummary, null),
         React.createElement(
           "div",
@@ -7551,7 +7625,7 @@ try {
             React.createElement(
             SaveBtn,
             {
-              disabled: !valid,
+              disabled: !valid || !pocketValid,
               onClick: () => {
                 if (duplicateExisting && !dupConfirm) {
                   setDupConfirm(true);
@@ -7678,7 +7752,7 @@ try {
                       date: f.date,
                       title: TRANSFER_PURPOSES[transferPurpose],
                       transferPurpose, receivedAmount,
-                      fromCurrency, toCurrency, transferFee,
+                      fromCurrency, toCurrency, transferFee, pocketOwner: transferPocket,
                       sourceRateTHB: rates.sourceRate, amountTHB: rates.amountTHB,
                       fromInvestment: isInvestmentAccount(fromAcc), toInvestment: isInvestmentAccount(toAcc),
                       fromPlatform: fromAcc?.platform || "", toPlatform: toAcc?.platform || "",
@@ -7745,7 +7819,7 @@ try {
                     kind: f.kind,
                     date: f.date,
                     accountId: f.accountId,
-                    category: studioMode ? "ห้องซ้อม" : normalizedCategory,
+                    category: normalizedCategory || (studioMode ? "ห้องซ้อม" : "อื่นๆ"),
                     taxable: f.kind === "in" ? f.taxable : true,
                     payer: f.kind === "in" ? f.payer.trim() : "",
                     moneyType: f.kind === "in" ? f.moneyType : "",
@@ -7786,7 +7860,8 @@ try {
                             ...(split.reimbursable ? { reimbursable: true } : {}),
                           }))
                         : [],
-                    studioExpense: studioMode || undefined,
+                    studioExpense: f.kind === "out" ? billStudio>0 : undefined,
+                    pocketSplit: f.kind === "out" ? {studio:billStudio,personal:billPersonal} : undefined,
                     fixedCostId: editMode ? initial?.fixedCostId || undefined : undefined,
                     note: f.note.trim(),
                   },
@@ -8061,15 +8136,15 @@ try {
                 expenseRows.map(row => React.createElement(Input, { key: row.category, label: `งบ ${row.category} (บาท)`, type: "number", value: draft[row.category] ?? "", onChange: value => setDraft(d => ({ ...d, [row.category]: value })), placeholder: "ไม่กำหนดงบ" })),
                 React.createElement(SaveBtn, { disabled: Object.values(draft).some(v => !Number.isFinite(Number(v)) || Number(v) < 0), onClick: () => { setExpenseTargets(previous => ({ ...previous, ...Object.fromEntries(Object.entries(draft).map(([key,value]) => [key,Number(value)||0])) })); setDraft(null); } }, "บันทึกงบ")));
     }
-    function BudgetHome({ accounts, transactions, payments, income, expense, cashIn, overdue, month, onAccounts, onInvest, onDue, onAdd }) {
+    function BudgetHome({ accounts, transactions, payments, incomeSources = [], income, expense, cashIn, overdue, month, onAccounts, onInvest, onDue, onAdd }) {
         const usable = {};
-        accounts.filter(isSpendableAccount).forEach(a => { const currency = accountCurrency(a); usable[currency] = (usable[currency] || 0) + nativeAccountBalance(a,transactions,payments); });
+        accounts.filter(isSpendableAccount).forEach(a => { const currency = accountCurrency(a); usable[currency] = (usable[currency] || 0) + (a.pocketEnabled ? accountPocketBalances(a,transactions,payments,incomeSources).personal : nativeAccountBalance(a,transactions,payments)); });
         const funding = investmentFunding(transactions,accounts,month);
         return React.createElement(React.Fragment,null,
             React.createElement("section", { className: "finance-panel p-4", style: { order: 1, background: T.surf, border: `1px solid ${T.border}`, borderRadius: 22 } },
                 React.createElement("div", { className: "flex justify-between items-center gap-2" }, React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "เงินใช้ได้ปัจจุบัน"), React.createElement("button", { onClick: onAccounts, className: "text-xs font-bold py-2", style: { color: T.purple } }, "ดูบัญชี →")),
                 (Object.entries(usable).length ? Object.entries(usable) : [["THB",0]]).map(([currency,value]) => React.createElement("div", { key: currency, className: "font-extrabold tabular-nums", style: { fontSize: currency === "THB" ? 32 : 22, lineHeight: 1.35, letterSpacing: "-.04em", color: value < 0 ? T.red : T.text } }, moneyIn(value,currency))),
-                React.createElement("p", { className: "text-[11px] mt-1", style: { color: T.muted } }, "ยอดทุกช่วงเวลา · เฉพาะบัญชีที่ตั้งให้นับเป็นเงินใช้ได้"),
+                React.createElement("p", { className: "text-[11px] mt-1", style: { color: T.muted } }, "ยอดปัจจุบัน · บัญชีที่แยกกระเป๋านับเฉพาะส่วนตัว"),
                 React.createElement("div", { className: "grid grid-cols-2 gap-3 mt-4 pt-4", style: { borderTop: `1px solid ${T.border}` } }, [["รายได้จากงาน",income,T.green],["รายจ่ายจริง",expense,T.orange]].map(([label,value,color]) => React.createElement("div", { key: label }, React.createElement("div", { className: "text-xs", style: { color: T.sub } }, label), React.createElement("div", { className: "font-extrabold text-xl mt-1 tabular-nums", style: { color } }, fmtBaht(value))))),
                 React.createElement("div", { className: "flex justify-between gap-3 mt-4 p-3 rounded-xl", style: { background: T.surf2 } }, React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "สุทธิจากงานเดือนที่เลือก"), React.createElement("strong", { className: "text-sm tabular-nums", style: { color: income-expense >= 0 ? T.green : T.red } }, fmtBaht(income-expense))),
                 React.createElement("details", { className: "mt-3 text-xs", style: { color: T.muted } }, React.createElement("summary", { style: { cursor: "pointer", padding: "5px 0" } }, "รายละเอียดเงินเข้า"), React.createElement("p", { className: "mt-2 leading-relaxed" }, `เงินเข้าทั้งหมด ${fmtBaht(cashIn)} รวมยอดรับเงินในเดือนที่เลือก รายได้จากงานแสดงแยกจากเงินคืน เงินส่วนตัว และเงินของผู้อื่น เงินโอนไม่รวมในรายรับ–รายจ่าย`))),
@@ -8113,6 +8188,7 @@ try {
                                 React.createElement("div",{className:"flex flex-wrap items-center gap-2 mt-2 tabular-nums",style:{fontSize:14,fontWeight:800}},React.createElement("span",{style:{color:T.text}},`−${ledgerMoney(t.amount,fromCurrency)}`),React.createElement("span",{style:{color:T.muted}},"→"),React.createElement("span",{style:{color:TRANSFER_COLOR}},`+${ledgerMoney(transferReceived(t),toCurrency)}`)),
                                 Number(t.transferFee)>0 && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.sub}},`ค่าธรรมเนียม ${ledgerMoney(t.transferFee,fromCurrency)} · ต้นทางออกจริง ${ledgerMoney((Number(t.amount)||0)+Number(t.transferFee),fromCurrency)}`)):
                                 React.createElement("div",{className:"font-extrabold text-base mt-2 tabular-nums",style:{color}},`${row.dir==="in"?"+":"−"}${moneyIn(row.amount,currency)}`),
+                            !transfer && t.kind==="out" && t.pocketSplit && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.purple}},`ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
                             !transfer && row.detailSummary && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.sub,overflowWrap:"anywhere"}},row.detailSummary),
                             !transfer && row.kind==="txn" && passThroughTotal(t)>0 && React.createElement("div",{className:"text-[11px] mt-2",style:{color:T.blue}},`ของฉัน ${fmtBaht(personalIncomeAmount(t))} · เงินผู้อื่น ${fmtBaht(passThroughTotal(t))}`)))));
         }));
@@ -8124,6 +8200,7 @@ try {
         return React.createElement("div",{className:"mb-4"},
             line("จากบัญชี",accountLabel(accounts.find(a=>a.id===t.fromAccountId),accounts)),
             line("ไปบัญชี",accountLabel(accounts.find(a=>a.id===t.toAccountId),accounts)),
+            line("ส่วนของเงิน",t.pocketOwner==="studio"?"Blurryroom Studio":"ส่วนตัว"),
             line("ยอดโอน",ledgerMoney(t.amount,fromCurrency)),
             line("รับจริง",ledgerMoney(transferReceived(t),toCurrency)),
             line("ค่าธรรมเนียม",ledgerMoney(t.transferFee||0,fromCurrency)),
@@ -8775,6 +8852,7 @@ try {
                                 const unpaidFixed = (fixedCosts || []).filter(fc => fc.kind !== "installment" || fixedCostPaidCount(fc) < Number(fc.installmentTotal || 0)).map(fc => ({ fc, remaining: Math.max(0, (Number(fc.amount) || 0) - fixedCostPaidAmountForMonth(fc, mkNow)) })).filter(x => x.remaining > 0.009);
                     const fixedRemaining = unpaidFixed.reduce((s, x) => s + x.remaining, 0);
                     return (React.createElement(React.Fragment, null,
+                        React.createElement(PocketSummary,{accounts,transactions,payments,sources:incomeSources}),
                         React.createElement(Glass, { className: "p-0 overflow-hidden", style: { order: 1 } },
                             React.createElement("button", { onClick: () => setShowAccounts(s => !s), className: "w-full flex items-center justify-between p-4 active:scale-[.99]" },
                                 React.createElement("div", { className: "text-left" },
@@ -8818,7 +8896,7 @@ try {
                                 React.createElement("span", { className: "text-xs font-extrabold whitespace-nowrap", style: { color: T.orange } }, fmtBaht(remaining)),
                                 React.createElement("button", { onClick: () => setPayFc({ ...fc, remainingAmount: remaining }), className: "px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0", style: { background: hex(T.green, .16), color: T.green, border: `1px solid ${hex(T.green, .5)}` } }, "จ่าย")))))));
                 })())),
-                sub === "summary" && budgetView === "overview" && React.createElement(BudgetHome, { accounts, transactions, payments, income: workIncomeSum, expense: expenseSum, cashIn: cashInSum, overdue: overdueDue.reduce((sum,row) => sum + row.amount,0), month: mk, onAccounts: () => { setBudgetView("accounts"); setShowAccounts(true); }, onInvest: () => setBudgetView("investment"), onDue: () => setSub("due"), onAdd: () => { setTxnKind("out"); setTxnOpen(true); } }),
+                sub === "summary" && budgetView === "overview" && React.createElement(BudgetHome, { accounts, transactions, payments, incomeSources, income: workIncomeSum, expense: expenseSum, cashIn: cashInSum, overdue: overdueDue.reduce((sum,row) => sum + row.amount,0), month: mk, onAccounts: () => { setBudgetView("accounts"); setShowAccounts(true); }, onInvest: () => setBudgetView("investment"), onDue: () => setSub("due"), onAdd: () => { setTxnKind("out"); setTxnOpen(true); } }),
                 sub === "summary" && budgetView === "overview" && React.createElement(BudgetCategories, { key: mk, incomeRows: incomeCategoryRows, expenseRows: expenseCategoryRows, setExpenseTargets, month: mk }),
                 sub === "summary" && budgetView === "reports" && (() => {
                     const cfMonths = Array.from({ length: 6 }, (_, i) => addMonthKey(monthKey(TK), i - 5));
@@ -9236,8 +9314,21 @@ try {
                 React.createElement("label", { className: "flex items-center gap-3 mb-3 text-sm" }, React.createElement("input", { type: "checkbox", checked: isSpendableAccount(editAcc), onChange: e => setEditAcc({ ...editAcc, spendable: e.target.checked }) }), "นับบัญชีนี้เป็นเงินใช้ได้"),
                 React.createElement("p", { className: "text-[10px] mb-3", style: { color: T.muted } }, "บัญชี USD รองรับยอดเริ่มต้นและการโอนในเวอร์ชันนี้ รายรับ–รายจ่ายทั่วไปยังบันทึกด้วยบัญชี THB"),
                 React.createElement(Input, { label: `ยอดเริ่มต้น (${accountCurrency(editAcc)})`, value: String(editAcc.startBalance ?? 0), onChange: v => setEditAcc({ ...editAcc, startBalance: v }), placeholder: "0", type: "number" }),
+                accountCurrency(editAcc)==="THB" && !isInvestmentAccount(editAcc) && React.createElement("div",{className:"p-3 rounded-xl mb-3",style:{background:T.surf2,border:`1px solid ${T.border}`}},
+                    React.createElement("label",{className:"flex items-center gap-3 text-sm font-bold"},React.createElement("input",{type:"checkbox",checked:!!editAcc.pocketEnabled,onChange:e=>{const enabled=e.target.checked;const row=accountPocketBalances(editAcc,transactions,payments,incomeSources);setEditAcc({...editAcc,pocketEnabled:enabled,_studioPocketTarget:enabled?String(Math.max(0,Math.min(row.total-row.held,row.studio))):undefined});}}),"แยกกระเป๋าส่วนตัว / ห้องซ้อม"),
+                    editAcc.pocketEnabled&&React.createElement(React.Fragment,null,
+                        React.createElement("p",{className:"text-xs my-3 leading-relaxed",style:{color:T.sub}},"กรอกเงินห้องซ้อมที่มีอยู่ตอนนี้ ระบบแบ่งส่วนตัวจากยอดที่เหลือ การตั้งค่านี้ไม่สร้างรายการรับเงินหรือโอนเพิ่ม"),
+                        React.createElement(Input,{label:"เงินห้องซ้อมปัจจุบันในบัญชีนี้ (บาท)",type:"number",value:editAcc._studioPocketTarget??String(accountPocketBalances(editAcc,transactions,payments,incomeSources).studio),onChange:v=>setEditAcc({...editAcc,_studioPocketTarget:v}),placeholder:"เช่น 4000"}),
+                        React.createElement("p",{className:"text-xs leading-relaxed",style:{color:T.muted}},`ยอดบัญชี ${moneyIn(nativeAccountBalance(editAcc,transactions,payments))} · ส่วนตัวหลังแบ่ง ${moneyIn(nativeAccountBalance(editAcc,transactions,payments)-accountPocketBalances(editAcc,transactions,payments,incomeSources).held-Number(editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio))}`))),
                 React.createElement(SaveBtn, { disabled: !editAcc.name.trim() || !Number.isFinite(Number(editAcc.startBalance)), onClick: () => {
-                        const val = { ...editAcc, id: editAcc.id || uid(), name: editAcc.name.trim(), startBalance: Number(editAcc.startBalance) || 0, accountType: editAcc.accountType || "bank", currency: accountCurrency(editAcc), platform: (editAcc.platform || "").trim(), spendable: isSpendableAccount(editAcc) };
+                        let val = { ...editAcc, id: editAcc.id || uid(), name: editAcc.name.trim(), startBalance: Number(editAcc.startBalance) || 0, accountType: editAcc.accountType || "bank", currency: accountCurrency(editAcc), platform: (editAcc.platform || "").trim(), spendable: isSpendableAccount(editAcc) };
+                        if (val.pocketEnabled && (Object.hasOwn(editAcc,"_studioPocketTarget") || !accounts.find(a=>a.id===editAcc.id)?.pocketEnabled)) {
+                            const target=editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio;
+                            const configured=setupAccountPockets(val,target,transactions,payments,incomeSources);
+                            if(!configured){fireToast("ยอดเงินห้องซ้อมต้องไม่ติดลบหรือเกินยอดบัญชีหลังหักเงินรอส่งผู้อื่น · รองรับบัญชี THB ทั่วไป");return;}
+                            val=configured;
+                        }
+                        delete val._studioPocketTarget;
                         const parentError = accountParentError(val, accounts);
                         if (parentError) { fireToast(parentError); return; }
                         if (editAcc.id && accountUsageCount(editAcc.id) > 0 && accountCurrency(accounts.find(a => a.id === editAcc.id)) !== val.currency) { fireToast("บัญชีมีรายการแล้ว กรุณาสร้างบัญชีใหม่เมื่อเปลี่ยนสกุลเงิน"); return; }
@@ -9274,6 +9365,7 @@ try {
                 React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                     React.createElement("div", { className: "text-sm font-extrabold" }, txnActionItem.title),
                     React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, `${shortDate(txnActionItem.date)} · ${txnActionItem.tag || "รายการ"} · ${moneyIn(txnActionItem.amount, accountCurrency(accounts.find(a => a.id === txnActionItem.accountId)))}`)),
+                txnActionItem.raw?.kind==="out"&&txnActionItem.raw?.pocketSplit&&React.createElement("p",{className:"text-xs mb-3 leading-relaxed",style:{color:T.purple}},`บิลรวม ${moneyIn(txnActionItem.raw.amount)} · ห้องซ้อม ${moneyIn(txnActionItem.raw.pocketSplit.studio)} · ส่วนตัว ${moneyIn(txnActionItem.raw.pocketSplit.personal)}`),
                 txnActionItem.raw?.investmentFeeFor && React.createElement("p", { className: "text-xs mb-3", style: { color: T.sub } }, `มูลค่ารายจ่าย ณ วันโอน ${moneyIn(txnActionItem.raw.amount)}`),
                 txnActionItem.raw?.kind === "transfer" && React.createElement(TransferDetail, { transaction: txnActionItem.raw, accounts }),
                 (txnActionItem.paymentRaw?.note || txnActionItem.raw?.note) && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub, whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, txnActionItem.paymentRaw?.note || txnActionItem.raw?.note),
@@ -11780,6 +11872,45 @@ try {
         check("ธุรกรรม: พับค่าธรรมเนียมในรายการโอน", collapseLedgerFees([transferLedgerRow,feeLedgerRow]).length,1);
         check("ธุรกรรม: กรองรายจ่ายยังเห็นค่าธรรมเนียม", collapseLedgerFees([feeLedgerRow]).length,1);
         check("ธุรกรรม: ไม่แก้หรือลบข้อมูลค่าธรรมเนียมต้นทาง", funded.length,2);
+
+        const sharedBank={id:"shared-bank",name:"KBank",currency:"THB",accountType:"bank",startBalance:12000};
+        const pocketBank=setupAccountPockets(sharedBank,4000,[],[],[]);
+        const sharedBill={id:"electricity",kind:"out",accountId:"shared-bank",date:TK,amount:2400,studioExpense:true,pocketSplit:{studio:600,personal:1800}};
+        check("กระเป๋า: ตั้งยอดห้องซ้อมไม่เพิ่มยอดธนาคาร",accountPocketBalances(pocketBank,[],[],[]).total,12000);
+        check("กระเป๋า: ส่วนตัวตั้งต้นเท่ากับยอดที่เหลือ",accountPocketBalances(pocketBank,[],[],[]).personal,8000);
+        check("กระเป๋า: บิลรวมถูกหักจากธนาคารครั้งเดียว",accountPocketBalances(pocketBank,[sharedBill],[],[]).total,9600);
+        check("กระเป๋า: ห้องซ้อมรับผิดชอบเฉพาะ 600",accountPocketBalances(pocketBank,[sharedBill],[],[]).studio,3400);
+        check("กระเป๋า: ส่วนตัวเหลือ 6200",accountPocketBalances(pocketBank,[sharedBill],[],[]).personal,6200);
+        check("กระเป๋า: ต้นทุน Studio ไม่คิดเต็มบิล",studioExpenseAmount(sharedBill,[sharedBill]),600);
+        check("กระเป๋า: รายจ่าย Studio เดิมคิดเต็มเหมือนเดิม",studioExpenseAmount({kind:"out",id:"legacy",amount:300,studioExpense:true},[]),300);
+        check("กระเป๋า: รายจ่ายส่วนตัวไม่เป็นต้นทุน Studio",studioExpenseAmount({kind:"out",amount:300},[]),0);
+        const oldIncome={id:"old-studio",kind:"in",accountId:"shared-bank",amount:1000,category:"Studio",moneyType:"work_income"};
+        const calibrated=setupAccountPockets(sharedBank,4000,[oldIncome],[],[]);
+        check("กระเป๋า: ตั้งยอดปัจจุบันไม่บวกรายรับเก่าซ้ำ",accountPocketBalances(calibrated,[oldIncome],[],[]).studio,4000);
+        check("กระเป๋า: รายรับ Studio ใหม่เข้ากระเป๋าอัตโนมัติ",accountPocketBalances(calibrated,[oldIncome,{...oldIncome,id:"new"}],[],[]).studio,5000);
+        check("กระเป๋า: ตั้งยอดเกินเงินจริงไม่ได้",setupAccountPockets(sharedBank,13000,[],[],[]),null);
+        const editedBill={...sharedBill,pocketSplit:{studio:800,personal:1600}};
+        check("กระเป๋า: แก้ส่วนห้องซ้อมปรับเฉพาะกระเป๋า",accountPocketBalances(pocketBank,[editedBill],[],[]).studio,3200);
+        check("กระเป๋า: แก้การแบ่งไม่หักธนาคารซ้ำ",accountPocketBalances(pocketBank,[editedBill],[],[]).total,9600);
+        check("กระเป๋า: ลบบิลคืนยอดห้องซ้อม",accountPocketBalances(pocketBank,[],[],[]).studio,4000);
+        const studioRefund={id:"refund",kind:"in",accountId:"shared-bank",amount:1200,moneyType:"reimbursement",linkedExpenseId:sharedBill.id};
+        check("กระเป๋า: เงินคืนบิลแบ่งคืนตามสัดส่วน",accountPocketBalances(pocketBank,[sharedBill,studioRefund],[],[]).studio,3700);
+        check("กระเป๋า: ต้นทุน Studio หลังรับเงินคืน",studioExpenseAmount(sharedBill,[sharedBill,studioRefund]),300);
+        const studioTransfer={id:"studio-transfer",kind:"transfer",amount:1000,receivedAmount:1000,fromAccountId:"shared-bank",toAccountId:"other",pocketOwner:"studio"};
+        check("กระเป๋า: โอนเงินห้องซ้อมหักจากกระเป๋าเดิม",accountPocketBalances(pocketBank,[studioTransfer],[],[]).studio,3000);
+        check("กระเป๋า: โอนห้องซ้อมไม่หักส่วนตัว",accountPocketBalances(pocketBank,[studioTransfer],[],[]).personal,8000);
+        const restoredPockets=migrate(JSON.parse(JSON.stringify({version:SCHEMA_VERSION,accounts:[pocketBank],transactions:[sharedBill]})));
+        check("กระเป๋า: ส่งออกนำเข้ารักษายอดเงิน",accountPocketBalances(restoredPockets.accounts[0],restoredPockets.transactions,[],[]).studio,3400);
+
+        const pocketSource={id:"pocket-booking",sourceType:"studio",category:"Studio"};
+        const pocketPayment={id:"pocket-payment",incomeSourceId:"pocket-booking",accountId:"shared-bank",amount:1200,allocations:[{id:"principal",role:"principal",category:"Studio",amount:900},{id:"tip",role:"tip",category:"Tips",amount:100},{id:"held",role:"pass_through",amount:200,recipientName:"ครู",settled:false}]};
+        const pocketReceipt=accountPocketBalances(pocketBank,[],[pocketPayment],[pocketSource]);
+        check("กระเป๋า: รับเงินจองและทิป Studio อัตโนมัติ",pocketReceipt.studio,5000);
+        check("กระเป๋า: เงินของผู้อื่นไม่กลายเป็นเงินส่วนตัว",pocketReceipt.held,200);
+        check("กระเป๋า: รับเงิน Studio ไม่เพิ่มส่วนตัว",pocketReceipt.personal,8000);
+        check("กระเป๋า: ผลรวมทุกส่วนตรงธนาคาร",pocketReceipt.personal+pocketReceipt.studio+pocketReceipt.held,pocketReceipt.total);
+        const studioMoveWithFee=withTransferFee([],{...studioTransfer,transferFee:10,sourceRateTHB:1,fromCurrency:"THB"});
+        check("กระเป๋า: โอนเงิน Studio ค่าธรรมเนียมตามเจ้าของเงิน",accountPocketBalances(pocketBank,studioMoveWithFee,[],[]).studio,2990);
         window.__TASKROUTINE_TEST_RESULTS__ = results;
         console.table(results);
         return results;
