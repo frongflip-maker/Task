@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-optional-income-rate-v15";
+window.__TASKROUTINE_BUILD__="2026-11-04-default-account-transfer-v18";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1462,7 +1462,7 @@ try {
 
     // Investment funding v1: native-currency balances, historical THB cash flows.
     const ACCOUNT_TYPES = { bank: "ธนาคาร", cash: "เงินสด", investment: "เงินลงทุน / เงินรอลงทุน", broker: "Broker / โบรกเกอร์" };
-    const TRANSFER_PURPOSES = { general: "โอนทั่วไป", invest: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน", exchange: "แลกสกุลเงิน" };
+    const TRANSFER_PURPOSES = { general: "โอนย้ายบัญชี", invest: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน", exchange: "แลกสกุลเงิน" };
     const INVESTMENT_FLOWS = { none: "ไม่ระบุเงินลงทุน", add: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน" };
     function investmentDirection(t, accounts) {
         if (Object.hasOwn(t, "investmentFlow")) return ["add", "withdraw"].includes(t.investmentFlow) ? t.investmentFlow : "none";
@@ -4548,7 +4548,7 @@ try {
             });
             transactions.forEach(t => {
                 if (t.kind === "transfer") {
-                    rows.push({ date: t.date, source: "Budget · โอนย้ายบัญชี", title: t.title, category: "โอนย้าย", accountId: t.fromAccountId, relatedAccountIds: [t.fromAccountId, t.toAccountId], accountName: `${accName(t.fromAccountId)} → ${accName(t.toAccountId)}`, fromAccountName: accName(t.fromAccountId), toAccountName: accName(t.toAccountId), direction: "transfer", taxable: false, gross: Number(t.amountTHB ?? t.amount) || 0, deduction: 0, amount: Number(t.amountTHB ?? t.amount) || 0, sentAmount: Number(t.amount) || 0, receivedAmount: transferReceived(t), fromCurrency: t.fromCurrency || accountCurrency(accounts.find(a => a.id === t.fromAccountId)), toCurrency: t.toCurrency || accountCurrency(accounts.find(a => a.id === t.toAccountId)), transferPurpose: TRANSFER_PURPOSES[t.transferPurpose] || "โอนทั่วไป", transferFee: Number(t.transferFee) || 0, sourceRateTHB: t.sourceRateTHB || 1, note: t.note || "" });
+                    rows.push({ date: t.date, source: "Budget · โอนย้ายบัญชี", title: t.title, category: "โอนย้าย", accountId: t.fromAccountId, relatedAccountIds: [t.fromAccountId, t.toAccountId], accountName: `${accName(t.fromAccountId)} → ${accName(t.toAccountId)}`, fromAccountName: accName(t.fromAccountId), toAccountName: accName(t.toAccountId), direction: "transfer", taxable: false, gross: Number(t.amountTHB ?? t.amount) || 0, deduction: 0, amount: Number(t.amountTHB ?? t.amount) || 0, sentAmount: Number(t.amount) || 0, receivedAmount: transferReceived(t), fromCurrency: t.fromCurrency || accountCurrency(accounts.find(a => a.id === t.fromAccountId)), toCurrency: t.toCurrency || accountCurrency(accounts.find(a => a.id === t.toAccountId)), transferPurpose: TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี", transferFee: Number(t.transferFee) || 0, sourceRateTHB: t.sourceRateTHB || 1, note: t.note || "" });
                 } else if (t.kind === "out" && Array.isArray(t.splits) && t.splits.length) {
                     const ratio = Number(t.amount) > 0 ? actualPersonalExpenseAmount(t, transactions) / Number(t.amount) : 1;
                     t.splits.forEach((split, index) => rows.push({ splitParentId: t.id, date: t.date, source: "Budget · รายการย่อย", title: split.title, parentTitle: t.title, category: split.category || t.category || "อื่นๆ", accountId: t.accountId, accountName: accName(t.accountId), direction: "out", taxable: false, gross: Number(split.amount) || 0, deduction: 0, amount: Number(split.amount) || 0, personalAmount: split.reimbursable ? 0 : (Number(split.amount) || 0), reimbursableAmount: split.reimbursable ? (Number(split.amount) || 0) : 0, splitIndex: index + 1, splitCount: t.splits.length, note: [t.note, `รายการย่อยจาก ${t.title}`].filter(Boolean).join(" · ") }));
@@ -5381,10 +5381,11 @@ try {
         return 0;
     }
     const SORT_HOLD_MS = 260;
-    function useLongPressSort(items, onMove, scope = "sort", holdMs = SORT_HOLD_MS, liveReorder = false) {
+    function useLongPressSort(items, onMove, scope = "sort", holdMs = SORT_HOLD_MS, liveReorder = false, wholeCard = false) {
         const [armedIndex, setArmedIndex] = useState(null);
         const [activeIndex, setActiveIndex] = useState(null);
         const [previewIndex, setPreviewIndex] = useState(null);
+        const suppressClickUntil = React.useRef(0);
         const state = React.useRef({ timer: null, raf: null, pointerId: null, startX: 0, startY: 0, lastY: 0, x: 0, y: 0, active: false, scrolling: false, sourceIndex: null, previewIndex: null, scrollEl: null, scrollBounds: null, sourceEl: null, ghost: null, rects: [], needsMeasure: false });
         const itemsRef = React.useRef(items); itemsRef.current = items;
         const moveRef = React.useRef(onMove); moveRef.current = onMove;
@@ -5393,14 +5394,14 @@ try {
         const measure = () => { const s = state.current; clearPreviewStyles(s.rects); s.rects = [...document.querySelectorAll(`[data-sort-scope="${scope}"]`)].map(node => ({ index: Number(node.dataset.sortIndex), rect: node.getBoundingClientRect(), node })).filter(item => Number.isInteger(item.index)).sort((a, b) => a.index - b.index); };
         const paintPreview = to => { const s = state.current; s.rects.forEach(item => { if (!item.node) return; const shift = liveReorder ? 0 : sortPreviewShift(s.rects, s.sourceIndex, to, item.index); item.node.style.transform = `translate3d(0,${shift}px,0)`; item.node.style.opacity = item.node === s.sourceEl || (!s.sourceEl?.isConnected && item.index === s.sourceIndex) ? ".18" : "1"; item.node.style.willChange = "transform"; }); };
         const reset = (commit = false) => { const s = state.current; if (!liveReorder && commit && s.active && s.sourceIndex !== null && s.previewIndex !== null && s.sourceIndex !== s.previewIndex) moveRef.current(s.sourceIndex, s.previewIndex); clearPreviewStyles(s.rects); if (s.timer) clearTimeout(s.timer); if (s.raf) window.cancelAnimationFrame(s.raf); window.removeEventListener("pointermove", globalMove); window.removeEventListener("pointerup", endDrag); window.removeEventListener("pointercancel", cancelDrag); s.ghost?.remove(); s.ghost = null; s.timer = null; s.raf = null; s.active = false; s.scrolling = false; s.sourceIndex = null; s.previewIndex = null; s.rects = []; s.needsMeasure = false; document.body.classList.remove("dnd-active"); setArmedIndex(null); setActiveIndex(null); setPreviewIndex(null); };
-        const endDrag = () => reset(true);
-        const cancelDrag = () => reset(false);
+        const endDrag = () => { if (state.current.active || state.current.scrolling) suppressClickUntil.current = Date.now() + 500; reset(true); };
+        const cancelDrag = () => { if (state.current.active || state.current.scrolling) suppressClickUntil.current = Date.now() + 500; reset(false); };
         const frame = () => { const s = state.current; if (!s.active) return; if (s.needsMeasure) { measure(); s.needsMeasure = false; } if (s.ghost) s.ghost.style.transform = `translate3d(0,${s.y - s.startY}px,0) scale(1.03)`; const ordered = s.rects; let to = s.previewIndex; if (ordered.length) { if (s.y <= ordered[0].rect.top) to = 0; else if (s.y >= ordered[ordered.length - 1].rect.bottom) to = ordered.length - 1; else to = ordered.reduce((best, item) => { const height = Number(item.rect.height) || Math.max(0, item.rect.bottom - item.rect.top); const distance = Math.abs(s.y - (item.rect.top + height / 2)); return distance < best.distance ? { index: item.index, distance } : best; }, { index: s.previewIndex, distance: Infinity }).index; } if (Number.isInteger(to) && to >= 0 && to < itemsRef.current.length && to !== s.previewIndex) { if (liveReorder) { const from = s.previewIndex; s.sourceIndex = to; s.previewIndex = to; setActiveIndex(to); setPreviewIndex(to); moveRef.current(from, to); s.needsMeasure = true; } else { s.previewIndex = to; setPreviewIndex(to); } } const el = s.scrollEl; if (el) { const rect = s.scrollBounds; const edge = 68; let speed = 0; if (s.y < rect.top + edge) speed = -Math.min(18, (rect.top + edge - s.y) * .32); else if (s.y > rect.bottom - edge) speed = Math.min(18, (s.y - (rect.bottom - edge)) * .32); if (speed) { el.scrollTop += speed; if (!s.needsMeasure) measure(); } } paintPreview(s.previewIndex); s.raf = window.requestAnimationFrame(frame); };
         useEffect(() => () => reset(false), []);
-        const down = (event, index, delay = SORT_HOLD_MS) => { if (items.length < 2 || event.button > 0 || event.target?.closest?.("input,textarea,select,button,a,[contenteditable='true']")) return; reset(false); const s = state.current; s.pointerId = event.pointerId; s.startX = s.x = event.clientX; s.startY = s.lastY = s.y = event.clientY; s.sourceIndex = s.previewIndex = index; s.sourceEl = (event.currentTarget.closest && event.currentTarget.closest(`[data-sort-scope="${scope}"]`)) || event.currentTarget; s.scrollEl = scrollParent(s.sourceEl); s.scrollBounds = s.scrollEl === document.scrollingElement || s.scrollEl === document.documentElement ? { top: 0, bottom: window.innerHeight } : s.scrollEl.getBoundingClientRect(); setArmedIndex(index); window.addEventListener("pointermove", globalMove, { passive: false }); window.addEventListener("pointerup", endDrag); window.addEventListener("pointercancel", cancelDrag); s.timer = setTimeout(() => { s.active = true; measure(); const rect = s.sourceEl.getBoundingClientRect(); const ghost = s.sourceEl.cloneNode(true); ghost.removeAttribute?.("data-sort-scope"); ghost.removeAttribute?.("data-sort-index"); Object.assign(ghost.style, { position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", zIndex: "9999", pointerEvents: "none", background: T.surf, color: T.text, border: `1px solid ${T.blue}`, borderRadius: "12px", boxShadow: `0 14px 30px ${hex(T.blue, .34)}`, opacity: "1", transform: "translate3d(0,0,0) scale(1.03)", transition: "none", willChange: "transform", contain: "layout paint" }); document.body.appendChild(ghost); s.ghost = ghost; setActiveIndex(index); setPreviewIndex(index); document.body.classList.add("dnd-active"); if (navigator.vibrate) navigator.vibrate(22); s.raf = window.requestAnimationFrame(frame); }, Math.max(0, delay)); };
+        const down = (event, index, delay = SORT_HOLD_MS) => { if (items.length < 2 || event.button > 0 || (event.target?.closest?.("input,textarea,select,button,a,[contenteditable='true']") && !(wholeCard && event.target?.closest?.("button") === event.currentTarget))) return; reset(false); const s = state.current; s.pointerId = event.pointerId; s.startX = s.x = event.clientX; s.startY = s.lastY = s.y = event.clientY; s.sourceIndex = s.previewIndex = index; s.sourceEl = (event.currentTarget.closest && event.currentTarget.closest(`[data-sort-scope="${scope}"]`)) || event.currentTarget; s.scrollEl = scrollParent(s.sourceEl); s.scrollBounds = s.scrollEl === document.scrollingElement || s.scrollEl === document.documentElement ? { top: 0, bottom: window.innerHeight } : s.scrollEl.getBoundingClientRect(); setArmedIndex(index); window.addEventListener("pointermove", globalMove, { passive: false }); window.addEventListener("pointerup", endDrag); window.addEventListener("pointercancel", cancelDrag); s.timer = setTimeout(() => { s.active = true; measure(); const rect = s.sourceEl.getBoundingClientRect(); const ghost = s.sourceEl.cloneNode(true); ghost.removeAttribute?.("data-sort-scope"); ghost.removeAttribute?.("data-sort-index"); Object.assign(ghost.style, { position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", zIndex: "9999", pointerEvents: "none", background: T.surf, color: T.text, border: `1px solid ${T.blue}`, borderRadius: "12px", boxShadow: `0 14px 30px ${hex(T.blue, .34)}`, opacity: "1", transform: "translate3d(0,0,0) scale(1.03)", transition: "none", willChange: "transform", contain: "layout paint" }); document.body.appendChild(ghost); s.ghost = ghost; setActiveIndex(index); setPreviewIndex(index); document.body.classList.add("dnd-active"); if (navigator.vibrate) navigator.vibrate(22); s.raf = window.requestAnimationFrame(frame); }, Math.max(0, delay)); };
         const globalMove = event => { const s = state.current; if (event.pointerId !== s.pointerId) return; s.x = event.clientX; s.y = event.clientY; if (!s.active && !s.scrolling && Math.hypot(s.x - s.startX, s.y - s.startY) > 10) { if (s.timer) clearTimeout(s.timer); s.timer = null; s.scrolling = true; setArmedIndex(null); } if (s.scrolling && s.scrollEl) { s.scrollEl.scrollTop -= s.y - s.lastY; s.lastY = s.y; event.preventDefault(); } if (s.active) event.preventDefault(); };
         const shiftFor = index => sortPreviewShift(state.current.rects, activeIndex, previewIndex, index);
-        return { armedIndex, activeIndex, previewIndex, dragging: activeIndex !== null, itemProps: index => ({ "data-sort-scope": scope, "data-sort-index": index, onPointerDown: event => down(event, index, holdMs) }), rowProps: index => ({ "data-sort-scope": scope, "data-sort-index": index }), handleProps: index => ({ onPointerDown: event => down(event, index, holdMs) }), itemStyle: index => ({ touchAction: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none", cursor: activeIndex === index ? "grabbing" : "grab", position: "relative", zIndex: activeIndex === index ? 50 : 1, transform: `translate3d(0,${shiftFor(index)}px,0)`, willChange: activeIndex !== null ? "transform" : "auto", boxShadow: armedIndex === index && activeIndex === null ? `0 6px 16px ${hex(T.blue, .2)}` : "none", opacity: activeIndex === index ? .18 : 1 }) };
+        return { suppressClick: () => Date.now() < suppressClickUntil.current, armedIndex, activeIndex, previewIndex, dragging: activeIndex !== null, itemProps: index => ({ "data-sort-scope": scope, "data-sort-index": index, onPointerDown: event => down(event, index, holdMs) }), rowProps: index => ({ "data-sort-scope": scope, "data-sort-index": index }), handleProps: index => ({ onPointerDown: event => down(event, index, holdMs) }), itemStyle: index => ({ touchAction: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none", cursor: activeIndex === index ? "grabbing" : "grab", position: "relative", zIndex: activeIndex === index ? 50 : 1, transform: `translate3d(0,${shiftFor(index)}px,0)`, willChange: activeIndex !== null ? "transform" : "auto", boxShadow: armedIndex === index && activeIndex === null ? `0 6px 16px ${hex(T.blue, .2)}` : "none", opacity: activeIndex === index ? .18 : 1 }) };
     }
     function ManageListSheet({ title, items, onClose, onSave, allowRename = false, onRename, onDelete, lockedItems = [] }) {
         const [list, setList] = useState(items);
@@ -5740,7 +5741,7 @@ try {
               toAccountId:
                 initial.toAccountId || accounts[1]?.id || accounts[0]?.id || null,
               transferNote: initial.note || "",
-              transferPurpose: ["invest", "withdraw"].includes(initial.transferPurpose) ? ((initial.fromCurrency || accountCurrency(accounts.find(a => a.id === initial.fromAccountId))) !== (initial.toCurrency || accountCurrency(accounts.find(a => a.id === initial.toAccountId))) ? "exchange" : "general") : initial.transferPurpose || "general",
+              transferPurpose: duplicateMode || ["invest", "withdraw"].includes(initial.transferPurpose) ? "general" : initial.transferPurpose || "general",
               investmentFlow: initial.kind === "transfer" ? investmentDirection(initial, accounts) : "none",
               receivedAmount: duplicateMode ? "" : initial.receivedAmount ?? initial.amount ?? "",
               transferFee: duplicateMode ? "" : initial.transferFee || "",
@@ -5795,6 +5796,7 @@ try {
               fromAccountId: accounts[0]?.id || null,
               toAccountId: accounts[1]?.id || accounts[0]?.id || null,
               transferNote: "",
+              transferPurpose: "general",
               sharedExpense: false,
               personalAmount: "",
               reimbursableAmount: "",
@@ -6597,6 +6599,7 @@ try {
                       setF({
                         ...f,
                         kind: k,
+                        transferPurpose: k === "transfer" && f.kind !== "transfer" ? "general" : f.transferPurpose || "general",
                         category: k === "in" ? "Work" : "",
                         paymentStage: k === "in" ? f.paymentStage : "",
                         taxable: true,
@@ -6666,13 +6669,13 @@ try {
                   onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", transferPurpose: "general" }),
                   exclude: f.fromAccountId,
                 }),
-                React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนทั่วไป", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
+                React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนย้ายบัญชี", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
                 !purposeValid && React.createElement("p", { className: "text-xs mb-3", style: { color: T.red } }, "แลกสกุลเงิน: เลือกบัญชีคนละสกุล"),
                 React.createElement("fieldset", { style: { padding: 12, marginBottom: 16, border: `1px solid ${T.border}`, borderRadius: 14, background: T.surf } },
                     React.createElement("legend", { style: { fontSize: 12, fontWeight: 700, color: T.sub, padding: "0 5px" } }, "กำกับเงินลงทุน (ไม่บังคับ)"),
                     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, [["add", "เติมเงินลงทุน"], ["withdraw", "ถอนเงินลงทุน"]].map(([key, text]) => React.createElement("label", { key, style: { display: "flex", alignItems: "center", gap: 8, flex: "1 1 140px", padding: "12px 10px", borderRadius: 11, fontSize: 12, fontWeight: 700, background: investmentFlow === key ? hex(T.blue,.12) : T.surf2, color: investmentFlow === key ? T.blue : T.sub, border: `1px solid ${investmentFlow === key ? T.blue : T.border}`, cursor: "pointer" } },
                         React.createElement("input", { type: "checkbox", "aria-label": text, checked: investmentFlow === key, onChange: e => setF(current => ({ ...current, investmentFlow: e.target.checked ? key : "none" })), style: { width: 18, height: 18, accentColor: T.blue, flexShrink: 0 } }), text))),
-                    React.createElement("p", { style: { fontSize: 11, color: T.muted, lineHeight: 1.7, marginTop: 9 } }, "เลือกได้ครั้งละหนึ่งอย่าง ใช้ร่วมกับโอนทั่วไปหรือแลกสกุลเงินได้ทุกประเภทบัญชี"),
+                    React.createElement("p", { style: { fontSize: 11, color: T.muted, lineHeight: 1.7, marginTop: 9 } }, "เลือกได้ครั้งละหนึ่งอย่าง ใช้ร่วมกับโอนย้ายบัญชีหรือแลกสกุลเงินได้ทุกประเภทบัญชี"),
                     investmentFlow !== "none" && React.createElement("p", { style: { fontSize: 11, color: T.blue, lineHeight: 1.7, marginTop: 6 } }, investmentFlow === "add" ? `นับเงินเติมให้บัญชีปลายทาง: ${toAcc?.name || "ยังไม่เลือก"}` : `นับเงินถอนจากบัญชีต้นทาง: ${fromAcc?.name || "ยังไม่เลือก"}`),
                     React.createElement("p", { style: { fontSize: 10, color: T.muted, lineHeight: 1.7, marginTop: 6 } }, "โอนหรือแลกเงินที่ลงทุนแล้วระหว่างบัญชีของตัวเอง เว้นทั้งสองช่องเพื่อไม่ให้นับยอดลงทุนซ้ำ")),
                 crossCurrency && React.createElement(Input, { label: `ยอดรับจริงปลายทาง (${toCurrency})`, type: "number", value: f.receivedAmount || "", onChange: v => setF({ ...f, receivedAmount: v }), placeholder: "จำนวนที่เข้าบัญชีจริง" }),
@@ -7732,7 +7735,7 @@ try {
             null,
             dupConfirm && duplicateExisting && React.createElement("div", { className: "mb-2 px-3 py-2 rounded-xl text-[11px] font-bold", style: { background: hex(T.orange, .14), border: `1px solid ${hex(T.orange, .5)}`, color: T.orange } }, "⚠ มีรายการชื่อ/ยอด/วันเดียวกันอยู่แล้ว — กดบันทึกอีกครั้งถ้าต้องการบันทึกซ้ำจริง"),
             isTransfer && !valid && React.createElement("p", { role: "status", style: { fontSize: 12, lineHeight: 1.7, color: T.red, marginBottom: 8 } },
-                !fromAcc || !toAcc ? "เลือกบัญชีต้นทางและปลายทาง" : f.fromAccountId === f.toAccountId ? "เลือกบัญชีต้นทางและปลายทางคนละบัญชี" : !(Number(f.amount) > 0) ? "กรอกยอดโอนมากกว่า 0" : !(receivedAmount > 0) ? "กรอกยอดรับจริงปลายทางมากกว่า 0" : needsTHBRate && !(rates.sourceRate > 0) ? "กรอกเรทเงินบาทมากกว่า 0 เพื่อคิดค่าธรรมเนียมหรือยอดลงทุน" : !purposeValid ? "บัญชีสกุลเดียวกันให้เลือกโอนทั่วไป" : "ตรวจค่าธรรมเนียมและบัญชีที่เลือกก่อนบันทึก"),
+                !fromAcc || !toAcc ? "เลือกบัญชีต้นทางและปลายทาง" : f.fromAccountId === f.toAccountId ? "เลือกบัญชีต้นทางและปลายทางคนละบัญชี" : !(Number(f.amount) > 0) ? "กรอกยอดโอนมากกว่า 0" : !(receivedAmount > 0) ? "กรอกยอดรับจริงปลายทางมากกว่า 0" : needsTHBRate && !(rates.sourceRate > 0) ? "กรอกเรทเงินบาทมากกว่า 0 เพื่อคิดค่าธรรมเนียมหรือยอดลงทุน" : !purposeValid ? "บัญชีสกุลเดียวกันให้เลือกโอนย้ายบัญชี" : "ตรวจค่าธรรมเนียมและบัญชีที่เลือกก่อนบันทึก"),
             React.createElement(
             SaveBtn,
             {
@@ -8303,42 +8306,63 @@ try {
         return result;
     }
     const ledgerMoney = (value,currency) => `${new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0)} ${currency}`;
+    function StatementMoney({ children }) {
+        const box = React.useRef(null), content = React.useRef(null);
+        useEffect(() => {
+            const fit = () => {
+                if (!box.current || !content.current) return;
+                content.current.style.fontSize = "14px";
+                const width = content.current.scrollWidth;
+                if (width > box.current.clientWidth && width > 0) content.current.style.fontSize = (14 * box.current.clientWidth / width * .99) + "px";
+            };
+            fit();
+            const observer = new ResizeObserver(fit);
+            if (box.current) observer.observe(box.current);
+            return () => observer.disconnect();
+        }, [children]);
+        return React.createElement("div", { ref: box, style: { width: "100%", minWidth: 0, whiteSpace: "nowrap", marginTop: 7, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
+            React.createElement("span", { ref: content, style: { display: "inline-flex", alignItems: "baseline", gap: 5, fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.5 } }, children));
+    }
     function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
-        const dnd = useLongPressSort(rows, (from, to) => {
-            const next = reorderListItem(rows, from, to);
-            onReorder(date, next.map(row => String(row.id)));
-        }, `statement-${String(date).replace(/[^a-zA-Z0-9_-]/g, "-")}`);
+        const dnd = useLongPressSort(rows, (from, to) => onReorder(date, reorderListItem(rows, from, to).map(row => String(row.id))), `statement-${String(date).replace(/[^a-zA-Z0-9_-]/g, "-")}`, 320, false, true);
         return React.createElement("div", null,
-            React.createElement("div", { className: "flex items-center gap-2 pt-4 pb-2" },
-                React.createElement("div", { className: "text-xs font-bold", style: { color: dnd.dragging ? T.blue : T.sub } }, parseK(date).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })),
-                dnd.dragging && React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.blue } }, "กำลังลาก · ปล่อยเพื่อวาง")),
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "12px 0 7px", fontSize: 12, fontWeight: 700, color: dnd.dragging ? T.blue : T.sub } },
+                parseK(date).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+                dnd.dragging && React.createElement("span", { style: { fontSize: 10, color: T.blue } }, "กำลังลาก · ปล่อยเพื่อวาง")),
             rows.map((row, index) => {
-            const transfer = row.raw?.kind === "transfer", t = row.raw || {};
-            const color = transfer ? TRANSFER_COLOR : row.dir === "in" ? T.green : T.orange;
-            const currency = accountCurrency(accounts.find(a => a.id === row.accountId));
-            const fromCurrency = t.fromCurrency || accountCurrency(accounts.find(a => a.id === t.fromAccountId));
-            const toCurrency = t.toCurrency || accountCurrency(accounts.find(a => a.id === t.toAccountId));
-            const fromAccount = accounts.find(a => a.id === t.fromAccountId), toAccount = accounts.find(a => a.id === t.toAccountId);
-            const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
-            return React.createElement("div", { key: row.id, ...dnd.rowProps(index), className: "flex items-stretch rounded-2xl mb-2", style: { ...dnd.itemStyle(index), touchAction: "auto", cursor: "default", background: T.surf, border: `1px solid ${active ? T.blue : armed ? hex(T.blue, .6) : T.border}`, boxShadow: active ? `0 12px 28px ${hex(T.blue, .24)}` : armed ? `0 6px 16px ${hex(T.blue, .18)}` : "none", overflow: "hidden" } },
-                React.createElement("span", { ...dnd.handleProps(index), role: "button", "aria-label": `กดค้างเพื่อลาก ${row.title}`, title: "กดค้างแล้วลากเพื่อจัดลำดับ", className: "shrink-0 flex items-center justify-center", style: { width: 36, touchAction: "none", cursor: active ? "grabbing" : "grab", color: active || armed ? T.blue : T.muted, background: active || armed ? hex(T.blue, .08) : T.surf2, borderRight: `1px solid ${T.border}` } }, React.createElement(GripVertical, { size: 17 })),
-                React.createElement("button",{type:"button",onClick:()=>onOpen(row),"aria-label":`ดูรายการ ${row.title}`,className:"flex-1 min-w-0 text-left p-3",style:{background:"transparent",display:"block"}},
-                    React.createElement("div",{className:"flex items-start gap-3"},
-                        React.createElement("span",{className:"shrink-0 rounded-xl flex items-center justify-center",style:{width:34,height:34,background:hex(color,.1),color}},React.createElement(transfer?RefreshCw:row.dir==="in"?TrendingUp:TrendingDown,{size:16})),
-                        React.createElement("div",{className:"flex-1 min-w-0"},
-                            React.createElement("div",{className:"flex items-start justify-between gap-2"},React.createElement("span",{className:"text-sm font-bold",style:{overflowWrap:"anywhere",lineHeight:1.5}},transfer?TRANSFER_PURPOSES[t.transferPurpose]||"โอนย้ายบัญชี":row.title),React.createElement(ChevronRight,{size:15,style:{color:T.muted,flexShrink:0,marginTop:3}})),
-                            transfer && investmentDirection(t, accounts) !== "none" && INVESTMENT_FLOWS[investmentDirection(t, accounts)] !== TRANSFER_PURPOSES[t.transferPurpose] && React.createElement("div", { style: { fontSize: 10, color: T.blue, marginTop: 5, fontWeight: 700 } }, INVESTMENT_FLOWS[investmentDirection(t, accounts)]),
-                            React.createElement("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 8 } }, transfer ? React.createElement(React.Fragment, null,
-                                React.createElement(AccountBadge, { account: fromAccount, accounts }), React.createElement("span", { style: { color: T.muted, fontSize: 13 } }, "→"), React.createElement(AccountBadge, { account: toAccount, accounts })) : React.createElement(React.Fragment, null,
-                                React.createElement("span", { style: { color: T.muted, fontSize: 11 } }, row.tag), React.createElement(AccountBadge, { account: accounts.find(a => a.id === row.accountId), accounts }))),
-                            transfer ? React.createElement(React.Fragment,null,
-                                React.createElement("div",{className:"flex flex-wrap items-center gap-2 mt-2 tabular-nums",style:{fontSize:14,fontWeight:800}},React.createElement("span",{style:{color:T.text}},`−${ledgerMoney(t.amount,fromCurrency)}`),React.createElement("span",{style:{color:T.muted}},"→"),React.createElement("span",{style:{color:TRANSFER_COLOR}},`+${ledgerMoney(transferReceived(t),toCurrency)}`)),
-                                Number(t.transferFee)>0 && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.sub}},`ค่าธรรมเนียม ${ledgerMoney(t.transferFee,fromCurrency)} · ต้นทางออกจริง ${ledgerMoney((Number(t.amount)||0)+Number(t.transferFee),fromCurrency)}`)):
-                                React.createElement("div",{className:"font-extrabold text-base mt-2 tabular-nums",style:{color}},`${row.dir==="in"?"+":"−"}${moneyIn(row.amount,currency)}`),
-                            !transfer && t.kind==="out" && t.pocketSplit && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.purple}},`ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
-                            !transfer && t.kind==="in" && t.accountAmount!=null && currency!=="THB" && React.createElement("div", { style: { fontSize: 11, lineHeight: 1.7, color: T.muted, marginTop: 5 } }, pendingIncomeValuation(t) ? "ยังไม่ระบุมูลค่าเงินบาท · เพิ่มเรทภายหลังได้" : `มูลค่ารายรับ ${moneyIn(t.amount)} · เรท ${Number(t.sourceRateTHB)} บาท/${currency}`),
-                            !transfer && row.detailSummary && React.createElement("div",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.sub,overflowWrap:"anywhere"}},row.detailSummary),
-                            !transfer && row.kind==="txn" && passThroughTotal(t)>0 && React.createElement("div",{className:"text-[11px] mt-2",style:{color:T.blue}},`ของฉัน ${fmtBaht(personalIncomeAmount(t))} · เงินผู้อื่น ${fmtBaht(passThroughTotal(t))}`)))));
+                const t = row.raw || {}, transfer = t.kind === "transfer";
+                const account = accounts.find(a => a.id === row.accountId);
+                const currency = accountCurrency(account);
+                const from = accounts.find(a => a.id === t.fromAccountId), to = accounts.find(a => a.id === t.toAccountId);
+                const fc = t.fromCurrency || accountCurrency(from), tc = t.toCurrency || accountCurrency(to);
+                const color = transfer ? TRANSFER_COLOR : row.dir === "in" ? T.green : T.orange;
+                const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
+                const flow = transfer ? investmentDirection(t, accounts) : "none";
+                return React.createElement("button", { key: row.id, type: "button", ...dnd.itemProps(index),
+                    "aria-label": `ดูรายการ ${row.title}`, title: "แตะเพื่อดูรายละเอียด · กดค้างเพื่อลาก",
+                    onContextMenu: e => e.preventDefault(),
+                    onClick: e => { if (dnd.suppressClick()) { e.preventDefault(); return; } onOpen(row); },
+                    style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", marginBottom: 7, padding: "10px 12px", borderRadius: 14, background: T.surf, color: T.text, overflow: "hidden", border: `1px solid ${active || armed ? T.blue : T.border}` } },
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
+                        React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 14, style: { color, flexShrink: 0 } }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 750, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, transfer ? TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี" : row.title),
+                        flow !== "none" && INVESTMENT_FLOWS[flow] !== TRANSFER_PURPOSES[t.transferPurpose] && React.createElement("span", { style: { color: T.blue, fontSize: 10, flexShrink: 0 } }, INVESTMENT_FLOWS[flow]),
+                        React.createElement(ChevronRight, { size: 13, style: { color: T.muted, flexShrink: 0 } })),
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 6 } },
+                        transfer ? React.createElement(React.Fragment, null,
+                            React.createElement(AccountBadge, { account: from, accounts }),
+                            React.createElement("span", { style: { color: T.muted, fontSize: 12 } }, "→"),
+                            React.createElement(AccountBadge, { account: to, accounts })) :
+                            React.createElement(React.Fragment, null, row.tag !== row.title && React.createElement("span", { style: { color: T.muted, fontSize: 10 } }, row.tag), React.createElement(AccountBadge, { account, accounts }))),
+                    React.createElement(StatementMoney, null, transfer ? [
+                        React.createElement("span", { key: "sent", style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
+                        React.createElement("span", { key: "arrow", style: { color: T.muted } }, "→"),
+                        React.createElement("span", { key: "received", style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`)
+                    ] : React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`)),
+                    transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
+                    !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
+                    !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
+                    !transfer && row.detailSummary && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.detailSummary));
             }));
     }
     function TransactionRows({ rows, accounts, onOpen, onReorder }) {
@@ -8350,7 +8374,7 @@ try {
         });
         const draggable = groups.some(group => group.rows.length > 1);
         return React.createElement("div", null,
-            draggable && React.createElement("div", { className: "flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1 text-[10px] leading-relaxed", style: { color: T.sub, background: hex(T.blue, .07), border: `1px solid ${hex(T.blue, .22)}` } }, React.createElement(GripVertical, { size: 14, style: { color: T.blue, flexShrink: 0 } }), "กดค้างที่ ≡ แล้วลากเพื่อเรียงรายการภายในวันเดียวกันให้ตรงกับ Statement"),
+            draggable && React.createElement("div", { style: { fontSize: 10, color: T.muted, padding: "2px 0 5px" } }, "แตะเพื่อดูรายละเอียด · กดค้างตรงไหนของการ์ดก็ได้เพื่อลากเรียงภายในวันเดียวกัน"),
             groups.map(group => React.createElement(StatementDayRows, { key: group.date, date: group.date, rows: group.rows, accounts, onOpen, onReorder })));
     }
     function TransferDetail({ transaction: t, accounts }) {
@@ -9530,7 +9554,7 @@ try {
                 React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                     React.createElement("div", { className: "text-sm font-extrabold" }, txnActionItem.title),
                     React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, `${shortDate(txnActionItem.date)} · ${txnActionItem.tag || "รายการ"} · ${moneyIn(txnActionItem.amount, accountCurrency(accounts.find(a => a.id === txnActionItem.accountId)))}`)),
-                txnActionItem.raw?.kind==="out"&&txnActionItem.raw?.pocketSplit&&React.createElement("p",{className:"text-xs mb-3 leading-relaxed",style:{color:T.purple}},`บิลรวม ${moneyIn(txnActionItem.raw.amount)} · ห้องซ้อม ${moneyIn(txnActionItem.raw.pocketSplit.studio)} · ส่วนตัว ${moneyIn(txnActionItem.raw.pocketSplit.personal)}`),
+                txnActionItem.raw?.kind==="out"&&Number(txnActionItem.raw?.pocketSplit?.studio)>0&&Number(txnActionItem.raw?.pocketSplit?.personal)>0&&React.createElement("p",{className:"text-xs mb-3 leading-relaxed",style:{color:T.purple}},`บิลรวม ${moneyIn(txnActionItem.raw.amount)} · ห้องซ้อม ${moneyIn(txnActionItem.raw.pocketSplit.studio)} · ส่วนตัว ${moneyIn(txnActionItem.raw.pocketSplit.personal)}`),
                 txnActionItem.raw?.investmentFeeFor && React.createElement("p", { className: "text-xs mb-3", style: { color: T.sub } }, `มูลค่ารายจ่าย ณ วันโอน ${moneyIn(txnActionItem.raw.amount)}`),
                 txnActionItem.raw?.kind === "transfer" && React.createElement(TransferDetail, { transaction: txnActionItem.raw, accounts }),
                 (txnActionItem.paymentRaw?.note || txnActionItem.raw?.note) && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub, whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, txnActionItem.paymentRaw?.note || txnActionItem.raw?.note),
