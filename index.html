@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-subaccount-style-v10";
+window.__TASKROUTINE_BUILD__="2026-11-04-usd-transfer-fix-v13";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -862,7 +862,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 1500000;
-    const SCHEMA_VERSION = 19;
+    const SCHEMA_VERSION = 20;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1463,6 +1463,14 @@ try {
     // Investment funding v1: native-currency balances, historical THB cash flows.
     const ACCOUNT_TYPES = { bank: "ธนาคาร", cash: "เงินสด", investment: "เงินลงทุน / เงินรอลงทุน", broker: "Broker / โบรกเกอร์" };
     const TRANSFER_PURPOSES = { general: "โอนทั่วไป", invest: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน", exchange: "แลกสกุลเงิน" };
+    const INVESTMENT_FLOWS = { none: "ไม่ระบุเงินลงทุน", add: "เติมเงินลงทุน", withdraw: "ถอนเงินลงทุน" };
+    function investmentDirection(t, accounts) {
+        if (Object.hasOwn(t, "investmentFlow")) return ["add", "withdraw"].includes(t.investmentFlow) ? t.investmentFlow : "none";
+        // Preserve historical totals for old records; new records always store an explicit choice.
+        const from = accounts.find(a => a.id === t.fromAccountId), to = accounts.find(a => a.id === t.toAccountId);
+        const fi = t.fromInvestment ?? isInvestmentAccount(from), ti = t.toInvestment ?? isInvestmentAccount(to);
+        return fi === ti ? "none" : ti ? "add" : "withdraw";
+    }
     const accountParent = (account, accounts) => accounts.find(a => a.id === account?.parentAccountId && a.id !== account?.id) || null;
     const accountLabel = (account, accounts) => { const parent = accountParent(account, accounts); return parent ? `${parent.name} › ${account.name}` : account?.name || "—"; };
     function orderedAccounts(accounts) {
@@ -1493,8 +1501,7 @@ try {
         const soft = "#" + [1,3,5].map(i => Math.round(parseInt(base.slice(i,i+2),16)*.3 + 255*.7).toString(16).padStart(2,"0")).join("");
         return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: 5, maxWidth: "100%", padding: child ? "3px 7px" : "6px 10px", borderRadius: child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: 1.6, overflowWrap: "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
             child && React.createElement("span", { "aria-hidden": true, style: { fontSize: 13, flexShrink: 0 } }, "↳"),
-            React.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, account?.name || "ไม่ระบุบัญชี"),
-            child && React.createElement("span", { style: { fontSize: 9, fontWeight: 500, opacity: .8, flexShrink: 0 } }, "ย่อย"));
+            React.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, account?.name || "ไม่ระบุบัญชี"));
     }
     function AccountColorPicker({ account, onChange }) {
         return React.createElement("div", { style: { marginBottom: 16 } },
@@ -1512,6 +1519,7 @@ try {
         const sourceRate = fromCurrency === "THB" ? 1 : toCurrency === "THB" && sent > 0 ? received / sent : Number(manualRate) || 0;
         return { sourceRate, amountTHB: sent * sourceRate };
     };
+    const transferNeedsTHBRate = (fromCurrency, toCurrency, fee, flow) => fromCurrency !== "THB" && toCurrency !== "THB" && (fromCurrency !== toCurrency || Number(fee) > 0 || ["add", "withdraw"].includes(flow));
     function investmentFeeRow(transfer) {
         if (transfer.kind !== "transfer" || !(Number(transfer.transferFee) > 0)) return null;
         return { id: `investment-fee-${transfer.id}`, investmentFeeFor: transfer.id, studioExpense: transfer.pocketOwner === "studio", title: `ค่าธรรมเนียม · ${TRANSFER_PURPOSES[transfer.transferPurpose] || "โอนย้าย"}`,
@@ -1544,9 +1552,9 @@ try {
         const platforms = {};
         transactions.filter(t => t.kind === "transfer" && (!month || String(t.date).startsWith(month))).forEach(t => {
             const from = accounts.find(a => a.id === t.fromAccountId), to = accounts.find(a => a.id === t.toAccountId);
-            const fromInvest = t.fromInvestment ?? isInvestmentAccount(from), toInvest = t.toInvestment ?? isInvestmentAccount(to);
+            const direction = investmentDirection(t, accounts), toInvest = direction === "add";
             const value = Number(t.amountTHB ?? (accountCurrency(from) === "THB" ? t.amount : accountCurrency(to) === "THB" ? transferReceived(t) : 0)) || 0;
-            if (fromInvest === toInvest) return;
+            if (direction === "none") return;
             const key = (toInvest ? t.toPlatform || to?.platform : t.fromPlatform || from?.platform) || (toInvest ? to?.name : from?.name) || "ไม่ระบุ";
             platforms[key] ||= { added: 0, withdrawn: 0 };
             if (toInvest) { added += value; platforms[key].added += value; }
@@ -1565,8 +1573,8 @@ try {
         let added = 0, withdrawn = 0;
         transactions.filter(t => t.kind === "transfer" && String(t.date).startsWith(plan.month)).forEach(t => {
             const from = accounts.find(a => a.id === t.fromAccountId), to = accounts.find(a => a.id === t.toAccountId);
-            const fi = t.fromInvestment ?? isInvestmentAccount(from), ti = t.toInvestment ?? isInvestmentAccount(to);
-            if (fi === ti) return;
+            const direction = investmentDirection(t, accounts), ti = direction === "add";
+            if (direction === "none") return;
             const account = ti ? to : from;
             const platform = (ti ? t.toPlatform : t.fromPlatform) || account?.platform || account?.name || "";
             const currency = (ti ? t.toCurrency : t.fromCurrency) || accountCurrency(account);
@@ -5724,7 +5732,8 @@ try {
               toAccountId:
                 initial.toAccountId || accounts[1]?.id || accounts[0]?.id || null,
               transferNote: initial.note || "",
-              transferPurpose: initial.transferPurpose || "general",
+              transferPurpose: ["invest", "withdraw"].includes(initial.transferPurpose) ? ((initial.fromCurrency || accountCurrency(accounts.find(a => a.id === initial.fromAccountId))) !== (initial.toCurrency || accountCurrency(accounts.find(a => a.id === initial.toAccountId))) ? "exchange" : "general") : initial.transferPurpose || "general",
+              investmentFlow: initial.kind === "transfer" ? investmentDirection(initial, accounts) : "none",
               receivedAmount: duplicateMode ? "" : initial.receivedAmount ?? initial.amount ?? "",
               transferFee: duplicateMode ? "" : initial.transferFee || "",
               sourceRateTHB: duplicateMode ? "" : initial.sourceRateTHB || "",
@@ -5947,11 +5956,13 @@ try {
       const receivedAmount = crossCurrency ? Number(f.receivedAmount) : Number(f.amount);
       const transferFee = Number(f.transferFee || 0);
       const transferPurpose = f.transferPurpose || "general";
+      const investmentFlow = f.investmentFlow || "none";
+      const needsTHBRate = transferNeedsTHBRate(fromCurrency, toCurrency, transferFee, investmentFlow);
       const rates = transferRates(fromCurrency, toCurrency, Number(f.amount), receivedAmount, f.sourceRateTHB);
-      const extendedTransfer = transferPocket === "studio" || fromAcc?.pocketEnabled || toAcc?.pocketEnabled || fromCurrency !== "THB" || toCurrency !== "THB" || transferPurpose !== "general" || transferFee > 0 || isInvestmentAccount(fromAcc) || isInvestmentAccount(toAcc);
+      const extendedTransfer = investmentFlow !== "none" || transferPocket === "studio" || fromAcc?.pocketEnabled || toAcc?.pocketEnabled || fromCurrency !== "THB" || toCurrency !== "THB" || transferPurpose !== "general" || transferFee > 0 || isInvestmentAccount(fromAcc) || isInvestmentAccount(toAcc);
       const pocketRouting = !isTransfer && !!accounts.find(a=>a.id===f.accountId)?.pocketEnabled;
       useEffect(()=>{if(pocketRouting && transferOnward)setTransferOnward(false);},[pocketRouting,transferOnward]);
-      const purposeValid = transferPurpose === "invest" ? !isInvestmentAccount(fromAcc) && isInvestmentAccount(toAcc) : transferPurpose === "withdraw" ? isInvestmentAccount(fromAcc) && !isInvestmentAccount(toAcc) : transferPurpose !== "exchange" || crossCurrency;
+      const purposeValid = transferPurpose !== "exchange" || crossCurrency;
       useEffect(() => { if (extendedTransfer) setTransferOnward(false); }, [extendedTransfer]);
       const outstandingExpenses = transactions.filter(
         (transaction) =>
@@ -6103,7 +6114,7 @@ try {
           Number.isFinite(Number(f.amount)) && Number(f.amount) > 0 &&
           Number.isFinite(receivedAmount) && receivedAmount > 0 &&
           Number.isFinite(transferFee) && transferFee >= 0 &&
-          Number.isFinite(rates.sourceRate) && rates.sourceRate > 0 &&
+          (!needsTHBRate || (Number.isFinite(rates.sourceRate) && rates.sourceRate > 0)) &&
           !!fromAcc && !!toAcc && purposeValid &&
           (!fromAcc.archived || editMode) && (!toAcc.archived || editMode) &&
           onwardValid
@@ -6415,6 +6426,7 @@ try {
           if (f.splitExpense) detail.push(`แยก ${f.splits.length} รายการย่อย`);
         } else {
           detail.push(`${TRANSFER_PURPOSES[transferPurpose]} · รับ ${moneyIn(receivedAmount, toCurrency)}`);
+          if (investmentFlow !== "none") detail.push(INVESTMENT_FLOWS[investmentFlow]);
           if (transferFee > 0) detail.push(`รวมค่าธรรมเนียม ${moneyIn(transferFee, fromCurrency)}`);
           if (transferOnward && !extendedTransfer && onwardAccountId) detail.push(`โอนต่อไป ${accountName(onwardAccountId)}`);
         }
@@ -6642,10 +6654,19 @@ try {
                   onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", transferPurpose: "general" }),
                   exclude: f.fromAccountId,
                 }),
-                React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: TRANSFER_PURPOSES, onChange: v => setF({ ...f, transferPurpose: v }) }),
-                !purposeValid && React.createElement("p", { className: "text-xs mb-3", style: { color: T.red } }, transferPurpose === "invest" ? "เติมเงินลงทุน: เลือกต้นทางทั่วไป → ปลายทางประเภทเงินลงทุน" : transferPurpose === "withdraw" ? "ถอนเงินลงทุน: เลือกต้นทางเงินลงทุน → ปลายทางทั่วไป" : "แลกสกุลเงิน: เลือกบัญชีคนละสกุล"),
+                React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนทั่วไป", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
+                !purposeValid && React.createElement("p", { className: "text-xs mb-3", style: { color: T.red } }, "แลกสกุลเงิน: เลือกบัญชีคนละสกุล"),
+                React.createElement("fieldset", { style: { padding: 12, marginBottom: 16, border: `1px solid ${T.border}`, borderRadius: 14, background: T.surf } },
+                    React.createElement("legend", { style: { fontSize: 12, fontWeight: 700, color: T.sub, padding: "0 5px" } }, "กำกับเงินลงทุน (ไม่บังคับ)"),
+                    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, [["add", "เติมเงินลงทุน"], ["withdraw", "ถอนเงินลงทุน"]].map(([key, text]) => React.createElement("label", { key, style: { display: "flex", alignItems: "center", gap: 8, flex: "1 1 140px", padding: "12px 10px", borderRadius: 11, fontSize: 12, fontWeight: 700, background: investmentFlow === key ? hex(T.blue,.12) : T.surf2, color: investmentFlow === key ? T.blue : T.sub, border: `1px solid ${investmentFlow === key ? T.blue : T.border}`, cursor: "pointer" } },
+                        React.createElement("input", { type: "checkbox", "aria-label": text, checked: investmentFlow === key, onChange: e => setF(current => ({ ...current, investmentFlow: e.target.checked ? key : "none" })), style: { width: 18, height: 18, accentColor: T.blue, flexShrink: 0 } }), text))),
+                    React.createElement("p", { style: { fontSize: 11, color: T.muted, lineHeight: 1.7, marginTop: 9 } }, "เลือกได้ครั้งละหนึ่งอย่าง ใช้ร่วมกับโอนทั่วไปหรือแลกสกุลเงินได้ทุกประเภทบัญชี"),
+                    investmentFlow !== "none" && React.createElement("p", { style: { fontSize: 11, color: T.blue, lineHeight: 1.7, marginTop: 6 } }, investmentFlow === "add" ? `นับเงินเติมให้บัญชีปลายทาง: ${toAcc?.name || "ยังไม่เลือก"}` : `นับเงินถอนจากบัญชีต้นทาง: ${fromAcc?.name || "ยังไม่เลือก"}`),
+                    React.createElement("p", { style: { fontSize: 10, color: T.muted, lineHeight: 1.7, marginTop: 6 } }, "โอนหรือแลกเงินที่ลงทุนแล้วระหว่างบัญชีของตัวเอง เว้นทั้งสองช่องเพื่อไม่ให้นับยอดลงทุนซ้ำ")),
                 crossCurrency && React.createElement(Input, { label: `ยอดรับจริงปลายทาง (${toCurrency})`, type: "number", value: f.receivedAmount || "", onChange: v => setF({ ...f, receivedAmount: v }), placeholder: "จำนวนที่เข้าบัญชีจริง" }),
-                fromCurrency !== "THB" && toCurrency !== "THB" && React.createElement(Input, { label: `เรทวันโอน · 1 ${fromCurrency} = กี่บาท`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF({ ...f, sourceRateTHB: v }), placeholder: "ระบุเพื่อสรุปมูลค่าเป็นบาท" }),
+                fromCurrency !== "THB" && toCurrency !== "THB" && React.createElement(React.Fragment, null,
+                    React.createElement(Input, { label: `เรทวันโอน · 1 ${fromCurrency} = กี่บาท${needsTHBRate ? " (จำเป็น)" : " (ไม่บังคับ)"}`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF({ ...f, sourceRateTHB: v }), placeholder: needsTHBRate ? "กรอกเรทมากกว่า 0" : "เว้นว่างได้" }),
+                    React.createElement("p", { style: { fontSize: 11, lineHeight: 1.7, marginBottom: 12, color: needsTHBRate && !(rates.sourceRate > 0) ? T.red : T.muted } }, needsTHBRate ? "ต้องใช้เรทเพื่อคิดค่าธรรมเนียมหรือยอดเติม–ถอนลงทุนเป็นเงินบาท" : `โอน ${fromCurrency} ระหว่างบัญชีได้โดยไม่กรอกเรท ยอดเงินบาทจะยังไม่ระบุ`)),
                 React.createElement(Input, { label: `ค่าธรรมเนียมจ่ายเพิ่มจากต้นทาง (${fromCurrency})`, type: "number", value: f.transferFee ?? "", onChange: v => setF({ ...f, transferFee: v }), placeholder: "0" }),
                 React.createElement("div", { className: "p-3 rounded-xl mb-3 text-xs leading-relaxed", style: { background: hex(T.blue, .09), color: T.sub } },
                     `ต้นทางออก ${moneyIn((Number(f.amount) || 0) + (Number.isFinite(transferFee) ? transferFee : 0), fromCurrency)} → ปลายทางรับ ${moneyIn(receivedAmount, toCurrency)}`,
@@ -7694,6 +7715,8 @@ try {
             React.Fragment,
             null,
             dupConfirm && duplicateExisting && React.createElement("div", { className: "mb-2 px-3 py-2 rounded-xl text-[11px] font-bold", style: { background: hex(T.orange, .14), border: `1px solid ${hex(T.orange, .5)}`, color: T.orange } }, "⚠ มีรายการชื่อ/ยอด/วันเดียวกันอยู่แล้ว — กดบันทึกอีกครั้งถ้าต้องการบันทึกซ้ำจริง"),
+            isTransfer && !valid && React.createElement("p", { role: "status", style: { fontSize: 12, lineHeight: 1.7, color: T.red, marginBottom: 8 } },
+                !fromAcc || !toAcc ? "เลือกบัญชีต้นทางและปลายทาง" : f.fromAccountId === f.toAccountId ? "เลือกบัญชีต้นทางและปลายทางคนละบัญชี" : !(Number(f.amount) > 0) ? "กรอกยอดโอนมากกว่า 0" : !(receivedAmount > 0) ? "กรอกยอดรับจริงปลายทางมากกว่า 0" : needsTHBRate && !(rates.sourceRate > 0) ? "กรอกเรทเงินบาทมากกว่า 0 เพื่อคิดค่าธรรมเนียมหรือยอดลงทุน" : !purposeValid ? "บัญชีสกุลเดียวกันให้เลือกโอนทั่วไป" : "ตรวจค่าธรรมเนียมและบัญชีที่เลือกก่อนบันทึก"),
             React.createElement(
             SaveBtn,
             {
@@ -7823,9 +7846,9 @@ try {
                       amount: Number(f.amount) || 0,
                       date: f.date,
                       title: TRANSFER_PURPOSES[transferPurpose],
-                      transferPurpose, receivedAmount,
+                      transferPurpose, investmentFlow, receivedAmount,
                       fromCurrency, toCurrency, transferFee, pocketOwner: transferPocket,
-                      sourceRateTHB: rates.sourceRate, amountTHB: rates.amountTHB,
+                      sourceRateTHB: rates.sourceRate > 0 ? rates.sourceRate : null, amountTHB: rates.sourceRate > 0 ? rates.amountTHB : null,
                       fromInvestment: isInvestmentAccount(fromAcc), toInvestment: isInvestmentAccount(toAcc),
                       fromPlatform: fromAcc?.platform || "", toPlatform: toAcc?.platform || "",
                       note: f.transferNote.trim(),
@@ -8282,6 +8305,7 @@ try {
                         React.createElement("span",{className:"shrink-0 rounded-xl flex items-center justify-center",style:{width:34,height:34,background:hex(color,.1),color}},React.createElement(transfer?RefreshCw:row.dir==="in"?TrendingUp:TrendingDown,{size:16})),
                         React.createElement("div",{className:"flex-1 min-w-0"},
                             React.createElement("div",{className:"flex items-start justify-between gap-2"},React.createElement("span",{className:"text-sm font-bold",style:{overflowWrap:"anywhere",lineHeight:1.5}},transfer?TRANSFER_PURPOSES[t.transferPurpose]||"โอนย้ายบัญชี":row.title),React.createElement(ChevronRight,{size:15,style:{color:T.muted,flexShrink:0,marginTop:3}})),
+                            transfer && investmentDirection(t, accounts) !== "none" && INVESTMENT_FLOWS[investmentDirection(t, accounts)] !== TRANSFER_PURPOSES[t.transferPurpose] && React.createElement("div", { style: { fontSize: 10, color: T.blue, marginTop: 5, fontWeight: 700 } }, INVESTMENT_FLOWS[investmentDirection(t, accounts)]),
                             React.createElement("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 8 } }, transfer ? React.createElement(React.Fragment, null,
                                 React.createElement(AccountBadge, { account: fromAccount, accounts }), React.createElement("span", { style: { color: T.muted, fontSize: 13 } }, "→"), React.createElement(AccountBadge, { account: toAccount, accounts })) : React.createElement(React.Fragment, null,
                                 React.createElement("span", { style: { color: T.muted, fontSize: 11 } }, row.tag), React.createElement(AccountBadge, { account: accounts.find(a => a.id === row.accountId), accounts }))),
@@ -8314,6 +8338,7 @@ try {
             line("จากบัญชี",React.createElement(AccountBadge, { account: accounts.find(a=>a.id===t.fromAccountId), accounts })),
             line("ไปบัญชี",React.createElement(AccountBadge, { account: accounts.find(a=>a.id===t.toAccountId), accounts })),
             line("ส่วนของเงิน",t.pocketOwner==="studio"?"Blurryroom Studio":"ส่วนตัว"),
+            line("กำกับเงินลงทุน",INVESTMENT_FLOWS[investmentDirection(t, accounts)]),
             line("ยอดโอน",ledgerMoney(t.amount,fromCurrency)),
             line("รับจริง",ledgerMoney(transferReceived(t),toCurrency)),
             line("ค่าธรรมเนียม",ledgerMoney(t.transferFee||0,fromCurrency)),
@@ -11970,6 +11995,18 @@ try {
         check("ลงทุน: ส่งออกนำเข้ารักษาประเภทบัญชี", investmentSnapshot.accounts.find(a => a.id === "us").accountType, "investment");
 
         const plan = {month:"2026-11",platform:"Dime",currency:"USD",target:100};
+        check("โอน USD: ไม่มีค่าธรรมเนียมไม่บังคับเรทบาท",transferNeedsTHBRate("USD","USD",0,"none"),false);
+        check("โอน USD: มีค่าธรรมเนียมต้องมีเรทบาท",transferNeedsTHBRate("USD","USD",1,"none"),true);
+        check("โอน USD: ติ๊กลงทุนต้องมีเรทสรุปบาท",transferNeedsTHBRate("USD","USD",0,"add"),true);
+        const markedExchange = {...fundingTransfer,transferPurpose:"exchange",investmentFlow:"add",fromInvestment:true,toInvestment:true};
+        check("กำกับลงทุน: แลกเงินระหว่างบัญชีลงทุนแล้วติ๊กเติมได้",investmentFunding([markedExchange],fundingAccounts,"2026-11").added,3500);
+        check("กำกับลงทุน: เงินรับ USD เข้าแผนครั้งเดียว",planFunding(plan,[markedExchange],fundingAccounts).added,100);
+        check("กำกับลงทุน: ไม่ติ๊กไม่เพิ่มยอดแม้บัญชีปลายทางลงทุน",investmentFunding([{...markedExchange,investmentFlow:"none"}],fundingAccounts,"2026-11").added,0);
+        check("กำกับลงทุน: ถอนโดยไม่ผูกประเภทบัญชี",investmentFunding([{...withdrawal,investmentFlow:"withdraw",transferPurpose:"exchange",fromInvestment:false,toInvestment:false}],fundingAccounts,"2026-11").withdrawn,360);
+        check("กำกับลงทุน: บัญชีธรรมดาก็ติ๊กเติมได้",investmentFunding([{...markedExchange,fromInvestment:false,toInvestment:false}],fundingAccounts,"2026-11").added,3500);
+        const markedRestored=migrate(JSON.parse(JSON.stringify({version:SCHEMA_VERSION,accounts:fundingAccounts,transactions:[markedExchange]})));
+        check("กำกับลงทุน: ส่งออกนำเข้ารักษาตัวเลือก",markedRestored.transactions[0].investmentFlow,"add");
+        check("กำกับลงทุน: ยอดเงินบัญชีไม่เปลี่ยนเพราะติ๊ก",nativeAccountBalance(fundingAccounts[2],[markedExchange],[]),100);
         check("แผน: เติมข้ามสกุลนับยอดรับ USD", planFunding(plan, funded, fundingAccounts).added, 100);
         check("แผน: ถึงเป้าแสดงยอดขาดศูนย์", planFunding(plan, funded, fundingAccounts).remaining, 0);
         check("แผน: ถอนหักตามสกุลต้นทาง", planFunding(plan, withdrawn, fundingAccounts).net, 90);
