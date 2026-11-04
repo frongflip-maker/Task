@@ -1655,8 +1655,180 @@ try {
         const fee = investmentFeeRow(transfer);
         return [...clean, transfer, ...(fee ? [fee] : [])];
     }
+    // Portfolio activity is owned by one account. Only its cash delta enters the account balance.
+    const portfolioTypes = { buy: "ซื้อ", sell: "ขาย", interest: "ดอกเบี้ย", dividend: "เงินปันผล", opening: "สินทรัพย์ตั้งต้น", cash: "ตั้งเงินสดเริ่มติดตาม", quote: "อัปเดตราคา", snapshot: "บันทึกมูลค่ารวม" };
+    function portfolioCash(row) {
+        const fee = row.feeUnit === "asset" ? 0 : row.fee || 0;
+        switch (row.type) {
+            case "buy": return -row.amount - fee;
+            case "sell": return row.amount - fee;
+            case "interest":
+            case "dividend": return row.amount - row.tax;
+            case "cash": return row.delta;
+            default: return 0;
+        }
+    }
+    function portfolioBook(entries) {
+        const assets = new window.Map(), realized = new window.Map();
+        const ordered = [...entries].sort((a,b) => a.date.localeCompare(b.date));
+        let unknownProfit = false, profit = 0, snapshot = null;
+        for (const row of ordered) {
+            if (row.type === "snapshot") { snapshot = row; continue; }
+            if (!["opening","buy","sell","quote"].includes(row.type)) continue;
+            const position = assets.get(row.symbol) || { symbol: row.symbol, units: 0, cost: 0, quote: null };
+            assets.set(row.symbol, position);
+            if (row.type === "quote") { position.quote = row; continue; }
+            const assetFee = row.feeUnit === "asset" ? row.fee : 0;
+            if (row.type === "sell") {
+                const units = row.units + assetFee;
+                const tolerance = Number.EPSILON * Math.max(units,position.units) * 16;
+                if (units > position.units + tolerance) throw new Error("จำนวน " + row.symbol + " ที่ขายเกินยอดถือครอง ณ " + row.date);
+                const basis = position.cost === null ? null : position.cost * Math.min(units / position.units, 1);
+                const gain = basis === null ? null : portfolioCash(row) - basis;
+                realized.set(row.id, gain);
+                if (gain === null) unknownProfit = true;
+                else profit += gain;
+                position.units -= units;
+                if (basis !== null) position.cost -= basis;
+                if (Math.abs(position.units) <= tolerance) { position.units = 0; position.cost = 0; }
+            } else {
+                position.units += row.units - assetFee;
+                const cost = row.type === "buy" ? -portfolioCash(row) : row.amount;
+                position.cost = cost === null || position.cost === null ? null : position.cost + cost;
+            }
+        }
+        return { assets, realized, profit: unknownProfit ? null : profit, snapshot };
+    }
+
+    function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, onClose }) {
+        const h = React.createElement, currency = accountCurrency(account);
+        const entries = account.portfolioEntries || [];
+        const totalOnly = account.portfolioMode === "summary";
+        const book = useMemo(() => portfolioBook(entries), [entries]);
+        const holdings = [...book.assets.values()].filter(p => p.units > 0);
+        const cash = nativeAccountBalance(account, transactions, payments);
+        const detailedMoney = new Intl.NumberFormat("th-TH",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:8});
+        const money = n => detailedMoney.format(n);
+        const quantity = n => Number(n).toLocaleString("en-US",{maximumFractionDigits:16});
+        const fresh = () => ({ id: uid(), symbol:"", units:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
+        const [tab,setTab] = useState("assets"), [type,setType] = useState("");
+        const [rows,setRows] = useState([]), [date,setDate] = useState(TK), [error,setError] = useState("");
+        const [editing,setEditing] = useState(null), [year,setYear] = useState("all");
+        const [confirmDelete,setConfirmDelete] = useState(null);
+        const balances = holdings.every(p => p.quote) ? holdings.reduce((sum,p) => sum + p.units * p.quote.amount,0) : null;
+        const cost = holdings.every(p => p.cost !== null) ? holdings.reduce((sum,p) => sum + p.cost,0) : null;
+        function begin(kind, old, reuse = false) {
+            setType(kind); setEditing(old && !reuse ? old.id : null); setDate(old && !reuse ? old.date : TK);
+            setRows([{ ...fresh(), ...(old || {}), id: old && !reuse ? old.id : uid(), amount: old?.amount ?? "" }]);
+            setError(""); setConfirmDelete(null);
+        }
+        function finish() { setType(""); setEditing(null); setError(""); }
+        function change(index,key,value) {
+            setRows(list => list.map((row,i) => i === index ? {...row,[key]:value} : row));
+            setError("");
+        }
+        function commit(next) {
+            portfolioBook(next); // Reject oversells, including those caused by changing an earlier entry.
+            setAccounts(list => list.map(a => a.id === account.id ? {...a,portfolioEntries:next} : a));
+        }
+        function save() {
+            try {
+                if (!/^\d{4}-\d\d-\d\d$/.test(date) || date > dkey(new Date())) throw new Error("เลือกวันที่ทำรายการที่ไม่เกินวันนี้");
+                const numeric = (value,label,allowZero = false) => {
+                    const n = Number(value);
+                    if (value === "" || value == null || !Number.isFinite(n) || (allowZero ? n < 0 : n <= 0)) throw new Error("กรุณาตรวจ " + label);
+                    return n;
+                };
+                const nextRows = rows.map(row => {
+                    const result = { id:row.id, type, date };
+                    if (["buy","sell","opening","quote","dividend"].includes(type)) {
+                        result.symbol = String(row.symbol || "").trim().toUpperCase();
+                        if (!result.symbol && type !== "dividend") throw new Error("กรอกชื่อหุ้นหรือเหรียญ");
+                    }
+                    result.amount = type === "opening" && (row.amount === "" || row.amount == null) ? null : numeric(row.amount,"จำนวนเงิน",["opening","cash","snapshot","quote"].includes(type));
+                    if (["buy","sell","opening"].includes(type)) result.units = numeric(row.units,"จำนวนหน่วย");
+                    if (["buy","sell"].includes(type)) {
+                        result.fee = numeric(row.fee || 0,"ค่าธรรมเนียม",true); result.feeUnit = row.feeUnit;
+                        if (result.feeUnit === "asset" && type === "buy" && result.fee >= result.units) throw new Error("ค่าธรรมเนียมต้องน้อยกว่าจำนวนหน่วยที่ซื้อ");
+                        if (result.feeUnit === "cash" && type === "sell" && result.fee > result.amount) throw new Error("ค่าธรรมเนียมเกินยอดขาย");
+                    }
+                    if (["interest","dividend"].includes(type)) {
+                        result.tax = numeric(row.tax || 0,"ภาษีหัก",true);
+                        if (result.tax > result.amount) throw new Error("ภาษีหักเกินยอดก่อนหักภาษี");
+                    }
+                    if (type === "cash") {
+                        if (entries.some(r => r.type === "cash" && r.id !== editing)) throw new Error("มีเงินสดตั้งต้นแล้ว แก้รายการเดิมใน Statement พอร์ต");
+                        const cutoff = r => r.date <= date;
+                        result.delta = result.amount - nativeAccountBalance({...account,portfolioEntries:entries.filter(r => r.id !== editing && cutoff(r))},transactions.filter(cutoff),payments.filter(cutoff));
+                    }
+                    return result;
+                });
+                commit(editing ? entries.map(r => r.id === editing ? nextRows[0] : r) : [...entries,...nextRows]);
+                finish();
+            } catch(e) { setError(e.message); }
+        }
+        const text = (s) => h("div",{className:"text-xs leading-relaxed",style:{color:T.sub}},s);
+        const button = (label,click,primary=false) => h("button",{type:"button",onClick:click,className:"px-3 py-2 rounded-xl text-xs font-bold",style:{background:primary ? T.purple : T.surf2,color:primary ? "#fff" : T.text}},label);
+        const group = (...children) => h("div",{className:"flex flex-wrap gap-2 my-3"},...children);
+        const field = (index,key,label,kind="number") => h(Input,{label,value:String(rows[index][key] ?? ""),type:kind,onChange:v=>change(index,key,v)});
+        const stat = (label,value) => h(Stat,{label,value});
+        const numbers = (...items) => h("div",{className:"grid grid-cols-2 gap-2 my-3"},...items);
+        const filtered = entries.filter(r => year === "all" || r.date.startsWith(year));
+        const income = filtered.filter(r => ["dividend","interest"].includes(r.type));
+        const gross = income.reduce((s,r)=>s+r.amount,0), tax = income.reduce((s,r)=>s+r.tax,0);
+        const types = totalOnly ? ["snapshot","interest","dividend"] : ["buy","sell","interest","dividend","opening","cash","quote"];
+        const history = [...filtered].reverse().sort((a,b)=>b.date.localeCompare(a.date));
+        const transferHistory = transactions.filter(t => t.kind === "transfer" && (t.fromAccountId === account.id || t.toAccountId === account.id));
+        const snapshots = entries.filter(r=>r.type==="snapshot").sort((a,b)=>a.date.localeCompare(b.date));
+        const first = snapshots[0], latest = book.snapshot;
+        const fundingSince = first && latest ? transferHistory.filter(r=>r.date > first.date && r.date <= latest.date).reduce((sum,r)=>sum+(r.toAccountId===account.id ? transferReceived(r) : -Number(r.amount)),0) : 0;
+        function description(r) {
+            if (["interest","dividend"].includes(r.type)) return "ก่อนหัก " + money(r.amount) + " · ภาษีหัก " + money(r.tax) + " · รับสุทธิ " + money(portfolioCash(r));
+            if (r.type === "quote") return money(r.amount) + " / หน่วย";
+            if (r.type === "snapshot" || r.type === "cash") return money(r.amount);
+            if (r.type === "opening") return quantity(r.units)+" หน่วย · ต้นทุน "+(r.amount === null ? "ยังไม่ระบุ" : money(r.amount));
+            return quantity(r.units)+" หน่วย · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
+        }
+        const draftSpend = type === "buy" ? rows.reduce((sum,r)=>sum+Number(r.amount || 0)+(r.feeUnit==="asset" ? 0 : Number(r.fee || 0)),0) : 0;
+        return h(Sheet,{title:type ? portfolioTypes[type]+" · "+account.name : "พอร์ตลงทุน · "+account.name,onClose:type ? finish : onClose},
+            type ? h(React.Fragment,null,
+                h(Input,{label:"วันที่",type:"date",value:date,onChange:setDate}),
+                rows.map((r,i)=>h("div",{key:r.id,className:"p-3 rounded-xl mb-3",style:{background:T.surf2}},
+                    rows.length>1 && group(text("รายการที่ "+(i+1)),button("เอาออก",()=>setRows(rows.filter(x=>x.id!==r.id)))),
+                    ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : "หุ้น / ETF / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น BTC หรือ SCHG"}),
+                    ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
+                    field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
+                    ["buy","sell"].includes(type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
+                    ["interest","dividend"].includes(type) && h(React.Fragment,null,field(i,"tax","ภาษีหัก ณ ที่จ่าย ("+currency+")"),text("รับสุทธิ "+money(Number(r.amount)-Number(r.tax)))),
+                    type==="cash" && text("ระบบปรับเฉพาะส่วนต่างจากเงินสดที่บันทึกไว้ถึงวันนั้น เพื่อให้ยอดตรงกับโบรกเกอร์"))),
+                type==="buy" && text("รวมเงินซื้อและค่าธรรมเนียม "+money(draftSpend)+(editing ? "" : " · เงินสดหลังบันทึก "+money(cash-draftSpend))),
+                type==="buy" && !editing && draftSpend > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
+                type==="buy" && !editing && button("+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows([...rows,fresh()])),
+                error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
+            : h(React.Fragment,null,
+                text(accountLabel(account,accounts)+" · "+currency),
+                group(button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history")),
+                tab==="assets" ? h(React.Fragment,null,
+                    totalOnly ? h(React.Fragment,null,numbers(stat("มูลค่าล่าสุด",latest ? money(latest.amount) : "—"),stat("วันที่อัปเดต",latest?.date || "—")),
+                    first && latest && first.id!==latest.id && text("ผลต่างจากยอดครั้งแรก หลังหักโอนสุทธิ "+money(latest.amount-first.amount-fundingSince))) :
+                    h(React.Fragment,null,numbers(stat("เงินสด",money(cash)),stat("มูลค่าสินทรัพย์",balances===null ? "รอราคาประเมิน" : money(balances)),stat("มูลค่ารวม",balances===null ? "รอราคาประเมิน" : money(cash+balances)),stat("กำไรขายแล้ว",book.profit===null ? "ต้นทุนไม่ครบ" : money(book.profit))),
+                    text("กำไรที่ยังไม่ขาย "+(cost===null || balances===null ? "รอต้นทุนและราคาประเมิน" : money(balances-cost))),
+                    holdings.map(p=>h("div",{key:p.symbol,className:"py-3",style:{borderBottom:"1px solid "+T.border}},h("strong",null,p.symbol+" · "+quantity(p.units)+" หน่วย"),text("ต้นทุนเฉลี่ย "+(p.cost===null ? "ยังไม่ระบุ" : money(p.cost/p.units))+" / หน่วย"),text(p.quote ? "ราคา "+money(p.quote.amount)+" · "+p.quote.date+" · มูลค่า "+money(p.units*p.quote.amount) : "ยังไม่ได้ระบุราคาประเมิน")))),
+                    !totalOnly && !holdings.length && text("เริ่มจากบันทึกซื้อ หรือเลือกสินทรัพย์ตั้งต้นสำหรับหุ้นและเหรียญที่มีอยู่แล้ว"),
+                    !account.archived && group(...types.map(k=>button(portfolioTypes[k],()=>begin(k),k==="buy" || k==="snapshot"))))
+                : h(React.Fragment,null,h(FinanceSelect,{label:"ปีของ Statement พอร์ต",value:year,onChange:setYear,options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,y])])}),
+                    numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะบัญชีและปีที่เลือก"),
+                    !history.length && text("ยังไม่มีรายการภายในพอร์ต"),
+                    history.map(r=>h("div",{key:r.id,className:"py-3",style:{borderBottom:"1px solid "+T.border}},text(r.date),h("strong",null,portfolioTypes[r.type]+(r.symbol ? " · "+r.symbol : "")),text(description(r)),
+                    !account.archived && group(button("แก้ไข",()=>begin(r.type,r)),r.type==="buy" && button("ซื้อซ้ำ",()=>begin("buy",r,true)),button(confirmDelete===r.id ? "ยืนยันลบ" : "ลบ",()=>{
+                        if(confirmDelete!==r.id) {setConfirmDelete(r.id);return;}
+                        try {commit(entries.filter(x=>x.id!==r.id));setConfirmDelete(null);setError("");} catch(e){setError(e.message);}
+                    }))))), error && h("p",{role:"alert",style:{color:T.red}},error)));
+    }
+
     function nativeAccountBalance(account, transactions, payments) {
         let balance = Number(account?.startBalance) || 0;
+        for (const row of account?.portfolioEntries || []) balance += portfolioCash(row);
         payments.forEach(payment => {
             if (payment.accountId === account.id) balance += Number(payment.amount) || 0;
             paymentAllocationRows(payment).filter(a => a.role === "pass_through" && a.settled && (a.settledAccountId || payment.accountId) === account.id).forEach(a => balance -= Number(a.amount) || 0);
@@ -1765,7 +1937,7 @@ try {
                 React.createElement(Stat, { label: "ค่าธรรมเนียมโอน", value: moneyIn(funding.fees), color: T.red })),
 
             Object.entries(funding.platforms).map(([name, flow]) => React.createElement("div", { key: name, className: "flex items-center justify-between gap-2 mt-3 text-xs" }, React.createElement("span", null, name), React.createElement("span", { className: "font-bold" }, `เติม ${moneyIn(flow.added)} · ถอน ${moneyIn(flow.withdrawn)}`))),
-            React.createElement("p", { className: "text-[10px] leading-relaxed mt-3", style: { color: T.muted } }, "เวอร์ชัน 1 ติดตามยอดโอนเข้า–ออก ไม่หักการซื้อหุ้น/คริปโต จึงยังไม่ใช่เงินสดคงเหลือจริงหรือมูลค่าพอร์ต ไม่รวมกำไร–ขาดทุน ยอดบาทใช้เรท ณ วันโอน ไม่ใช่เรทปัจจุบัน"),
+            React.createElement("p", { className: "text-[10px] leading-relaxed mt-3", style: { color: T.muted } }, "ยอดบัญชีด้านบนเป็นเงินสดตามรายการที่บันทึก ส่วนแผนรายเดือนวัดจากยอดเติมสุทธิ ดูสินทรัพย์และ Statement แยกได้ในพอร์ตของแต่ละบัญชี"),
             React.createElement(InvestmentPlans, { key: month, plans: investmentPlans, setPlans: setInvestmentPlans, accounts, transactions, month }),
             !investmentAccounts.length && React.createElement("p", { className: "text-xs mt-2", style: { color: T.sub } }, "เริ่มด้วยบัญชี Binance TH (THB) หรือ Dime US (USD) แล้วเลือกประเภทเงินลงทุน"),
             React.createElement("button", { onClick: onTransfer, className: "w-full py-3 rounded-xl font-bold text-sm mt-3", style: { background: T.purple, color: "#fff" } }, "โอน / เติม / ถอนเงินลงทุน"));
@@ -8405,35 +8577,35 @@ try {
                 const color = transfer ? TRANSFER_COLOR : row.dir === "in" ? T.green : T.orange;
                 const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
                 const flow = transfer ? investmentDirection(t, accounts) : "none";
+                const contentInset = 23; // 16px direction icon plus the 7px gap beside it.
                 const heading = transfer ? (["invest","withdraw"].includes(t.transferPurpose) ? "โอนย้ายบัญชี" : TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี") : row.title;
                 return React.createElement("button", { key: row.id, type: "button", ...dnd.itemProps(index),
                     "aria-label": `ดูรายการ ${row.title}`, title: "แตะเพื่อดูรายละเอียด · กดค้างเพื่อลาก",
                     onContextMenu: e => e.preventDefault(),
                     onClick: e => { if (dnd.suppressClick()) { e.preventDefault(); return; } onOpen(row); },
                     style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", margin: 0, padding: "11px 11px", borderRadius: 0, background: active || armed ? hex(T.blue,.06) : T.surf, color: T.text, overflow: "hidden", border: "none", borderTop: index ? `1px solid ${T.border}` : "none", outline: active || armed ? `1px solid ${T.blue}` : "none", outlineOffset: -1 } },
-                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
-                        React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 16, style: { color, flexShrink: 0 } }),
-                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 } },
-                            React.createElement("span", { title: heading, style: { fontSize: transfer ? 14 : 15, fontWeight: 750, lineHeight: 1.45, flex: transfer ? "0 0 auto" : "0 1 auto", maxWidth: transfer ? "44%" : undefined, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, heading),
-                            transfer ? React.createElement("span", { "data-transfer-route": true, style: { display: "flex", alignItems: "center", gap: 3, flex: "1 1 auto", minWidth: 0 } },
+                    React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 } },
+                        React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 16, style: { color, flexShrink: 0, marginTop: 2 } }),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", flexWrap: transfer ? "wrap" : "nowrap", columnGap: 6, rowGap: 2, flex: 1, minWidth: 0 } },
+                            React.createElement("span", { title: heading, style: { fontSize: transfer ? 14 : 15, fontWeight: 750, lineHeight: 1.45, flex: transfer ? "0 0 auto" : "0 1 auto", maxWidth: transfer ? "100%" : undefined, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, heading),
+                            transfer ? React.createElement("span", { "data-transfer-route": true, style: { display: "flex", alignItems: "center", gap: 3, flex: "0 1 auto", maxWidth: "100%", minWidth: 0 } },
                                 React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: from, accounts, compact: "tiny" })),
                                 React.createElement("span", { style: { color: T.muted, fontSize: 10, flexShrink: 0 } }, "→"),
                                 React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: to, accounts, compact: "tiny" }))) :
-                                React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts, compact: true }))),
-                        React.createElement(ChevronRight, { size: 13, style: { color: T.muted, flexShrink: 0 } })),
-                    flow !== "none" && React.createElement("div", { "data-investment-flow": flow, style: { color: T.blue, fontSize: 11, fontWeight: 600, paddingLeft: 23, marginTop: 2, lineHeight: 1.5 } }, INVESTMENT_FLOWS[flow]),
+                                React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts, compact: "tiny" }))),
+                        flow !== "none" && React.createElement("span", { "data-investment-flow": flow, style: { marginLeft: "auto", flexShrink: 0, color: T.blue, fontSize: "clamp(9px, 2.35vw, 10.5px)", fontWeight: 650, lineHeight: "20px", whiteSpace: "nowrap", textAlign: "right" } }, INVESTMENT_FLOWS[flow])),
                     transfer ? React.createElement(React.Fragment, null,
                         React.createElement(StatementMoney, { fontSize: 15 },
                             React.createElement("span", { style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
                             React.createElement("span", { style: { color: T.muted } }, "→"),
                             React.createElement("span", { style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`))) :
-                        React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 4, paddingLeft: 23, minWidth: 0 } },
+                        React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 4, paddingLeft: contentInset, minWidth: 0 } },
                             React.createElement("span", { style: { color: T.sub, fontSize: 13, lineHeight: 1.5, flex: "0 1 auto", maxWidth: "42%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag !== row.title ? row.tag || "อื่นๆ" : ""),
                             React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`))),
-                    transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
-                    !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
-                    !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
-                    !transfer && row.detailSummary && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.detailSummary));
+                    transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, paddingLeft: contentInset, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
+                    !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, paddingLeft: contentInset, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
+                    !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, paddingLeft: contentInset, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
+                    !transfer && row.detailSummary && React.createElement("div", { style: { fontSize: 10, color: T.muted, paddingLeft: contentInset, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.detailSummary));
             })));
     }
     function TransactionRows({ rows, accounts, onOpen, onReorder }) {
@@ -8482,6 +8654,8 @@ try {
         catch { } };
         const [mode, setMode] = useState("total");
         const [budgetView, setBudgetView] = useState("overview");
+        const [portfolioId, setPortfolioId] = useState(null);
+        const selectedPortfolio = accounts.find(a => a.id === portfolioId && a.portfolioEnabled);
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
         const [mk, setMk] = useState(monthKey(TK));
@@ -8688,6 +8862,7 @@ try {
             if (!accountId)
                 return 0;
             let count = accounts.filter(a => a.parentAccountId === accountId).length;
+            count += accounts.find(a => a.id === accountId)?.portfolioEntries?.length || 0;
             payments.forEach(payment => {
                 if (payment.accountId === accountId) count += 1;
                 paymentAllocationRows(payment).filter(allocation => allocation.role === "pass_through" && allocation.settled && allocation.settledAccountId === accountId).forEach(() => count += 1);
@@ -8883,6 +9058,7 @@ try {
             })),
             sub === "summary" && React.createElement("nav", { "aria-label": "ส่วนของภาพรวมบัญชี", className: "flex gap-1", style: { order: -2, borderBottom: `1px solid ${T.border}` } }, [["overview","สรุปเดือน"],["accounts","บัญชี"],["investment","ลงทุน"],["reports","รายงาน"]].map(([id,label]) => React.createElement("button", { key: id, "aria-current": budgetView === id ? "page" : undefined, onClick: () => { setBudgetView(id); if (id === "accounts") setShowAccounts(true); }, className: "flex-1 text-xs font-bold py-3", style: { color: budgetView === id ? T.purple : T.muted, borderBottom: `2px solid ${budgetView === id ? T.purple : "transparent"}` } }, label))),
             sub === "summary" && budgetView === "overview" && React.createElement("div", { className: "flex items-center justify-between gap-2", style: { order: -1 } }, React.createElement("button", { "aria-label": "เดือนก่อนหน้า", onClick: () => setMk(value => addMonthKey(value,-1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronLeft,{size:18})), React.createElement("input", { type: "month", "aria-label": "เดือนภาพรวมบัญชี", value: mk, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setMk(e.target.value); } }, style: { padding: "8px 10px", maxWidth: 170, borderRadius: 10, background: T.surf, color: T.text, border: `1px solid ${T.border}`, fontSize: 13 } }), React.createElement("button", { "aria-label": "เดือนถัดไป", onClick: () => setMk(value => addMonthKey(value,1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronRight,{size:18}))),
+            sub === "summary" && budgetView === "investment" && React.createElement(Glass,{className:"p-4"},React.createElement("div",{className:"font-bold text-sm"},"พอร์ตลงทุน"),accounts.some(a=>a.portfolioEnabled) ? React.createElement("div",{className:"flex flex-wrap gap-2 mt-2"},accounts.filter(a=>a.portfolioEnabled).map(a=>React.createElement("button",{key:a.id,onClick:()=>setPortfolioId(a.id),className:"px-3 py-2 rounded-xl font-bold text-xs",style:{background:T.surf2,color:T.purple}},accountLabel(a,accounts)))) : React.createElement("button",{onClick:()=>{setBudgetView("accounts");setShowAccounts(true);},className:"text-xs py-2",style:{color:T.purple}},"ไปที่บัญชี แล้วติ๊กเปิดพอร์ตลงทุนในการแก้ไขบัญชี")),
             sub === "summary" && budgetView === "investment" && React.createElement(InvestmentOverview, { accounts, transactions, payments, month: mk, setMonth: setMk, investmentPlans, setInvestmentPlans, onAddAccount: () => setEditAcc({ id: null, name: "", startBalance: 0, accountType: "investment", currency: "THB", spendable: false }), onTransfer: () => { setTxnKind("transfer"); setTxnOpen(true); } }),
             sub === "due" && React.createElement("div", { className: "flex items-center gap-2" }, React.createElement(FinanceSelect, { label: "ช่วงเวลาค้างรับ", value: mode, options: { total: "ทุกช่วงเวลา", month: "เดือนที่เลือก" }, onChange: setMode }), mode === "month" && React.createElement("input", { "aria-label": "เดือนค้างรับ", type: "month", value: mk, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, style: { padding: 10, borderRadius: 12, background: T.surf, color: T.text, minWidth: 0, maxWidth: "50%" } })),
             sub === "transactions" && React.createElement("div", { className: "flex gap-1.5 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } }, [["all", "รายการทั้งหมด"], ["fixed", "ค่าใช้จ่ายประจำ"]].map(([key, label]) => React.createElement("button", { key, onClick: () => setTransactionSection(key), className: "flex-1 py-2.5 rounded-xl text-xs font-bold active:scale-[.98]", style: { minHeight: 42, background: transactionSection === key ? T.purple : "transparent", color: transactionSection === key ? "#fff" : T.sub, boxShadow: transactionSection === key ? "0 5px 14px rgba(173,95,68,.22)" : "none", transition: "all .18s ease" } }, label))),
@@ -9132,7 +9308,8 @@ try {
                                             React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.blue } }, `${a.platform || ACCOUNT_TYPES[a.accountType || "bank"]} · ${accountCurrency(a)} · ${isSpendableAccount(a) ? "เงินใช้ได้" : "แยกจากเงินใช้ได้"}`),
                                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } },
                                                 "ยอดเริ่มต้น ",
-                                                moneyIn(a.startBalance, accountCurrency(a)))),
+                                                moneyIn(a.startBalance, accountCurrency(a))),
+                                            a.portfolioEnabled && React.createElement("button",{onClick:()=>setPortfolioId(a.id),className:"mt-1 text-xs px-2 py-1 rounded-lg font-bold",style:{background:T.surf2,color:T.purple}},"เปิดพอร์ตลงทุน")),
                                         React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: bal >= 0 ? T.text : T.red } }, moneyIn(bal, accountCurrency(a))),
                                         !accountParent(a, accounts) && !a.archived && React.createElement("button", { onClick: () => setEditAcc({ id: null, name: "", startBalance: 0, parentAccountId: a.id, platform: a.platform || a.name, accountType: "investment", currency: "USD", spendable: false }), "aria-label": `เพิ่มบัญชีย่อยของ ${a.name}`, className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.purple, background: hex(T.purple, .1) } }, React.createElement(Plus, { size: 15 })),
                                         React.createElement("button", { onClick: () => setEditAcc(a), "aria-label": "\u0E41\u0E01\u0E49\u0E44\u0E02\u0E1A\u0E31\u0E0D\u0E0A\u0E35", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.blue } },
@@ -9550,11 +9727,14 @@ try {
                     setFixedCosts(fs => fs.map(x => x.id === payFc.id ? { ...x, lastAccountId: accId, fixedCostTrackingVersion: 2 } : x));
                     setPayFc(null);
                 } }),
+            selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id, account:selectedPortfolio, accounts, transactions, payments, setAccounts, onClose:()=>setPortfolioId(null) }),
             editAcc && (React.createElement(Sheet, { onClose: () => setEditAcc(null), title: editAcc.id ? "แก้ไขบัญชี" : "เพิ่มบัญชี" },
                 React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D\u0E1A\u0E31\u0E0D\u0E0A\u0E35", value: editAcc.name, onChange: v => setEditAcc({ ...editAcc, name: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E01\u0E2A\u0E34\u0E01\u0E23\u0E44\u0E17\u0E22, \u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14" }),
                 React.createElement(FinanceSelect, { label: "อยู่ใต้บัญชีหลัก", value: editAcc.parentAccountId || "", disabled: accounts.some(a => a.parentAccountId === editAcc.id), options: { "": "ไม่มี · เป็นบัญชีหลัก", ...Object.fromEntries(accounts.filter(a => a.id !== editAcc.id && !a.parentAccountId && !a.archived).map(a => [a.id, a.name])), ...(editAcc.parentAccountId && !accounts.some(a => a.id === editAcc.parentAccountId && !a.archived) ? { [editAcc.parentAccountId]: accounts.find(a => a.id === editAcc.parentAccountId)?.name || "บัญชีหลักเดิม" } : {}) }, onChange: v => { const parent = accounts.find(a => a.id === v); setEditAcc({ ...editAcc, parentAccountId: v || null, platform: editAcc.platform || parent?.platform || parent?.name || "" }); } }),
                 React.createElement("p", { className: "text-[10px] mb-3 leading-relaxed", style: { color: T.muted } }, "เลือกบัญชีหลักเพื่อจัดเป็นบัญชีย่อย ยอดเงินและประวัติยังเป็นของบัญชีนี้ บัญชีหลักเก็บเฉพาะเงินของตัวเอง ไม่ต้องบวกยอดลูกเข้าไปอีก"),
                 React.createElement(FinanceSelect, { label: "ประเภทบัญชี", value: editAcc.accountType || "bank", options: ACCOUNT_TYPES, onChange: v => setEditAcc({ ...editAcc, accountType: v, spendable: !["investment", "broker"].includes(v) }) }),
+                React.createElement("label",{className:"flex items-center gap-3 mb-3 text-sm font-bold"},React.createElement("input",{type:"checkbox",checked:!!editAcc.portfolioEnabled,onChange:e=>setEditAcc({...editAcc,portfolioEnabled:e.target.checked})}),"เปิดใช้พอร์ตลงทุนสำหรับบัญชีนี้"),
+                editAcc.portfolioEnabled && React.createElement(FinanceSelect,{label:"วิธีติดตามพอร์ต",value:editAcc.portfolioMode || "assets",options:{assets:"รายสินทรัพย์ · ซื้อขายและติดตามต้นทุน",summary:"ยอดรวม · กรอกมูลค่าจากแอปเป็นครั้งคราว"},onChange:v=>setEditAcc({...editAcc,portfolioMode:v})}),
                 React.createElement(AccountColorPicker, { account: editAcc, onChange: backgroundColor => setEditAcc({ ...editAcc, backgroundColor }) }),
                 React.createElement(Input, { label: "กลุ่มแพลตฟอร์ม (เพิ่ม / เปลี่ยนชื่อได้)", value: editAcc.platform || "", onChange: v => setEditAcc({ ...editAcc, platform: v }), placeholder: "เช่น Dime, Binance TH, KBank" }),
                 React.createElement(FinanceSelect, { label: "สกุลเงิน · บัญชีมีประวัติแล้วเปลี่ยนไม่ได้", value: accountCurrency(editAcc), options: { THB: "THB · บาท", USD: "USD · ดอลลาร์สหรัฐ" }, disabled: !!editAcc.id && accountUsageCount(editAcc.id) > 0, onChange: v => setEditAcc({ ...editAcc, currency: v }) }),
