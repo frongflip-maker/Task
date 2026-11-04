@@ -401,7 +401,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-usd-remittance-v31";
+window.__TASKROUTINE_BUILD__="2026-11-04-sell-all-v32";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1944,6 +1944,31 @@ try {
             portfolioBook(next); // Reject oversells, including those caused by changing an earlier entry.
             setAccounts(list => list.map(a => a.id === account.id ? {...a,portfolioEntries:next} : a));
         }
+        function sellAvailable(index) {
+            const row=rows[index], symbol=String(row.symbol || "").trim().toUpperCase();
+            const cutoff=date+"T"+(row.eventTime || "12:00");
+            let held=0, available=0;
+            const timeline=entries.filter(entry=>entry.id!==editing && entry.symbol===symbol)
+                .sort((a,b)=>a.date.localeCompare(b.date) || (a.eventTime||"12:00").localeCompare(b.eventTime||"12:00"));
+            for(const entry of timeline){
+                const assetFee=entry.feeUnit==="asset" ? Number(entry.fee)||0 : 0;
+                const delta=entry.type==="sell" ? -Number(entry.units)-assetFee
+                    : ["buy","opening"].includes(entry.type) ? Number(entry.units)-assetFee : 0;
+                if(entry.date+"T"+(entry.eventTime || "12:00")<=cutoff)held+=delta;
+            }
+            available=held;
+            for(const entry of timeline){
+                if(entry.date+"T"+(entry.eventTime || "12:00")<=cutoff)continue;
+                const assetFee=entry.feeUnit==="asset" ? Number(entry.fee)||0 : 0;
+                if(entry.type==="sell")held-=Number(entry.units)+assetFee;
+                if(["buy","opening"].includes(entry.type))held+=Number(entry.units)-assetFee;
+                available=Math.min(available,held);
+            }
+            const reserved=rows.reduce((sum,item,i)=>i!==index && String(item.symbol || "").trim().toUpperCase()===symbol
+                ? sum+(Number(item.units)||0)+(item.tradeMode!=="crypto" && item.feeUnit==="asset" ? Number(item.fee)||0 : 0) : sum,0);
+            const fee=!isCrypto(row,type) && row.feeUnit==="asset" ? Number(row.fee)||0 : 0;
+            return Math.max(0,available-reserved-fee);
+        }
         function save() {
             try {
                 if (!/^\d{4}-\d\d-\d\d$/.test(date) || date > dkey(new Date())) throw new Error("เลือกวันที่ทำรายการที่ไม่เกินวันนี้");
@@ -2046,12 +2071,17 @@ try {
                     rows.length>1 && group(text("รายการที่ "+(i+1)),button("เอาออก",()=>setRows(rows.filter(x=>x.id!==r.id)))),
                     isTrade(type) && h(FinanceSelect,{label:"วิธีบันทึก",value:r.tradeMode,options:{stock:"ซื้อขายทั่วไป · ระบุค่าธรรมเนียม",crypto:"คริปโต · คำนวณจากอัตรา ไม่มีค่าธรรมเนียม"},onChange:v=>{setRows(list=>list.map((item,j)=>j===i ? {...item,tradeMode:v,budget:item.budget || item.amount || ""} : item));setError("");}}),
                     ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : isCrypto(r,type) ? "สัญลักษณ์เหรียญ" : "หุ้น / ETF / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น BTC หรือ SCHG"}),
+                    type==="sell" && holdings.length>0 && h("div",{className:"flex flex-wrap gap-2","aria-label":"เลือกสินทรัพย์ที่ถืออยู่"},
+                        ...holdings.map(position=>h("button",{key:position.symbol,type:"button",className:"si-link","aria-pressed":String(r.symbol).trim().toUpperCase()===position.symbol,onClick:()=>change(i,"symbol",position.symbol)},position.symbol))),
                     isCrypto(r,type) && h(React.Fragment,null,
                         type==="buy" && field(i,"budget","งบต่อรอบ ("+currency+")"),
                         field(i,"units",type==="buy" ? "จำนวนเหรียญที่ได้รับจริง" : "จำนวนเหรียญที่ขาย"),
                         field(i,"rate","อัตรา · 1 "+(r.symbol || "เหรียญ")+" เท่ากับกี่ "+currency),
                         preview(r)),
                     !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
+                    type==="sell" && h("div",{className:"pf-pair"},
+                        text(r.symbol ? "ขายได้ "+quantity(sellAvailable(i))+" หน่วย" : "เลือกหุ้นหรือเหรียญก่อน"),
+                        h("button",{type:"button",className:"si-link",disabled:!r.symbol || sellAvailable(i)<=0,"aria-label":"ขายทั้งหมด รายการที่ "+(i+1),onClick:()=>change(i,"units",String(sellAvailable(i)))},"ขายทั้งหมด")),
                     isTrade(type) && !isCrypto(r,type) && field(i,"unitPrice",(type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย")+" ("+currency+")"),
                     !isCrypto(r,type) && field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
                     isTrade(type) && !isCrypto(r,type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
