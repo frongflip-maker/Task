@@ -370,6 +370,23 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 .finance-panel button:focus-visible{outline:2px solid #AD5F44;outline-offset:3px}
 .finance-panel details[open] summary{color:#AD5F44}
 @media(max-width:380px){.finance-panel{padding:14px!important}.finance-panel .text-base{font-size:14px}}
+
+.pf-stack,.pf-fields,.pf-entry{display:grid;gap:16px;min-width:0}
+.pf-stack button{min-height:40px}
+.pf-stack small{font-size:12px}
+.pf-tabs,.pf-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pf-tabs{padding-bottom:14px;border-bottom:1px solid #b8aa932e}
+.pf-total,.pf-receipt,.pf-fields{border:1px solid #b8aa934d;border-radius:14px;padding:15px}
+.pf-total,.pf-receipt{background:#a78a6010;display:grid;gap:9px}
+.pf-total>b{font-size:clamp(21px,5vw,29px);line-height:1.25;margin-bottom:7px;overflow-wrap:anywhere}
+.pf-pair{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px}
+.pf-pair>span{opacity:.75}.pf-pair>strong{text-align:right;overflow-wrap:anywhere;min-width:0;font-variant-numeric:tabular-nums}
+.pf-stack details{padding:10px 0;border-block:1px solid #b8aa9333}.pf-stack summary{cursor:pointer;font-size:13px;font-weight:650;padding:4px 0}
+.pf-stack details[open]>summary{margin-bottom:12px}.pf-stack details .pf-pair+.pf-pair{margin-top:8px}
+.pf-entry{gap:9px;border-top:1px solid #b8aa934d;padding:16px 0 4px}
+.pf-stack .my-3,.pf-stack .mb-3{margin-block:0}
+.pf-form>.flex:last-child{display:grid;grid-template-columns:1fr 2fr;padding-top:12px;border-top:1px solid #b8aa934d;gap:10px}
+.pf-form>button{justify-self:start;border:1px dashed #b8aa9388}
 </style>
 </head>
 <body>
@@ -1717,7 +1734,12 @@ try {
         const detailedMoney = new Intl.NumberFormat("th-TH",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:8});
         const money = n => detailedMoney.format(n);
         const quantity = n => Number(n).toLocaleString("en-US",{maximumFractionDigits:16});
-        const fresh = () => ({ id: uid(), symbol:"", units:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
+        const cryptoDefault = /binance/i.test([account.name,account.platform,accountLabel(account,accounts)].join(" "));
+        const isTrade = k => k === "buy" || k === "sell";
+        const isCrypto = (r,k) => isTrade(k) && r.tradeMode === "crypto";
+        const decimalCash = value => Number(value.toFixed(8));
+        const cryptoValue = r => decimalCash(Number(r.units) * Number(r.rate));
+        const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
         const [tab,setTab] = useState("assets"), [type,setType] = useState("");
         const [rows,setRows] = useState([]), [date,setDate] = useState(TK), [error,setError] = useState("");
         const [editing,setEditing] = useState(null), [year,setYear] = useState("all");
@@ -1726,7 +1748,7 @@ try {
         const cost = holdings.every(p => p.cost !== null) ? holdings.reduce((sum,p) => sum + p.cost,0) : null;
         function begin(kind, old, reuse = false) {
             setType(kind); setEditing(old && !reuse ? old.id : null); setDate(old && !reuse ? old.date : TK);
-            setRows([{ ...fresh(), ...(old || {}), id: old && !reuse ? old.id : uid(), amount: old?.amount ?? "" }]);
+            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), amount: old?.amount ?? "" }]);
             setError(""); setConfirmDelete(null);
         }
         function finish() { setType(""); setEditing(null); setError(""); }
@@ -1752,9 +1774,23 @@ try {
                         result.symbol = String(row.symbol || "").trim().toUpperCase();
                         if (!result.symbol && type !== "dividend") throw new Error("กรอกชื่อหุ้นหรือเหรียญ");
                     }
+                    if (isCrypto(row,type)) {
+                        result.tradeMode = "crypto";
+                        result.rate = numeric(row.rate,"ราคาต่อเหรียญ");
+                        result.units = numeric(row.units,"จำนวนเหรียญ");
+                        result.amount = numeric(cryptoValue(row),"ยอดตามอัตราแลกเปลี่ยน");
+                        result.fee = 0;
+                        result.feeUnit = "cash";
+                        if (type === "buy") {
+                            result.budget = numeric(row.budget,"งบต่อรอบ");
+                            if (result.amount > result.budget) throw new Error("ยอดซื้อจริงสูงกว่างบต่อรอบ กรุณาตรวจจำนวนเหรียญและอัตรา");
+                        }
+                        return result;
+                    }
                     result.amount = type === "opening" && (row.amount === "" || row.amount == null) ? null : numeric(row.amount,"จำนวนเงิน",["opening","cash","snapshot","quote"].includes(type));
                     if (["buy","sell","opening"].includes(type)) result.units = numeric(row.units,"จำนวนหน่วย");
                     if (["buy","sell"].includes(type)) {
+                        result.tradeMode = "stock";
                         result.fee = numeric(row.fee || 0,"ค่าธรรมเนียม",true); result.feeUnit = row.feeUnit;
                         if (result.feeUnit === "asset" && type === "buy" && result.fee >= result.units) throw new Error("ค่าธรรมเนียมต้องน้อยกว่าจำนวนหน่วยที่ซื้อ");
                         if (result.feeUnit === "cash" && type === "sell" && result.fee > result.amount) throw new Error("ค่าธรรมเนียมเกินยอดขาย");
@@ -1796,37 +1832,49 @@ try {
             if (r.type === "opening") return quantity(r.units)+" หน่วย · ต้นทุน "+(r.amount === null ? "ยังไม่ระบุ" : money(r.amount));
             return quantity(r.units)+" หน่วย · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
         }
-        const draftSpend = type === "buy" ? rows.reduce((sum,r)=>sum+Number(r.amount || 0)+(r.feeUnit==="asset" ? 0 : Number(r.fee || 0)),0) : 0;
+        const preview = r => {
+            const value = cryptoValue(r);
+            const ready = Number.isFinite(value) && Number(r.rate)>0 && Number(r.units)>0;
+            return h("div",{className:"pf-receipt"},pair(type==="buy" ? "ต้นทุนที่ใช้ซื้อ" : "ยอดขาย",ready ? money(value) : "—"),
+                type==="buy" && pair("เงินเหลือจากงบรอบนี้",ready && Number(r.budget)>0 ? money(decimalCash(Number(r.budget)-value)) : "—"));
+        };
+        const pair = (label,value) => h("div",{className:"pf-pair"},h("span",null,label),h("strong",null,value));
+        const draftSpend = type === "buy" ? rows.reduce((sum,r)=>sum+(isCrypto(r,type) ? cryptoValue(r) : Number(r.amount || 0)+(r.feeUnit==="asset" ? 0 : Number(r.fee || 0))),0) : 0;
         return h(Sheet,{title:type ? portfolioTypes[type]+" · "+account.name : "พอร์ตลงทุน · "+account.name,onClose:type ? finish : onClose},
-            type ? h(React.Fragment,null,
+            type ? h("div",{className:"pf-stack pf-form"},
                 h(Input,{label:"วันที่",type:"date",value:date,onChange:setDate}),
-                rows.map((r,i)=>h("div",{key:r.id,className:"p-3 rounded-xl mb-3",style:{background:T.surf2}},
+                rows.map((r,i)=>h("div",{key:r.id,className:"pf-fields"},
                     rows.length>1 && group(text("รายการที่ "+(i+1)),button("เอาออก",()=>setRows(rows.filter(x=>x.id!==r.id)))),
-                    ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : "หุ้น / ETF / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น BTC หรือ SCHG"}),
-                    ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
-                    field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
-                    ["buy","sell"].includes(type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
+                    isTrade(type) && h(FinanceSelect,{label:"วิธีบันทึก",value:r.tradeMode,options:{stock:"ซื้อขายทั่วไป · ระบุค่าธรรมเนียม",crypto:"คริปโต · คำนวณจากอัตรา ไม่มีค่าธรรมเนียม"},onChange:v=>{setRows(list=>list.map((item,j)=>j===i ? {...item,tradeMode:v,budget:item.budget || item.amount || ""} : item));setError("");}}),
+                    ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : isCrypto(r,type) ? "สัญลักษณ์เหรียญ" : "หุ้น / ETF / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น BTC หรือ SCHG"}),
+                    isCrypto(r,type) && h(React.Fragment,null,
+                        type==="buy" && field(i,"budget","งบต่อรอบ ("+currency+")"),
+                        field(i,"units",type==="buy" ? "จำนวนเหรียญที่ได้รับจริง" : "จำนวนเหรียญที่ขาย"),
+                        field(i,"rate","อัตรา · 1 "+(r.symbol || "เหรียญ")+" เท่ากับกี่ "+currency),
+                        preview(r)),
+                    !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
+                    !isCrypto(r,type) && field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
+                    isTrade(type) && !isCrypto(r,type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
                     ["interest","dividend"].includes(type) && h(React.Fragment,null,field(i,"tax","ภาษีหัก ณ ที่จ่าย ("+currency+")"),text("รับสุทธิ "+money(Number(r.amount)-Number(r.tax)))),
                     type==="cash" && text("ระบบปรับเฉพาะส่วนต่างจากเงินสดที่บันทึกไว้ถึงวันนั้น เพื่อให้ยอดตรงกับโบรกเกอร์"))),
-                type==="buy" && text("รวมเงินซื้อและค่าธรรมเนียม "+money(draftSpend)+(editing ? "" : " · เงินสดหลังบันทึก "+money(cash-draftSpend))),
+                type==="buy" && h("div",{className:"pf-receipt"},pair("เงินสดที่ใช้รวม",money(draftSpend)),pair("เงินสดในบัญชีหลังบันทึก",money(decimalCash(cash-draftSpend-(editing ? portfolioCash(entries.find(r=>r.id===editing) || {}) : 0)))) ),
                 type==="buy" && !editing && draftSpend > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
                 type==="buy" && !editing && button("+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows([...rows,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
-            : h(React.Fragment,null,
-                text(accountLabel(account,accounts)+" · "+currency),
-                group(button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history")),
+            : h("div",{className:"pf-stack"},
+                h("div",{className:"pf-tabs"},button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history")),
                 tab==="assets" ? h(React.Fragment,null,
                     totalOnly ? h(React.Fragment,null,numbers(stat("มูลค่าล่าสุด",latest ? money(latest.amount) : "—"),stat("วันที่อัปเดต",latest?.date || "—")),
                     first && latest && first.id!==latest.id && text("ผลต่างจากยอดครั้งแรก หลังหักโอนสุทธิ "+money(latest.amount-first.amount-fundingSince))) :
-                    h(React.Fragment,null,numbers(stat("เงินสด",money(cash)),stat("มูลค่าสินทรัพย์",balances===null ? "รอราคาประเมิน" : money(balances)),stat("มูลค่ารวม",balances===null ? "รอราคาประเมิน" : money(cash+balances)),stat("กำไรขายแล้ว",book.profit===null ? "ต้นทุนไม่ครบ" : money(book.profit))),
-                    text("กำไรที่ยังไม่ขาย "+(cost===null || balances===null ? "รอต้นทุนและราคาประเมิน" : money(balances-cost))),
+                    h(React.Fragment,null,h("section",{className:"pf-total"},h("small",null,"มูลค่าพอร์ต · "+currency),h("b",null,balances===null ? "รอราคาประเมิน" : money(cash+balances)),pair("เงินสด",money(cash)),pair("มูลค่าสินทรัพย์",balances===null ? "รอราคาประเมิน" : money(balances))),
+                    h("details",null,h("summary",null,"กำไร / ขาดทุน"),pair("ขายแล้ว",book.profit===null ? "ต้นทุนไม่ครบ" : money(book.profit)),pair("ยังไม่ขาย",cost===null || balances===null ? "รอต้นทุนและราคา" : money(balances-cost))),
                     holdings.map(p=>h("div",{key:p.symbol,className:"py-3",style:{borderBottom:"1px solid "+T.border}},h("strong",null,p.symbol+" · "+quantity(p.units)+" หน่วย"),text("ต้นทุนเฉลี่ย "+(p.cost===null ? "ยังไม่ระบุ" : money(p.cost/p.units))+" / หน่วย"),text(p.quote ? "ราคา "+money(p.quote.amount)+" · "+p.quote.date+" · มูลค่า "+money(p.units*p.quote.amount) : "ยังไม่ได้ระบุราคาประเมิน")))),
                     !totalOnly && !holdings.length && text("เริ่มจากบันทึกซื้อ หรือเลือกสินทรัพย์ตั้งต้นสำหรับหุ้นและเหรียญที่มีอยู่แล้ว"),
-                    !account.archived && group(...types.map(k=>button(portfolioTypes[k],()=>begin(k),k==="buy" || k==="snapshot"))))
+                    !account.archived && h("div",{className:"pf-stack"},h("div",{className:"pf-actions"},...types.filter(k=>["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k),k!=="sell"))),h("details",null,h("summary",null,"รายได้และการจัดการพอร์ต"),h("div",{className:"pf-actions"},...types.filter(k=>!["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k)))))))
                 : h(React.Fragment,null,h(FinanceSelect,{label:"ปีของ Statement พอร์ต",value:year,onChange:setYear,options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,y])])}),
-                    numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะบัญชีและปีที่เลือก"),
+                    income.length>0 && h("section",{className:"pf-stack"},numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะปีที่เลือก")),
                     !history.length && text("ยังไม่มีรายการภายในพอร์ต"),
-                    history.map(r=>h("div",{key:r.id,className:"py-3",style:{borderBottom:"1px solid "+T.border}},text(r.date),h("strong",null,portfolioTypes[r.type]+(r.symbol ? " · "+r.symbol : "")),text(description(r)),
+                    history.map(r=>h("div",{key:r.id,className:"pf-entry"},text(r.date),h("strong",null,portfolioTypes[r.type]+(r.symbol ? " · "+r.symbol : "")),isCrypto(r,r.type) ? h("div",{className:"pf-receipt"},pair("จำนวนเหรียญ",quantity(r.units)+" "+r.symbol),pair("ราคา 1 "+r.symbol,money(r.rate)),r.type==="buy" && pair("งบต่อรอบ",money(r.budget)),pair(r.type==="buy" ? "ต้นทุนที่ใช้ซื้อ" : "ยอดขาย",money(r.amount)),r.type==="buy" && pair("เงินเหลือจากงบ",money(decimalCash(r.budget-r.amount))),r.type==="sell" && pair("กำไรขาย",book.realized.get(r.id)==null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id)))) : text(description(r)),
                     !account.archived && group(button("แก้ไข",()=>begin(r.type,r)),r.type==="buy" && button("ซื้อซ้ำ",()=>begin("buy",r,true)),button(confirmDelete===r.id ? "ยืนยันลบ" : "ลบ",()=>{
                         if(confirmDelete!==r.id) {setConfirmDelete(r.id);return;}
                         try {commit(entries.filter(x=>x.id!==r.id));setConfirmDelete(null);setError("");} catch(e){setError(e.message);}
@@ -5579,8 +5627,8 @@ try {
             open && React.createElement(BookingModal, { bookings: bookings, events: events, onClose: () => setOpen(false), onSave: (b) => { if (addBooking(b) !== false) setOpen(false); } }),
             editBk && React.createElement(BookingModal, { bookings: bookings, events: events, initial: editBk, onClose: () => setEditBk(null), onSave: (b) => { if (editBooking(editBk.id, b) !== false) setEditBk(null); } }),
             redeemCustomer && React.createElement(BookingModal, { bookings: bookings, events: events, loyaltyCustomer: redeemCustomer, onClose: () => setRedeemCustomer(null), onSave: (booking) => { if (addBooking(booking) !== false) setRedeemCustomer(null); } }),
-            txnOpen && React.createElement(TxnModal, { studioMode: true, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, onClose: () => setTxnOpen(false), onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); } }),
-            editTxn && React.createElement(TxnModal, { initial: editTxn, studioMode: editTxn.kind === "out" && !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
+            txnOpen && React.createElement(TxnModal, { payments, studioMode: true, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, onClose: () => setTxnOpen(false), onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); } }),
+            editTxn && React.createElement(TxnModal, { payments, initial: editTxn, studioMode: editTxn.kind === "out" && !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
             editCustomer && React.createElement(CustomerProfileModal, { initial: editCustomer, onClose: () => setEditCustomer(null), onSave: profile => { updateCustomerProfile(editCustomer.customerId, profile); setEditCustomer(null); }, onDelete: () => { deleteCustomerProfile(editCustomer.customerId); setEditCustomer(null); } }),
             loyaltyEdit && React.createElement(LoyaltyAdjustModal, { group: loyaltyEdit, onClose: () => setLoyaltyEdit(null), onSave: remainingHours => { setLoyaltyRemaining(loyaltyEdit.customerId, remainingHours); setLoyaltyEdit(null); } }),
             loyaltyResetConfirm && React.createElement(LoyaltyResetConfirmModal, { group: loyaltyResetConfirm, onClose: () => setLoyaltyResetConfirm(null), onConfirm: () => { resetLoyalty(loyaltyResetConfirm.customerId); setLoyaltyResetConfirm(null); } }),
@@ -6040,6 +6088,7 @@ try {
               investmentFlow: initial.kind === "transfer" ? investmentDirection(initial, accounts) : "none",
               receivedAmount: duplicateMode ? "" : initial.receivedAmount ?? initial.amount ?? "",
               transferFee: duplicateMode ? "" : initial.transferFee || "",
+              fxCostOverride: duplicateMode ? "" : initial.fxCostOverride ?? "",
               sourceRateTHB: duplicateMode ? "" : initial.sourceRateTHB || "",
               sharedExpense: Number(initial.reimbursableAmount) > 0,
               personalAmount: initial.personalAmount ?? initial.amount ?? "",
@@ -6267,6 +6316,12 @@ try {
       const investmentFlow = f.investmentFlow || "none";
       const needsTHBRate = transferNeedsTHBRate(fromCurrency, toCurrency, transferFee, investmentFlow);
       const rates = transferRates(fromCurrency, toCurrency, Number(f.amount), receivedAmount, f.sourceRateTHB);
+      const sellingFX = isTransfer && fromCurrency !== "THB" && toCurrency === "THB";
+      const fxAuto = useMemo(()=>sellingFX ? fxCashBasis(accounts,transactions,payments,{
+        id:editMode ? initial.id : null, createdAt:editMode ? initial.createdAt : null, date:f.date,
+        fromAccountId:f.fromAccountId,amount:f.amount,transferFee}) : null,
+        [sellingFX,accounts,transactions,payments,editMode,initial,f.date,f.fromAccountId,f.amount,transferFee]);
+      const fxFigures = isTransfer ? exchangeFigures({...f,receivedAmount,transferFee},fromCurrency,toCurrency,f.fxCostOverride || fxAuto) : null;
       const extendedTransfer = investmentFlow !== "none" || transferPocket === "studio" || fromAcc?.pocketEnabled || toAcc?.pocketEnabled || fromCurrency !== "THB" || toCurrency !== "THB" || transferPurpose !== "general" || transferFee > 0 || isInvestmentAccount(fromAcc) || isInvestmentAccount(toAcc);
       const pocketRouting = !isTransfer && !!accounts.find(a=>a.id===f.accountId)?.pocketEnabled;
       useEffect(()=>{if(pocketRouting && transferOnward)setTransferOnward(false);},[pocketRouting,transferOnward]);
@@ -6430,6 +6485,7 @@ try {
           Number.isFinite(receivedAmount) && receivedAmount > 0 &&
           Number.isFinite(transferFee) && transferFee >= 0 &&
           (!needsTHBRate || (Number.isFinite(rates.sourceRate) && rates.sourceRate > 0)) &&
+          (!sellingFX || !f.fxCostOverride || (Number.isFinite(Number(f.fxCostOverride)) && Number(f.fxCostOverride)>0)) &&
           !!fromAcc && !!toAcc && purposeValid &&
           (!fromAcc.archived || editMode) && (!toAcc.archived || editMode) &&
           onwardValid
@@ -6965,14 +7021,14 @@ try {
                   accounts: accounts,
                   value: f.fromAccountId,
                   allowForeign: true, allowArchived: editMode,
-                  onChange: (v) => setF({ ...f, fromAccountId: v, receivedAmount: "", sourceRateTHB: "", transferPurpose: "general" }),
+                  onChange: (v) => setF({ ...f, fromAccountId: v, receivedAmount: "", sourceRateTHB: "", fxCostOverride:"", transferPurpose: "general" }),
                 }),
                 React.createElement(AccPicker, { transactions, payments,
                   label: "บัญชีเข้า",
                   accounts: accounts,
                   value: f.toAccountId,
                   allowForeign: true, allowArchived: editMode,
-                  onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", transferPurpose: "general" }),
+                  onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", fxCostOverride:"", transferPurpose: "general" }),
                   exclude: f.fromAccountId,
                 }),
                 React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนย้ายบัญชี", deposit: "ฝากเงิน", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
@@ -6992,9 +7048,11 @@ try {
                 React.createElement(Input, { label: `ค่าธรรมเนียมจ่ายเพิ่มจากต้นทาง (${fromCurrency})`, type: "number", value: f.transferFee ?? "", onChange: v => setF({ ...f, transferFee: v }), placeholder: "0" }),
                 React.createElement("div", { className: "p-3 rounded-xl mb-3 text-xs leading-relaxed", style: { background: hex(T.blue, .09), color: T.sub } },
                     `ต้นทางออก ${moneyIn((Number(f.amount) || 0) + (Number.isFinite(transferFee) ? transferFee : 0), fromCurrency)} → ปลายทางรับ ${moneyIn(receivedAmount, toCurrency)}`,
-                    crossCurrency && Number(f.amount) > 0 && receivedAmount > 0 ? ` · เรทจริง 1 ${fromCurrency} = ${(receivedAmount / Number(f.amount)).toFixed(6)} ${toCurrency}` : "",
+
                     rates.amountTHB > 0 ? ` · มูลค่าโอน ${moneyIn(rates.amountTHB)}` : "",
                     React.createElement("div", { className: "mt-1 text-[10px]" }, "กรอกยอดโอนหลังแยกค่าธรรมเนียมแล้ว ค่าธรรมเนียมช่องนี้หักเพิ่มจากต้นทางและลงรายจ่ายแยก หากรวมอยู่ในเรทแล้วอย่ากรอกซ้ำ")),
+                crossCurrency && React.createElement(ExchangeSummary,{figures:fxFigures,manual:!!f.fxCostOverride}),
+                sellingFX && React.createElement(Input,{label:`เรทต้นทุนที่ทราบ · บาทต่อ 1 ${fromCurrency} (กรอกแทนค่าเฉลี่ยได้)`,type:"number",value:f.fxCostOverride ?? "",placeholder:fxAuto ? String(Number(fxAuto.toFixed(6))) : "เว้นว่างได้",onChange:v=>setF({...f,fxCostOverride:v})}),
                 React.createElement(Input, {
                   label: "โน้ต (ไม่บังคับ)",
                   value: f.transferNote,
@@ -8107,7 +8165,7 @@ try {
                       amount: Number(f.amount) || 0,
                       date: f.date,
                       title: TRANSFER_PURPOSES[transferPurpose],
-                      transferPurpose, investmentFlow, receivedAmount,
+                      transferPurpose, investmentFlow, receivedAmount, fxCostOverride:sellingFX && Number(f.fxCostOverride)>0 ? Number(f.fxCostOverride) : null,
                       fromCurrency, toCurrency, transferFee, pocketOwner: transferPocket,
                       sourceRateTHB: rates.sourceRate > 0 ? rates.sourceRate : null, amountTHB: rates.sourceRate > 0 ? rates.amountTHB : null,
                       fromInvestment: isInvestmentAccount(fromAcc), toInvestment: isInvestmentAccount(toAcc),
@@ -8627,7 +8685,85 @@ try {
             draggable && React.createElement("div", { style: { fontSize: 10, color: T.muted, padding: "2px 0 5px" } }, "แตะดูรายละเอียด · กดค้างที่รายการเพื่อลากเรียงในวันเดียวกัน"),
             groups.map(group => React.createElement(StatementDayRows, { key: group.date, date: group.date, rows: group.rows, accounts, onOpen, onReorder })));
     }
-    function TransferDetail({ transaction: t, accounts }) {
+    // Carry the average THB cost of foreign cash between wallets. A missing cost stays unknown.
+    function fxCashBasis(accounts, transactions, payments, target) {
+        const wallets = new window.Map();
+        const activity = [];
+        for (const a of accounts) {
+            if (accountCurrency(a) === "THB") continue;
+            const units = Number(a.startBalance) || 0;
+            wallets.set(a.id,{units, cost:units === 0 ? 0 : null});
+            for (const r of a.portfolioEntries || []) {
+                const delta = portfolioCash(r);
+                if (delta) activity.push({date:r.date, wallet:a.id, delta});
+            }
+        }
+        for (const p of payments || []) if (wallets.has(p.accountId))
+            activity.push({date:p.date,wallet:p.accountId,delta:Number(p.amount)||0});
+        for (const t of transactions) {
+            if (t.investmentFeeFor) continue; // The source debit below includes the transfer fee.
+            if (target.id && t.id === target.id) activity.push({...target,stop:true});
+            else activity.push(t);
+        }
+        if (!activity.some(t=>t.stop)) activity.push({...target,createdAt:"\uffff",stop:true});
+        activity.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+        function take(wallet,units) {
+            if (!wallet || !(units>0)) return null;
+            const basis = wallet.cost !== null && units <= wallet.units+1e-9 && wallet.units>0 ? wallet.cost*Math.min(1,units/wallet.units) : null;
+            wallet.units -= units;
+            if (Math.abs(wallet.units)<1e-9) { wallet.units=0; wallet.cost=0; }
+            else wallet.cost = basis===null ? null : wallet.cost-basis;
+            return basis;
+        }
+        function add(wallet,units,cost) {
+            if (!wallet || !(units>0)) return;
+            wallet.units += units;
+            wallet.cost = wallet.cost===null || cost===null ? null : wallet.cost+cost;
+            if (Math.abs(wallet.units)<1e-9) {wallet.units=0;wallet.cost=0;}
+        }
+        for (const t of activity) {
+            if (t.stop) break;
+            if (t.kind === "transfer") {
+                const sent=Number(t.amount), fee=Number(t.transferFee)||0;
+                const from=wallets.get(t.fromAccountId), to=wallets.get(t.toAccountId);
+                const basis=take(from,sent+fee);
+                const thbSource=(t.fromCurrency || accountCurrency(accounts.find(a=>a.id===t.fromAccountId)))==="THB";
+                const units=transferReceived(t);
+                add(to,units,thbSource && t.receivedAmount!=null ? sent+fee : basis);
+            } else {
+                const wallet=wallets.get(t.wallet || t.accountId);
+                const delta=t.wallet ? t.delta : (t.kind==="in" ? 1 : -1)*nativeAmount(t);
+                if (delta<0) take(wallet,-delta);
+                else add(wallet,delta,t.kind==="in" && Number(t.sourceRateTHB)>0 ? delta*Number(t.sourceRateTHB) : null);
+            }
+        }
+        const source=wallets.get(target.fromAccountId);
+        const required=Number(target.amount)+(Number(target.transferFee)||0);
+        return source && source.cost!==null && source.units>0 && required<=source.units+1e-9 ? source.cost/source.units : null;
+    }
+    function exchangeFigures(t, from, to, reference) {
+        const sent=Number(t.amount), received=Number(t.receivedAmount), fee=Number(t.transferFee)||0;
+        if (from===to || ![from,to].includes("THB") || !(sent>0 && received>0 && fee>=0)) return null;
+        const buy=from==="THB", units=buy ? received : sent+fee;
+        const raw=buy ? sent/received : received/sent;
+        const net=buy ? (sent+fee)/received : received/units;
+        const basis=Number(reference);
+        return {buy,raw,net,symbol:buy ? to : from,basis:!buy && basis>0 ? basis : null,
+            gain:!buy && basis>0 ? received-units*basis : null};
+    }
+    function ExchangeSummary({figures:x,manual=false}) {
+        if (!x) return null;
+        const rate=n=>n.toLocaleString("th-TH",{maximumFractionDigits:6});
+        const pair=(label,value)=>React.createElement("div",{className:"pf-pair"},React.createElement("span",null,label),React.createElement("strong",null,value));
+        return React.createElement("section",{className:"pf-receipt",style:{margin:"12px 0"}},
+            pair("เรทที่แลกจริง","1 "+x.symbol+" = "+rate(x.raw)+" บาท"),
+            (x.buy || x.raw!==x.net) && pair(x.buy ? "ต้นทุนต่อหน่วยรวมค่าธรรมเนียม" : "เรทรับสุทธิหลังค่าธรรมเนียม",rate(x.net)+" บาท"),
+            !x.buy && (x.basis!==null ? React.createElement(React.Fragment,null,
+                pair(manual ? "เรทต้นทุนที่ระบุ" : "ต้นทุนเฉลี่ยถ่วงน้ำหนัก",rate(x.basis)+" บาท"),
+                pair("ส่วนต่างสุทธิครั้งนี้",(x.gain>0 ? "+" : "")+moneyIn(x.gain)+" ("+((x.net/x.basis-1)*100).toFixed(2)+"%)"))
+                : React.createElement("small",null,"ประวัติเงินสกุลนี้มีต้นทุนไม่ครบ กรอกเรทต้นทุนในฟอร์มเพื่อดูส่วนต่าง")));
+    }
+    function TransferDetail({ transaction: t, accounts, transactions, payments }) {
         const fromCurrency = t.fromCurrency || accountCurrency(accounts.find(a=>a.id===t.fromAccountId));
         const toCurrency = t.toCurrency || accountCurrency(accounts.find(a=>a.id===t.toAccountId));
         const line = (label,value) => React.createElement("div",{key:label,className:"flex items-start justify-between gap-3 py-2 text-xs",style:{borderBottom:`1px solid ${T.border}`}},React.createElement("span",{style:{color:T.muted}},label),React.createElement("span",{className:"font-semibold text-right",style:{maxWidth:"70%",overflowWrap:"anywhere"}},value));
@@ -8641,7 +8777,7 @@ try {
             line("ค่าธรรมเนียม",ledgerMoney(t.transferFee||0,fromCurrency)),
             fromCurrency !== "THB" && Number(t.transferFee)>0 && line("ค่าธรรมเนียมคิดเป็นบาท",moneyIn(Math.round(Number(t.transferFee)*(Number(t.sourceRateTHB)||1)*100)/100)),
             line("ต้นทางออกจริง",ledgerMoney((Number(t.amount)||0)+(Number(t.transferFee)||0),fromCurrency)),
-            fromCurrency!==toCurrency && Number(t.amount)>0 && line("เรทจริง",`1 ${fromCurrency} = ${(transferReceived(t)/Number(t.amount)).toFixed(6)} ${toCurrency}`),
+            fromCurrency!==toCurrency && React.createElement(ExchangeSummary,{figures:exchangeFigures(t,fromCurrency,toCurrency,t.fxCostOverride || (toCurrency==="THB" ? fxCashBasis(accounts,transactions,payments,t) : null)),manual:!!t.fxCostOverride}),
             React.createElement("p",{className:"text-[11px] mt-2 leading-relaxed",style:{color:T.muted}},"เงินโอนไม่รวมในรายรับ–รายจ่าย ค่าธรรมเนียมบันทึกเป็นรายจ่ายแยกและผูกกับรายการนี้"));
     }
 
@@ -9801,7 +9937,7 @@ try {
                     React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.muted } }, `${shortDate(txnActionItem.date)} · ${txnActionItem.tag || "รายการ"} · ${moneyIn(txnActionItem.amount, accountCurrency(accounts.find(a => a.id === txnActionItem.accountId)))}`)),
                 txnActionItem.raw?.kind==="out"&&Number(txnActionItem.raw?.pocketSplit?.studio)>0&&Number(txnActionItem.raw?.pocketSplit?.personal)>0&&React.createElement("p",{className:"text-xs mb-3 leading-relaxed",style:{color:T.purple}},`บิลรวม ${moneyIn(txnActionItem.raw.amount)} · ห้องซ้อม ${moneyIn(txnActionItem.raw.pocketSplit.studio)} · ส่วนตัว ${moneyIn(txnActionItem.raw.pocketSplit.personal)}`),
                 txnActionItem.raw?.investmentFeeFor && React.createElement("p", { className: "text-xs mb-3", style: { color: T.sub } }, `มูลค่ารายจ่าย ณ วันโอน ${moneyIn(txnActionItem.raw.amount)}`),
-                txnActionItem.raw?.kind === "transfer" && React.createElement(TransferDetail, { transaction: txnActionItem.raw, accounts }),
+                txnActionItem.raw?.kind === "transfer" && React.createElement(TransferDetail, { transaction: txnActionItem.raw, accounts, transactions, payments }),
                 (txnActionItem.paymentRaw?.note || txnActionItem.raw?.note) && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub, whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, txnActionItem.paymentRaw?.note || txnActionItem.raw?.note),
                 txnActionItem.detailSummary && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub } }, txnActionItem.detailSummary),
                 txnActionItem.kind === "passThrough" ? React.createElement("div", { className: "space-y-2" },
@@ -9874,9 +10010,9 @@ try {
             editPassThrough && React.createElement(PassThroughEditModal, { initial: editPassThrough.initial, accounts, onClose: () => setEditPassThrough(null), onSave: data => { if (savePassThroughData(editPassThrough.item, data) !== false) setEditPassThrough(null); } }),
             editIncomePayment && React.createElement(TxnModal, { accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourcePayment: editIncomePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, onClose: () => setEditIncomePayment(null), onSave: () => {} }),
             txnOpen && React.createElement(TxnModal, { initialKind: txnKind, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, bookings, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onSaveManualIncome: addManualIncomeWithAllocations, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
-            refundExpense && React.createElement(TxnModal, { initial: { title: refundExpense.title, amount: refundExpense.amount, kind: "in", date: TK, accountId: accounts.find(a => !a.archived && accountCurrency(a) === "THB")?.id || null, category: txnCategories.income?.[0] || "อื่นๆ", taxable: false, payer: refundExpense.payer || "", moneyType: "reimbursement", linkedExpenseId: refundExpense.id, note: `รับคืนจากรายการ ${refundExpense.raw?.title || "สำรองจ่าย"}` }, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setRefundExpense(null), onSave: (list) => { list.forEach(addTxn); setRefundExpense(null); } }),
-            duplicateTxn && React.createElement(TxnModal, { initial: duplicateTxn, duplicateMode: true, studioMode: !!duplicateTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setDuplicateTxn(null), onSave: (list) => { list.forEach(addTxn); setDuplicateTxn(null); } }),
-            editTxn && React.createElement(TxnModal, { initial: editTxn, studioMode: !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
+            refundExpense && React.createElement(TxnModal, { payments, initial: { title: refundExpense.title, amount: refundExpense.amount, kind: "in", date: TK, accountId: accounts.find(a => !a.archived && accountCurrency(a) === "THB")?.id || null, category: txnCategories.income?.[0] || "อื่นๆ", taxable: false, payer: refundExpense.payer || "", moneyType: "reimbursement", linkedExpenseId: refundExpense.id, note: `รับคืนจากรายการ ${refundExpense.raw?.title || "สำรองจ่าย"}` }, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setRefundExpense(null), onSave: (list) => { list.forEach(addTxn); setRefundExpense(null); } }),
+            duplicateTxn && React.createElement(TxnModal, { payments, initial: duplicateTxn, duplicateMode: true, studioMode: !!duplicateTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setDuplicateTxn(null), onSave: (list) => { list.forEach(addTxn); setDuplicateTxn(null); } }),
+            editTxn && React.createElement(TxnModal, { payments, initial: editTxn, studioMode: !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
             ));
     }
     let _actx = null;
