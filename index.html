@@ -1694,7 +1694,7 @@ try {
     }
     function portfolioBook(entries) {
         const assets = new window.Map(), realized = new window.Map();
-        const ordered = [...entries].sort((a,b) => a.date.localeCompare(b.date));
+        const ordered = [...entries].sort((a,b) => a.date.localeCompare(b.date) || (a.eventTime||"12:00").localeCompare(b.eventTime||"12:00"));
         let unknownProfit = false, profit = 0, snapshot = null;
         for (const row of ordered) {
             if (row.type === "snapshot") { snapshot = row; continue; }
@@ -1724,6 +1724,74 @@ try {
         return { assets, realized, profit: unknownProfit ? null : profit, snapshot };
     }
 
+    function BrokerReport({mode,account,accounts,transactions,payments,setAccounts,onEdit}) {
+        const h=React.createElement, currency=accountCurrency(account);
+        const [day,setDay]=useState(TK),[actual,setActual]=useState(""),[rate,setRate]=useState(""),[msg,setMsg]=useState("");
+        const events=useMemo(()=>portfolioTimeline(accounts,transactions,payments),[accounts,transactions,payments]);
+        const through=useMemo(()=>events.filter(e=>e.date<=day),[events,day]);
+        const ledger=useMemo(()=>brokerCashRows(account,through),[account,through]);
+        const close=ledger.at(-1)?.balance ?? (Number(account.startBalance)||0);
+        const checkpoints=account.portfolioChecks || {};
+        const closeAt=d=>ledger.filter(r=>r.date<=d).at(-1)?.balance ?? (Number(account.startBalance)||0);
+        const gap=(v,c)=>Math.round((Number(v)-c)*100)/100;
+        const first=Object.keys(checkpoints).sort().find(d=>d<=day && gap(checkpoints[d],closeAt(d))!==0);
+        const money=n=>moneyIn(n,currency), baht=n=>moneyIn(n,"THB");
+        const pair=(label,value)=>h("div",{className:"pf-pair"},h("span",null,label),h("strong",null,value));
+        const box=(title,...kids)=>h("section",{className:"pf-receipt"},h("strong",null,title),...kids);
+        const button=(s,fn)=>h("button",{type:"button",className:"rounded-xl px-3 text-sm font-bold",style:{background:T.surf2,color:T.text},onClick:fn},s);
+        const note=s=>h("small",{style:{color:T.sub}},s);
+        const saved=checkpoints[day], draft=actual!==""?actual:saved;
+        const marketRate=rate!==""?Number(rate):Number(account.portfolioMarketRates?.[day]);
+        const validDay=/^\d{4}-\d{2}-\d{2}$/.test(day)&&day<=dkey(new Date());
+        function record(key,value,positive=false) {
+            if(!validDay || value==="" || value==null || !Number.isFinite(Number(value)) || (positive && Number(value)<=0)){setMsg("กรุณาตรวจวันที่และตัวเลขที่กรอก");return;}
+            setAccounts(list=>list.map(a=>a.id===account.id?{...a,[key]:{...a[key],[day]:Number(value)}}:a));
+            setMsg("บันทึกแล้ว");
+        }
+        const dateField=h(Input,{label:"ยอด ณ สิ้นวันที่",type:"date",value:day,onChange:v=>{setDay(v);setActual("");setRate("");setMsg("");}});
+        if(mode==="audit"){
+            const month=day.slice(0,7), period=ledger.filter(r=>r.date.startsWith(month));
+            const opening=period.length?period[0].balance-period[0].delta:close;
+            return h("div",{className:"pf-stack"},dateField,
+                box("เทียบยอดเงินสด · "+currency,pair("ตามรายการในแอป",money(close)), close<0 && note("ยอดติดลบ · ตรวจเงินตั้งต้น รายการซื้อขาย และเงินเข้า–ออกตาม Statement"),
+                    h(Input,{label:"ยอดเงินสดตาม Statement",type:"number",value:draft??"",onChange:v=>{setActual(v);setMsg("");}}),
+                    draft!=null && draft!=="" && pair("Statement ลบยอดในแอป",gap(draft,close)===0?"ยอดตรงกัน":money(gap(draft,close))+" · รอตรวจสอบ"),
+                    !account.archived && button("บันทึกยอดเปรียบเทียบ",()=>record("portfolioChecks",draft)),
+                    note("ใช้ยอดเงินสดสกุลเดียวกันและวันเดียวกัน ตัวเลขนี้เก็บไว้ตรวจสอบโดยไม่ปรับเงินสด")),
+                msg&&note(msg),first&&note("วันแรกที่พบยอดต่างในวันที่มี Statement เทียบ · "+first+" ("+money(gap(checkpoints[first],closeAt(first)))+")"),
+                h("details",null,h("summary",null,"วันที่บันทึกยอด Statement"),...Object.keys(checkpoints).sort().reverse().map(d=>button(d+" · "+money(checkpoints[d]),()=>{setDay(d);setActual("");setMsg("");}))),
+                box("รายการเงินสดเดือน "+month,pair("ยอดยกมา",money(opening)),note("วันที่เดียวกันเรียงตามเวลา หากไม่ระบุจะจัดเงินแลกเข้าก่อนซื้อขาย และแลกกลับหลังซื้อขาย"),
+                    ...period.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date),h("strong",null,r.title),pair(r.delta>=0?"เงินเข้า":"เงินออก",money(Math.abs(r.delta))),pair("คงเหลือ",money(r.balance)))),
+                    pair("ยอดปลายงวด",money(close))));
+        }
+        const analysis=brokerAnalysis(accounts,through), wallet=analysis.wallets.get(account.id);
+        const rows=analysis.results.filter(r=>r.accountId===account.id);
+        const sum=(list,key)=>list.some(r=>r[key]==null)?null:list.reduce((n,r)=>n+r[key],0);
+        const format=(n,fn)=>n===null?"ข้อมูลไม่ครบ":fn(n);
+        const section=(kind,title)=>{
+            const list=rows.filter(r=>r.kind===kind), income=["interest","dividend"].includes(kind);
+            return box(title,income && pair("ก่อนหักภาษี",money(sum(list,"gross"))),income && pair("ภาษีที่บันทึก",money(sum(list,"tax"))),
+                pair(income?"รับสุทธิ":"กำไร/ขาดทุน",format(sum(list,"native"),money)),currency!=="THB"&&pair("คิดเป็นบาท ณ วันรายการ",format(sum(list,"thb"),baht)));
+        };
+        const fx=rows.filter(r=>r.kind.startsWith("fx"));
+        const missing=rows.filter(r=>r.thb===null);
+        const book=portfolioBook((account.portfolioEntries||[]).filter(r=>r.date<=day));
+        const held=[...book.assets.values()].filter(p=>p.units>0);
+        const localRate=currency==="THB"?1:marketRate;
+        const reportValue=(value,rate)=>Number.isFinite(rate)&&rate>0&&value!=null?value*rate:null;
+        const cashValue=reportValue(close,localRate);
+        return h("div",{className:"pf-stack"},dateField,note("ผลสะสมถึงวันที่เลือก · ต้นทุนเฉลี่ยถ่วงน้ำหนัก · กำไรขายคิดเป็นบาทด้วยเรทวันขาย"),
+            section("interest","ดอกเบี้ย"),section("dividend","เงินปันผล"),section("trade","กำไร/ขาดทุนจากการขายสินทรัพย์"),
+            currency!=="THB" && box("ส่วนต่างอัตราแลกเปลี่ยน",pair("จากเงินต้นของสินทรัพย์ที่ขาย",format(sum(fx.filter(r=>r.kind==="fxAsset"),"thb"),baht)),pair("จากการแลกเงินสดกลับเป็นบาท",format(sum(fx.filter(r=>r.kind==="fxCash"),"thb"),baht))),
+            box("ผลตอบแทนที่เกิดขึ้นแล้ว",pair("รวมหลังภาษีและค่าซื้อขาย",format(sum(rows,"thb"),baht))),
+            missing.length>0 && h("details",null,h("summary",null,"ตรวจรายการที่ขาดเรทหรือต้นทุน"),...missing.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date+" · "+r.title),note(({trade:"ตรวจต้นทุนหุ้นและเรทวันขาย",fxAsset:"ตรวจเรทวันขายและต้นทุนเงินบาทของหุ้นที่ซื้อ",fxCash:"ตรวจต้นทุน USD ในรายละเอียดการแลกเงิน",interest:"ระบุเรทวันที่รับดอกเบี้ย",dividend:"ระบุเรทวันที่รับปันผล"})[r.kind]),!account.archived && (account.portfolioEntries||[]).some(x=>x.id===r.id) && button("แก้รายการ",()=>{const x=account.portfolioEntries.find(x=>x.id===r.id);onEdit(x.type,x);})))),
+            box("มูลค่าที่ยังถืออยู่",currency!=="THB"&&h(React.Fragment,null,h(Input,{label:"เรทประเมินวันที่เลือก · บาทต่อ 1 "+currency,type:"number",value:rate || account.portfolioMarketRates?.[day] || "",onChange:v=>{setRate(v);setMsg("");}}),!account.archived&&button("บันทึกเรทของวันที่เลือก",()=>record("portfolioMarketRates",rate || account.portfolioMarketRates?.[day],true)),msg&&note(msg)),
+                pair("เงินสด "+currency,money(close)),currency!=="THB"&&pair("ส่วนต่างค่าเงินสดที่ยังไม่แลก",format(cashValue===null || wallet.cash.cost===null || close<0 ? null : cashValue-wallet.cash.cost,baht)),
+                ...held.map(p=>{const mv=p.quote?p.units*p.quote.amount:null, basis=wallet.positions.get(p.symbol)?.thb.cost;
+                    return h("div",{className:"pf-entry",key:p.symbol},h("strong",null,p.symbol),note(p.quote?"ราคาประเมินวันที่ "+p.quote.date:"รอราคาประเมิน"),pair("มูลค่า",format(mv,money)),pair("กำไร/ขาดทุนจากราคา",format(mv===null || p.cost===null ? null : mv-p.cost,money)),currency!=="THB"&&pair("ส่วนต่างค่าเงินของเงินต้น",format(p.cost===null || basis==null || !(localRate>0)?null:p.cost*localRate-basis,baht)));}),
+                account.portfolioMode==="summary" && note("บัญชีติดตามยอดรวมแสดงผลแยกได้เฉพาะรายการที่ลงรายละเอียดไว้")));
+    }
+
     function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, onClose }) {
         const h = React.createElement, currency = accountCurrency(account);
         const entries = account.portfolioEntries || [];
@@ -1748,12 +1816,18 @@ try {
         const cost = holdings.every(p => p.cost !== null) ? holdings.reduce((sum,p) => sum + p.cost,0) : null;
         function begin(kind, old, reuse = false) {
             setType(kind); setEditing(old && !reuse ? old.id : null); setDate(old && !reuse ? old.date : TK);
-            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), amount: old?.amount ?? "" }]);
+            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), ...(reuse ? {thbRate:"",eventTime:""} : {}), amount: old?.amount ?? "" }]);
             setError(""); setConfirmDelete(null);
         }
         function finish() { setType(""); setEditing(null); setError(""); }
         function change(index,key,value) {
-            setRows(list => list.map((row,i) => i === index ? {...row,[key]:value} : row));
+            setRows(list => list.map((row,i) => {
+                if (i !== index) return row;
+                const next = {...row,[key]:value};
+                if (type === "buy" && !isCrypto(next,type) && ["unitPrice","units"].includes(key) && (next.unitPrice || key==="unitPrice"))
+                    next.amount = purchaseValue(next.units,next.unitPrice);
+                return next;
+            }));
             setError("");
         }
         function commit(next) {
@@ -1769,7 +1843,9 @@ try {
                     return n;
                 };
                 const nextRows = rows.map(row => {
-                    const result = { id:row.id, type, date };
+                    const result = { id:row.id, type, date, eventTime:row.eventTime || "" };
+                    if(currency!=="THB" && row.thbRate!=="" && row.thbRate!=null)
+                        result.thbRate=numeric(row.thbRate,"เรทเงินบาท ณ วันที่ทำรายการ");
                     if (["buy","sell","opening","quote","dividend"].includes(type)) {
                         result.symbol = String(row.symbol || "").trim().toUpperCase();
                         if (!result.symbol && type !== "dividend") throw new Error("กรอกชื่อหุ้นหรือเหรียญ");
@@ -1791,6 +1867,8 @@ try {
                     if (["buy","sell","opening"].includes(type)) result.units = numeric(row.units,"จำนวนหน่วย");
                     if (["buy","sell"].includes(type)) {
                         result.tradeMode = "stock";
+                        if (type==="buy" && row.unitPrice!=="" && row.unitPrice!=null)
+                            result.unitPrice = numeric(row.unitPrice,"ราคาที่ซื้อต่อหน่วย");
                         result.fee = numeric(row.fee || 0,"ค่าธรรมเนียม",true); result.feeUnit = row.feeUnit;
                         if (result.feeUnit === "asset" && type === "buy" && result.fee >= result.units) throw new Error("ค่าธรรมเนียมต้องน้อยกว่าจำนวนหน่วยที่ซื้อ");
                         if (result.feeUnit === "cash" && type === "sell" && result.fee > result.amount) throw new Error("ค่าธรรมเนียมเกินยอดขาย");
@@ -1830,7 +1908,7 @@ try {
             if (r.type === "quote") return money(r.amount) + " / หน่วย";
             if (r.type === "snapshot" || r.type === "cash") return money(r.amount);
             if (r.type === "opening") return quantity(r.units)+" หน่วย · ต้นทุน "+(r.amount === null ? "ยังไม่ระบุ" : money(r.amount));
-            return quantity(r.units)+" หน่วย · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
+            return quantity(r.units)+" หน่วย"+(r.type==="buy" && r.units>0 ? " · "+(r.unitPrice ? "ราคาที่กรอก " : "ราคาต่อหน่วยจากยอดซื้อ ")+money(r.unitPrice || r.amount/r.units) : "")+" · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
         }
         const preview = r => {
             const value = cryptoValue(r);
@@ -1853,17 +1931,22 @@ try {
                         field(i,"rate","อัตรา · 1 "+(r.symbol || "เหรียญ")+" เท่ากับกี่ "+currency),
                         preview(r)),
                     !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
+                    type==="buy" && !isCrypto(r,type) && field(i,"unitPrice","ราคาที่ซื้อต่อหน่วย ("+currency+" · ถ้ามี)"),
                     !isCrypto(r,type) && field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
                     isTrade(type) && !isCrypto(r,type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
                     ["interest","dividend"].includes(type) && h(React.Fragment,null,field(i,"tax","ภาษีหัก ณ ที่จ่าย ("+currency+")"),text("รับสุทธิ "+money(Number(r.amount)-Number(r.tax)))),
+                    h("details",null,h("summary",null,currency==="THB"?"เวลาตาม Statement":"เรทเงินบาทและเวลาตาม Statement"),
+                        field(i,"eventTime","เวลาในวันที่ทำรายการ (ถ้าทราบ)","time"),
+                        currency!=="THB" && field(i,"thbRate",type==="opening" ? "ต้นทุนเงินบาทต่อ 1 "+currency+" ของยอดตั้งต้น" : "เรทวันรายการ · บาทต่อ 1 "+currency),
+                        currency!=="THB" && text("ใช้แยกผลตอบแทนเป็นบาท หากยังไม่ทราบเรทให้เว้นว่าง")),
                     type==="cash" && text("ระบบปรับเฉพาะส่วนต่างจากเงินสดที่บันทึกไว้ถึงวันนั้น เพื่อให้ยอดตรงกับโบรกเกอร์"))),
                 type==="buy" && h("div",{className:"pf-receipt"},pair("เงินสดที่ใช้รวม",money(draftSpend)),pair("เงินสดในบัญชีหลังบันทึก",money(decimalCash(cash-draftSpend-(editing ? portfolioCash(entries.find(r=>r.id===editing) || {}) : 0)))) ),
                 type==="buy" && !editing && draftSpend > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
                 type==="buy" && !editing && button("+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows([...rows,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
             : h("div",{className:"pf-stack"},
-                h("div",{className:"pf-tabs"},button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history")),
-                tab==="assets" ? h(React.Fragment,null,
+                h("div",{className:"pf-tabs"},button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns")),
+                (tab==="audit" || tab==="returns") ? h(BrokerReport,{key:tab,mode:tab,account,accounts,transactions,payments,setAccounts,onEdit:begin}) : tab==="assets" ? h(React.Fragment,null,
                     totalOnly ? h(React.Fragment,null,numbers(stat("มูลค่าล่าสุด",latest ? money(latest.amount) : "—"),stat("วันที่อัปเดต",latest?.date || "—")),
                     first && latest && first.id!==latest.id && text("ผลต่างจากยอดครั้งแรก หลังหักโอนสุทธิ "+money(latest.amount-first.amount-fundingSince))) :
                     h(React.Fragment,null,h("section",{className:"pf-total"},h("small",null,"มูลค่าพอร์ต · "+currency),h("b",null,balances===null ? "รอราคาประเมิน" : money(cash+balances)),pair("เงินสด",money(cash)),pair("มูลค่าสินทรัพย์",balances===null ? "รอราคาประเมิน" : money(balances))),
@@ -6088,6 +6171,8 @@ try {
               investmentFlow: initial.kind === "transfer" ? investmentDirection(initial, accounts) : "none",
               receivedAmount: duplicateMode ? "" : initial.receivedAmount ?? initial.amount ?? "",
               transferFee: duplicateMode ? "" : initial.transferFee || "",
+              eventTime: duplicateMode ? "" : initial.eventTime || "",
+              fxBuyPrice: duplicateMode ? "" : initial.fxBuyPrice ?? "",
               fxCostOverride: duplicateMode ? "" : initial.fxCostOverride ?? "",
               sourceRateTHB: duplicateMode ? "" : initial.sourceRateTHB || "",
               sharedExpense: Number(initial.reimbursableAmount) > 0,
@@ -6316,11 +6401,12 @@ try {
       const investmentFlow = f.investmentFlow || "none";
       const needsTHBRate = transferNeedsTHBRate(fromCurrency, toCurrency, transferFee, investmentFlow);
       const rates = transferRates(fromCurrency, toCurrency, Number(f.amount), receivedAmount, f.sourceRateTHB);
+      const buyingFX = isTransfer && fromCurrency==="THB" && crossCurrency;
       const sellingFX = isTransfer && fromCurrency !== "THB" && toCurrency === "THB";
       const fxAuto = useMemo(()=>sellingFX ? fxCashBasis(accounts,transactions,payments,{
         id:editMode ? initial.id : null, createdAt:editMode ? initial.createdAt : null, date:f.date,
-        fromAccountId:f.fromAccountId,amount:f.amount,transferFee}) : null,
-        [sellingFX,accounts,transactions,payments,editMode,initial,f.date,f.fromAccountId,f.amount,transferFee]);
+        fromAccountId:f.fromAccountId,toAccountId:f.toAccountId,fromCurrency,toCurrency,eventTime:f.eventTime,amount:f.amount,transferFee}) : null,
+        [sellingFX,accounts,transactions,payments,editMode,initial,f.date,f.eventTime,f.fromAccountId,f.toAccountId,fromCurrency,toCurrency,f.amount,transferFee]);
       const fxFigures = isTransfer ? exchangeFigures({...f,receivedAmount,transferFee},fromCurrency,toCurrency,f.fxCostOverride || fxAuto) : null;
       const extendedTransfer = investmentFlow !== "none" || transferPocket === "studio" || fromAcc?.pocketEnabled || toAcc?.pocketEnabled || fromCurrency !== "THB" || toCurrency !== "THB" || transferPurpose !== "general" || transferFee > 0 || isInvestmentAccount(fromAcc) || isInvestmentAccount(toAcc);
       const pocketRouting = !isTransfer && !!accounts.find(a=>a.id===f.accountId)?.pocketEnabled;
@@ -6485,6 +6571,7 @@ try {
           Number.isFinite(receivedAmount) && receivedAmount > 0 &&
           Number.isFinite(transferFee) && transferFee >= 0 &&
           (!needsTHBRate || (Number.isFinite(rates.sourceRate) && rates.sourceRate > 0)) &&
+          (!buyingFX || !f.fxBuyPrice || (Number.isFinite(Number(f.fxBuyPrice)) && Number(f.fxBuyPrice)>0)) &&
           (!sellingFX || !f.fxCostOverride || (Number.isFinite(Number(f.fxCostOverride)) && Number(f.fxCostOverride)>0)) &&
           !!fromAcc && !!toAcc && purposeValid &&
           (!fromAcc.archived || editMode) && (!toAcc.archived || editMode) &&
@@ -6575,7 +6662,7 @@ try {
               value: f.amount,
               onChange: (event) => {
                 const value = event.target.value;
-                setF((current) => ({ ...current, amount: value }));
+                setF(current => ({ ...current, amount: value, ...(buyingFX && current.fxBuyPrice ? {receivedAmount:purchaseValue(value,current.fxBuyPrice,true)} : {}) }));
                 if (linkedIncomeSource)
                   setLinkedAllocations((list) => list.length === 1 && list[0].role !== "pass_through" ? [{ ...list[0], amount: value }] : list);
               },
@@ -7021,14 +7108,14 @@ try {
                   accounts: accounts,
                   value: f.fromAccountId,
                   allowForeign: true, allowArchived: editMode,
-                  onChange: (v) => setF({ ...f, fromAccountId: v, receivedAmount: "", sourceRateTHB: "", fxCostOverride:"", transferPurpose: "general" }),
+                  onChange: (v) => setF({ ...f, fromAccountId: v, receivedAmount: "", sourceRateTHB: "", fxCostOverride:"", fxBuyPrice:"", transferPurpose: "general" }),
                 }),
                 React.createElement(AccPicker, { transactions, payments,
                   label: "บัญชีเข้า",
                   accounts: accounts,
                   value: f.toAccountId,
                   allowForeign: true, allowArchived: editMode,
-                  onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", fxCostOverride:"", transferPurpose: "general" }),
+                  onChange: (v) => setF({ ...f, toAccountId: v, receivedAmount: "", sourceRateTHB: "", fxCostOverride:"", fxBuyPrice:"", transferPurpose: "general" }),
                   exclude: f.fromAccountId,
                 }),
                 React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนย้ายบัญชี", deposit: "ฝากเงิน", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
@@ -7041,6 +7128,7 @@ try {
                     React.createElement("p", { style: { fontSize: 11, color: T.muted, lineHeight: 1.7, marginTop: 9 } }, "เลือกได้ครั้งละหนึ่งอย่าง ใช้ร่วมกับโอนย้ายบัญชีหรือแลกสกุลเงินได้ทุกประเภทบัญชี"),
                     investmentFlow !== "none" && React.createElement("p", { style: { fontSize: 11, color: T.blue, lineHeight: 1.7, marginTop: 6 } }, investmentFlow === "add" ? `นับเงินเติมให้บัญชีปลายทาง: ${toAcc?.name || "ยังไม่เลือก"}` : `นับเงินถอนจากบัญชีต้นทาง: ${fromAcc?.name || "ยังไม่เลือก"}`),
                     React.createElement("p", { style: { fontSize: 10, color: T.muted, lineHeight: 1.7, marginTop: 6 } }, "โอนหรือแลกเงินที่ลงทุนแล้วระหว่างบัญชีของตัวเอง เว้นทั้งสองช่องเพื่อไม่ให้นับยอดลงทุนซ้ำ")),
+                buyingFX && React.createElement(Input,{label:`ราคาที่ซื้อ · 1 ${toCurrency} กี่บาท (ถ้ามี)`,type:"number",value:f.fxBuyPrice ?? "",placeholder:"กรอกเรทเพื่อคำนวณยอดรับ หรือกรอกยอดรับจริงด้านล่าง",onChange:v=>setF(current=>({...current,fxBuyPrice:v,receivedAmount:purchaseValue(current.amount,v,true)}))}),
                 crossCurrency && React.createElement(Input, { label: `ยอดรับจริงปลายทาง (${toCurrency})`, type: "number", value: f.receivedAmount || "", onChange: v => setF({ ...f, receivedAmount: v }), placeholder: "จำนวนที่เข้าบัญชีจริง" }),
                 fromCurrency !== "THB" && toCurrency !== "THB" && React.createElement(React.Fragment, null,
                     React.createElement(Input, { label: `เรทวันโอน · 1 ${fromCurrency} = กี่บาท${needsTHBRate ? " (จำเป็น)" : " (ไม่บังคับ)"}`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF({ ...f, sourceRateTHB: v }), placeholder: needsTHBRate ? "กรอกเรทมากกว่า 0" : "เว้นว่างได้" }),
@@ -7051,6 +7139,7 @@ try {
 
                     rates.amountTHB > 0 ? ` · มูลค่าโอน ${moneyIn(rates.amountTHB)}` : "",
                     React.createElement("div", { className: "mt-1 text-[10px]" }, "กรอกยอดโอนหลังแยกค่าธรรมเนียมแล้ว ค่าธรรมเนียมช่องนี้หักเพิ่มจากต้นทางและลงรายจ่ายแยก หากรวมอยู่ในเรทแล้วอย่ากรอกซ้ำ")),
+                (fromCurrency!=="THB" || toCurrency!=="THB") && React.createElement("details",null,React.createElement("summary",{className:"text-xs py-2"},"เวลาตาม Statement (ถ้าทราบ)"),React.createElement(Input,{type:"time",label:"เวลาทำรายการ",value:f.eventTime || "",onChange:v=>setF({...f,eventTime:v})})),
                 crossCurrency && React.createElement(ExchangeSummary,{figures:fxFigures,manual:!!f.fxCostOverride}),
                 sellingFX && React.createElement(Input,{label:`เรทต้นทุนที่ทราบ · บาทต่อ 1 ${fromCurrency} (กรอกแทนค่าเฉลี่ยได้)`,type:"number",value:f.fxCostOverride ?? "",placeholder:fxAuto ? String(Number(fxAuto.toFixed(6))) : "เว้นว่างได้",onChange:v=>setF({...f,fxCostOverride:v})}),
                 React.createElement(Input, {
@@ -8165,7 +8254,7 @@ try {
                       amount: Number(f.amount) || 0,
                       date: f.date,
                       title: TRANSFER_PURPOSES[transferPurpose],
-                      transferPurpose, investmentFlow, receivedAmount, fxCostOverride:sellingFX && Number(f.fxCostOverride)>0 ? Number(f.fxCostOverride) : null,
+                      transferPurpose, investmentFlow, receivedAmount, eventTime:f.eventTime || "", fxBuyPrice:buyingFX && Number(f.fxBuyPrice)>0 ? Number(f.fxBuyPrice) : null, fxCostOverride:sellingFX && Number(f.fxCostOverride)>0 ? Number(f.fxCostOverride) : null,
                       fromCurrency, toCurrency, transferFee, pocketOwner: transferPocket,
                       sourceRateTHB: rates.sourceRate > 0 ? rates.sourceRate : null, amountTHB: rates.sourceRate > 0 ? rates.amountTHB : null,
                       fromInvestment: isInvestmentAccount(fromAcc), toInvestment: isInvestmentAccount(toAcc),
@@ -8685,61 +8774,133 @@ try {
             draggable && React.createElement("div", { style: { fontSize: 10, color: T.muted, padding: "2px 0 5px" } }, "แตะดูรายละเอียด · กดค้างที่รายการเพื่อลากเรียงในวันเดียวกัน"),
             groups.map(group => React.createElement(StatementDayRows, { key: group.date, date: group.date, rows: group.rows, accounts, onOpen, onReorder })));
     }
-    // Carry the average THB cost of foreign cash between wallets. A missing cost stays unknown.
-    function fxCashBasis(accounts, transactions, payments, target) {
-        const wallets = new window.Map();
-        const activity = [];
-        for (const a of accounts) {
-            if (accountCurrency(a) === "THB") continue;
-            const units = Number(a.startBalance) || 0;
-            wallets.set(a.id,{units, cost:units === 0 ? 0 : null});
-            for (const r of a.portfolioEntries || []) {
-                const delta = portfolioCash(r);
-                if (delta) activity.push({date:r.date, wallet:a.id, delta});
-            }
+    function portfolioTimeline(accounts,transactions,payments) {
+        const events=[];
+        function recordedTime(row) {
+            const at=Date.parse(row.createdAt);
+            if(!Number.isFinite(at)) return "";
+            const local=new Date(at+7*3600000).toISOString();
+            return local.startsWith(row.date+"T") ? local.slice(11,16) : "";
         }
-        for (const p of payments || []) if (wallets.has(p.accountId))
-            activity.push({date:p.date,wallet:p.accountId,delta:Number(p.amount)||0});
+        function push(row,kind,accountId,delta,title,time) {
+            if (!row.date) return;
+            events.push({row,kind,accountId,delta,title,date:row.date,time:row.eventTime || (kind==="transfer" ? recordedTime(row) : "") || time || "12:00"});
+        }
+        for (const account of accounts) for (const r of account.portfolioEntries || [])
+            push(r,"portfolio",account.id,portfolioCash(r),(portfolioTypes[r.type] || r.type)+(r.symbol ? " · "+r.symbol : ""));
         for (const t of transactions) {
-            if (t.investmentFeeFor) continue; // The source debit below includes the transfer fee.
-            if (target.id && t.id === target.id) activity.push({...target,stop:true});
-            else activity.push(t);
-        }
-        if (!activity.some(t=>t.stop)) activity.push({...target,createdAt:"\uffff",stop:true});
-        activity.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
-        function take(wallet,units) {
-            if (!wallet || !(units>0)) return null;
-            const basis = wallet.cost !== null && units <= wallet.units+1e-9 && wallet.units>0 ? wallet.cost*Math.min(1,units/wallet.units) : null;
-            wallet.units -= units;
-            if (Math.abs(wallet.units)<1e-9) { wallet.units=0; wallet.cost=0; }
-            else wallet.cost = basis===null ? null : wallet.cost-basis;
-            return basis;
-        }
-        function add(wallet,units,cost) {
-            if (!wallet || !(units>0)) return;
-            wallet.units += units;
-            wallet.cost = wallet.cost===null || cost===null ? null : wallet.cost+cost;
-            if (Math.abs(wallet.units)<1e-9) {wallet.units=0;wallet.cost=0;}
-        }
-        for (const t of activity) {
-            if (t.stop) break;
-            if (t.kind === "transfer") {
-                const sent=Number(t.amount), fee=Number(t.transferFee)||0;
-                const from=wallets.get(t.fromAccountId), to=wallets.get(t.toAccountId);
-                const basis=take(from,sent+fee);
-                const thbSource=(t.fromCurrency || accountCurrency(accounts.find(a=>a.id===t.fromAccountId)))==="THB";
-                const units=transferReceived(t);
-                add(to,units,thbSource && t.receivedAmount!=null ? sent+fee : basis);
+            if (t.kind==="transfer") {
+                const from=accounts.find(a=>a.id===t.fromAccountId), to=accounts.find(a=>a.id===t.toAccountId);
+                const inbound=(t.fromCurrency || accountCurrency(from))==="THB";
+                const outbound=(t.toCurrency || accountCurrency(to))==="THB";
+                push(t,"transfer",null,0,(from?.name || "ต้นทาง")+" → "+(to?.name || "ปลายทาง"),inbound ? "08:00" : outbound ? "18:00" : "09:00");
             } else {
-                const wallet=wallets.get(t.wallet || t.accountId);
-                const delta=t.wallet ? t.delta : (t.kind==="in" ? 1 : -1)*nativeAmount(t);
-                if (delta<0) take(wallet,-delta);
-                else add(wallet,delta,t.kind==="in" && Number(t.sourceRateTHB)>0 ? delta*Number(t.sourceRateTHB) : null);
+                push(t,"ordinary",t.accountId,(t.kind==="in"?1:-1)*nativeAmount(t),t.title || t.category);
+                if (t.kind==="in") for (const s of t.recipientSplits || []) if (s.settled)
+                    push({...t,date:s.settledDate||t.date},"settled",s.settledAccountId||t.accountId,-Number(s.amount),"ส่งต่อ · "+(s.name||""));
             }
         }
-        const source=wallets.get(target.fromAccountId);
-        const required=Number(target.amount)+(Number(target.transferFee)||0);
-        return source && source.cost!==null && source.units>0 && required<=source.units+1e-9 ? source.cost/source.units : null;
+        for (const p of payments || []) {
+            push(p,"payment",p.accountId,Number(p.amount)||0,p.title || "รับชำระ");
+            for (const s of paymentAllocationRows(p)) if (s.role==="pass_through" && s.settled)
+                push({...p,date:s.settledDate||p.date},"settled",s.settledAccountId||p.accountId,-Number(s.amount),"ส่งต่อ · "+(s.recipientName||""));
+        }
+        return events.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||String(a.row.createdAt||"").localeCompare(String(b.row.createdAt||"")));
+    }
+    function brokerCashRows(account,events) {
+        let balance=Number(account.startBalance)||0;
+        const rows=[];
+        for (const e of events) {
+            const t=e.row;
+            let delta=e.accountId===account.id ? e.delta : 0;
+            if(e.kind==="transfer") {
+                if(t.fromAccountId===account.id) delta-=Number(t.amount);
+                if(t.toAccountId===account.id) delta+=transferReceived(t);
+            }
+            if(!delta) continue;
+            balance+=delta;
+            rows.push({date:e.date,title:e.title,delta,balance});
+        }
+        return rows;
+    }
+    function fxCashBasis(accounts,transactions,payments,target) {
+        const existing=transactions.some(t=>t.id && t.id===target.id);
+        const marker={...target,kind:"transfer",fxStop:true};
+        const list=existing ? transactions.map(t=>t.id===target.id ? {...t,...marker} : t) : [...transactions,{...marker,createdAt:"\uffff"}];
+        return brokerAnalysis(accounts,portfolioTimeline(accounts,list,payments)).before;
+    }
+    // Stock cost carries the THB paid for its USD. Split price movement from FX at the sale-date rate.
+    function brokerAnalysis(accounts,events) {
+        const wallets=new window.Map(), results=[];
+        function pool(units=0,cost=0){return {units,cost};}
+        function debit(p,n) {
+            if(!p || !(n>0)) return null;
+            const used=p.cost!==null && p.units>0 && n<=p.units+1e-9 ? p.cost*Math.min(1,n/p.units) : null;
+            p.units-=n;
+            p.cost=p.cost===null || used===null ? null : p.cost-used;
+            if(Math.abs(p.units)<=Number.EPSILON*Math.max(n,1)*8){p.units=0;p.cost=0;}
+            return used;
+        }
+        function credit(p,n,cost) {
+            if(!p || !(n>0)) return;
+            p.units+=n;p.cost=p.cost===null || cost===null ? null : p.cost+cost;
+            if(Math.abs(p.units)<1e-12){p.units=0;p.cost=0;}
+        }
+        for(const a of accounts) {
+            const n=Number(a.startBalance)||0, rate=accountCurrency(a)==="THB"?1:Number(a.openingCashRate);
+            wallets.set(a.id,{cash:pool(n,n===0?0:rate>0?n*rate:null),positions:new window.Map(),currency:accountCurrency(a)});
+        }
+        for(const e of events) {
+            const r=e.row,w=wallets.get(e.accountId);
+            const note=(kind,native,thb,accountId=e.accountId)=>results.push({kind,native,thb,accountId,date:e.date,title:e.title,id:r.id});
+            if(e.kind==="transfer"){
+                const from=wallets.get(r.fromAccountId),to=wallets.get(r.toAccountId);
+                const n=Number(r.amount)+(Number(r.transferFee)||0),received=transferReceived(r);
+                if(r.fxStop) return {before:from && from.cash.cost!==null && from.cash.units>0 && n<=from.cash.units+1e-9 ? from.cash.cost/from.cash.units:null};
+                const cost=debit(from?.cash,n);
+                if(from?.currency!=="THB" && to?.currency==="THB"){
+                    const basis=Number(r.fxCostOverride)>0?n*Number(r.fxCostOverride):cost;
+                    note("fxCash",null,basis===null || r.receivedAmount==null ? null : received-basis,r.fromAccountId);
+                }
+                credit(to?.cash,received,to?.currency==="THB" ? received : from?.currency==="THB" ? (r.receivedAmount!=null?n:null) : cost);
+                continue;
+            }
+            if(!w || r.investmentFeeFor) continue;
+            const rate=w.currency==="THB"?1:Number(r.thbRate || r.sourceRateTHB)||null;
+            if(e.kind==="portfolio" && ["opening","buy","sell"].includes(r.type)){
+                const key=r.symbol;
+                if(!w.positions.has(key)) w.positions.set(key,{native:pool(),thb:pool()});
+                const pos=w.positions.get(key),assetFee=r.feeUnit==="asset"?Number(r.fee)||0:0;
+                if(r.type==="sell"){
+                    const n=r.units+assetFee, proceeds=e.delta, basis=debit(pos.native,n), historic=debit(pos.thb,n);
+                    const gain=basis===null?null:proceeds-basis;
+                    note("trade",gain,rate && gain!==null ? gain*rate:null);
+                    if(w.currency!=="THB") note("fxAsset",null,rate && basis!==null && historic!==null ? basis*rate-historic:null);
+                    credit(w.cash,proceeds,rate?proceeds*rate:null);
+                }else{
+                    const n=r.units-assetFee, native=r.type==="buy"?-e.delta:r.amount;
+                    const historic=r.type==="buy"?debit(w.cash,native):null;
+                    credit(pos.native,n,native);
+                    credit(pos.thb,n,historic ?? (rate && native!=null ? native*rate:null));
+                }
+                continue;
+            }
+            if(e.delta<0) debit(w.cash,-e.delta);
+            else credit(w.cash,e.delta,rate?e.delta*rate:null);
+            const kind=e.kind==="portfolio"?r.type:e.kind==="ordinary" && r.kind==="in"?({"ดอกเบี้ย":"interest","เงินปันผล":"dividend"})[r.category]:null;
+            if(kind==="interest" || kind==="dividend"){
+                const tax=e.kind==="portfolio"?Number(r.tax)||0:0;
+                note(kind,e.delta,rate?e.delta*rate:null);
+                Object.assign(results[results.length-1],{gross:e.delta+tax,tax});
+            }
+        }
+        return {wallets,results};
+    }
+    function purchaseValue(quantity,unitPrice,convertFromTHB=false) {
+        const q = Number(quantity), price = Number(unitPrice);
+        if (!(q > 0 && price > 0)) return "";
+        const value = convertFromTHB ? q/price : q*price;
+        return Number.isFinite(value) ? String(Number(value.toFixed(8))) : "";
     }
     function exchangeFigures(t, from, to, reference) {
         const sent=Number(t.amount), received=Number(t.receivedAmount), fee=Number(t.transferFee)||0;
@@ -8773,6 +8934,7 @@ try {
             line("ส่วนของเงิน",t.pocketOwner==="studio"?"Blurryroom Studio":"ส่วนตัว"),
             line("กำกับเงินลงทุน",INVESTMENT_FLOWS[investmentDirection(t, accounts)]),
             line("ยอดโอน",ledgerMoney(t.amount,fromCurrency)),
+            fromCurrency==="THB" && fromCurrency!==toCurrency && Number(t.fxBuyPrice)>0 && line("ราคาที่ซื้อตามที่กรอก",`1 ${toCurrency} = ${Number(t.fxBuyPrice).toLocaleString("th-TH",{maximumFractionDigits:12})} บาท`),
             line("รับจริง",ledgerMoney(transferReceived(t),toCurrency)),
             line("ค่าธรรมเนียม",ledgerMoney(t.transferFee||0,fromCurrency)),
             fromCurrency !== "THB" && Number(t.transferFee)>0 && line("ค่าธรรมเนียมคิดเป็นบาท",moneyIn(Math.round(Number(t.transferFee)*(Number(t.sourceRateTHB)||1)*100)/100)),
@@ -9005,7 +9167,8 @@ try {
             if (!accountId)
                 return 0;
             let count = accounts.filter(a => a.parentAccountId === accountId).length;
-            count += accounts.find(a => a.id === accountId)?.portfolioEntries?.length || 0;
+            const linkedAccount=accounts.find(a=>a.id===accountId);
+            count += (linkedAccount?.portfolioEntries?.length || 0) + Object.keys(linkedAccount?.portfolioChecks || {}).length + Object.keys(linkedAccount?.portfolioMarketRates || {}).length;
             payments.forEach(payment => {
                 if (payment.accountId === accountId) count += 1;
                 paymentAllocationRows(payment).filter(allocation => allocation.role === "pass_through" && allocation.settled && allocation.settledAccountId === accountId).forEach(() => count += 1);
@@ -9453,7 +9616,7 @@ try {
                                                 "ยอดเริ่มต้น ",
                                                 moneyIn(a.startBalance, accountCurrency(a))),
                                             a.portfolioEnabled && React.createElement("button",{onClick:()=>setPortfolioId(a.id),className:"mt-1 text-xs px-2 py-1 rounded-lg font-bold",style:{background:T.surf2,color:T.purple}},"เปิดพอร์ตลงทุน")),
-                                        React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: bal >= 0 ? T.text : T.red } }, moneyIn(bal, accountCurrency(a))),
+                                        React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: bal >= 0 ? T.text : T.red } }, moneyIn(bal, accountCurrency(a)),bal<0 && a.portfolioEnabled && React.createElement("small",{style:{display:"block",textAlign:"right",fontSize:10,color:T.sub}},"รอตรวจสอบ")),
                                         !accountParent(a, accounts) && !a.archived && React.createElement("button", { onClick: () => setEditAcc({ id: null, name: "", startBalance: 0, parentAccountId: a.id, platform: a.platform || a.name, accountType: "investment", currency: "USD", spendable: false }), "aria-label": `เพิ่มบัญชีย่อยของ ${a.name}`, className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.purple, background: hex(T.purple, .1) } }, React.createElement(Plus, { size: 15 })),
                                         React.createElement("button", { onClick: () => setEditAcc(a), "aria-label": "\u0E41\u0E01\u0E49\u0E44\u0E02\u0E1A\u0E31\u0E0D\u0E0A\u0E35", className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.blue } },
                                             React.createElement(Pencil, { size: 14 }))));
@@ -9877,6 +10040,7 @@ try {
                 React.createElement("p", { className: "text-[10px] mb-3 leading-relaxed", style: { color: T.muted } }, "เลือกบัญชีหลักเพื่อจัดเป็นบัญชีย่อย ยอดเงินและประวัติยังเป็นของบัญชีนี้ บัญชีหลักเก็บเฉพาะเงินของตัวเอง ไม่ต้องบวกยอดลูกเข้าไปอีก"),
                 React.createElement(FinanceSelect, { label: "ประเภทบัญชี", value: editAcc.accountType || "bank", options: ACCOUNT_TYPES, onChange: v => setEditAcc({ ...editAcc, accountType: v, spendable: !["investment", "broker"].includes(v) }) }),
                 React.createElement("label",{className:"flex items-center gap-3 mb-3 text-sm font-bold"},React.createElement("input",{type:"checkbox",checked:!!editAcc.portfolioEnabled,onChange:e=>setEditAcc({...editAcc,portfolioEnabled:e.target.checked})}),"เปิดใช้พอร์ตลงทุนสำหรับบัญชีนี้"),
+                editAcc.portfolioEnabled && accountCurrency(editAcc)!=="THB" && Number(editAcc.startBalance)>0 && React.createElement(Input,{type:"number",label:"ต้นทุนเงินสดยอดเริ่มต้น · บาทต่อ 1 "+accountCurrency(editAcc)+" (ถ้าทราบ)",value:editAcc.openingCashRate ?? "",onChange:v=>setEditAcc({...editAcc,openingCashRate:v})}),
                 editAcc.portfolioEnabled && React.createElement(FinanceSelect,{label:"วิธีติดตามพอร์ต",value:editAcc.portfolioMode || "assets",options:{assets:"รายสินทรัพย์ · ซื้อขายและติดตามต้นทุน",summary:"ยอดรวม · กรอกมูลค่าจากแอปเป็นครั้งคราว"},onChange:v=>setEditAcc({...editAcc,portfolioMode:v})}),
                 React.createElement(AccountColorPicker, { account: editAcc, onChange: backgroundColor => setEditAcc({ ...editAcc, backgroundColor }) }),
                 React.createElement(Input, { label: "กลุ่มแพลตฟอร์ม (เพิ่ม / เปลี่ยนชื่อได้)", value: editAcc.platform || "", onChange: v => setEditAcc({ ...editAcc, platform: v }), placeholder: "เช่น Dime, Binance TH, KBank" }),
