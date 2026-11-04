@@ -401,7 +401,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-investment-income-v30";
+window.__TASKROUTINE_BUILD__="2026-11-04-usd-remittance-v31";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1785,6 +1785,36 @@ try {
             fxCash:["ส่วนต่างจากแลกเงินสดกลับ","คำนวณจากบาทที่ได้รับ หักต้นทุนเงินบาทของ USD ที่แลกออก รวมค่าธรรมเนียมต้นทาง การจัดประเภทภาษีต้องพิจารณาที่มาและลักษณะธุรกรรม"],
             fxAsset:["ส่วนต่างค่าเงินของต้นทุนสินทรัพย์ที่ขาย","ส่วนของผลตอบแทนที่เกิดจากเรทวันขายเทียบกับต้นทุนเงินบาทเดิม ใช้แยกผลของราคาหุ้นกับค่าเงิน เมื่อตรวจภาษีให้จับคู่กับรายการขายเดียวกันเพื่อป้องกันการนับซ้ำ"]
         };
+        const remittance=currency==="USD" ? usdRemittanceBook(accounts,through) : null;
+        const returnsInPeriod=remittance?.conversions.filter(r=>r.accountId===account.id && r.date>=start)||[];
+        const remittedSources=returnsInPeriod.flatMap(r=>r.sources);
+        const sourceSum=(kind,key)=>remittedSources.filter(r=>r.kind===kind).reduce((s,r)=>s+r[key],0);
+        const unknownUSD=sourceSum("unknown","value");
+        const incomeTHB=["trade","interest","dividend"].reduce((s,k)=>s+sourceSum(k,"thb"),0);
+        const remaining=remittance?.wallets.get(account.id);
+        function remittanceCard(kind){
+            const [title,explanation]=guidance[kind],list=rows.filter(r=>r.kind===kind);
+            const income=kind==="interest" || kind==="dividend";
+            const native=sum(list,"native"), thb=sourceSum(kind,"thb");
+            return box(title,h("button",{type:"button",className:"si-link","aria-expanded":help===kind,"aria-label":"คำอธิบาย "+title,onClick:()=>setHelp(help===kind?"":kind)},"!"),
+                help===kind && note(explanation),
+                pair("เกิดขึ้นในช่วงนี้ (USD)",kind==="trade"?resultText(native,money):money(native)),
+                income && pair("ก่อนหัก / ภาษีหักไว้ (USD)",money(sum(list,"gross"))+" / "+money(sum(list,"tax"))),
+                pair("ส่วนที่แลกกลับในช่วงนี้ (USD)",money(sourceSum(kind,"value"))),
+                pair("รับจริงเป็นบาทตอนแลกกลับ",baht(thb)));
+        }
+        function exportRemittance(){
+            const data=[["รายงานแบ่งที่มาของ USD ที่แลกเป็นบาท","ตามสัดส่วนเงินสดก่อนถอน"],["บัญชี",account.name],["ช่วง",range],
+                ["หมวด","USD ที่แลกกลับ","บาทที่ได้รับ"],...["principal","trade","interest","dividend","unknown"].map(k=>[({principal:"เงินต้น",trade:"กำไรขายสินทรัพย์",interest:"ดอกเบี้ยสุทธิ",dividend:"ปันผลสุทธิ",unknown:"ยังระบุที่มาไม่ได้"})[k],sourceSum(k,"value"),sourceSum(k,"thb")]),
+                [],["วันแลกกลับ","รหัสแลกกลับ","วันเกิดเงินต้น/รายได้","รหัสต้นทาง","หมวด","USD","เรทบาท","THB"]];
+            for(const r of returnsInPeriod)for(const l of r.sources)data.push([r.date,r.id,l.date,l.id,l.kind,l.value,r.rate,l.thb]);
+            data.push([],["ประวัติรายได้ USD ถึงวันตัดยอด (ใช้ตรวจที่มา)","รหัส","ชื่อ","ประเภท","ก่อนหัก USD","ภาษีหักไว้ USD","สุทธิ USD"]);
+            for(const r of analysis.results.filter(r=>r.accountId===account.id && ["trade","interest","dividend"].includes(r.kind)))
+                data.push([r.date,r.id,r.title,r.kind,r.gross,r.tax,r.native]);
+            data.push([],["วิธีคิด","แบ่งตามสัดส่วนเงินสดก่อนแลกกลับ ค่าธรรมเนียมหักแยก ยอดรายได้เป็นยอดสุทธิหลังภาษีต่างประเทศ"],["ตรวจประกอบภาษี","ตรวจข้อเท็จจริง เงินต้น ปีที่เกิดเงินได้ และวันที่นำเข้าไทย การแลกเป็นบาทใช้เป็นจุดคำนวณในแอป"],
+                ["แหล่งอ้างอิง","https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf"]);
+            downloadCSV("TaskRoutine_USD_to_THB_"+account.id+"_"+period+"_"+day+".csv",data);
+        }
         const law="https://www.rd.go.th/5937.html";
         const range=(start || "เริ่มบันทึก")+" ถึง "+day;
         const resultText=(v,fmt)=>v==null?"รอเรทหรือต้นทุน":Math.abs(v)<0.005?"เท่าทุน ("+fmt(0)+")":(v>0?"กำไร ":"ขาดทุน ")+fmt(Math.abs(v));
@@ -1835,15 +1865,30 @@ try {
             note("ช่วงรายงาน "+range+" · ใช้วันที่เกิดรายการ"),
             box("เงินสดคงเหลือ",h("strong",{style:{fontSize:28}},money(close)),
                 note(saved == null ? "ยังไม่มี Statement เทียบ ณ วันที่เลือก" : gap(saved,close)===0 ? "ตรงกับ Statement ณ วันที่เลือก" : "ต่างจาก Statement "+money(gap(saved,close)))),
-            box("ผลตอบแทนที่เกิดขึ้นแล้ว", trades.length>0 && pair("ขายสินทรัพย์",resultText(tradeGain,money)),
+            currency!=="USD" && box("ผลตอบแทนที่เกิดขึ้นแล้ว", trades.length>0 && pair("ขายสินทรัพย์",resultText(tradeGain,money)),
                 pair("รวมหลังภาษีหักไว้และค่าซื้อขาย",rows.length ? resultText(sum(rows,"thb"),baht) : "ไม่มีรายการในช่วงนี้")),
             box("เงินเข้า–ออกจากการแลกในช่วงนี้",flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินในช่วงที่เลือก"},
                 h("thead",null,h("tr",null,...["สกุล","เข้า","ออก","สุทธิ"].map(x=>h("th",{key:x,scope:"col"},x)))),
                 h("tbody",null,fxRow("USD"),fxRow("THB"))),note("สุทธิ = รับ − จ่าย ในสกุลนั้น ยอดออกรวมค่าธรรมเนียมต้นทาง")) : note("ไม่มีรายการแลกในช่วงนี้")),
-            ...Object.keys(guidance).map(metric),
-            note("ใช้ประกอบการตรวจภาษีเงินได้ต่างประเทศ ตรวจปีที่เกิดเงินได้ ถิ่นที่อยู่ ปีที่นำเงินเข้าไทย และหลักฐานภาษีต่างประเทศก่อนยื่น"),
-            button("ส่งออก CSV · สรุปและรายการในช่วงนี้",exportReport),
-            missing.length>0 && h("details",null,h("summary",null,"ตรวจรายการที่ขาดเรทหรือต้นทุน"),...missing.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date+" · "+r.title),note(({trade:"ตรวจต้นทุนหุ้นและเรทวันขาย",fxAsset:"ตรวจเรทวันขายและต้นทุนเงินบาทของหุ้นที่ซื้อ",fxCash:"ตรวจต้นทุน USD ในรายละเอียดการแลกเงิน",interest:"ระบุเรทวันที่รับดอกเบี้ย",dividend:"ระบุเรทวันที่รับปันผล"})[r.kind]),!account.archived && (account.portfolioEntries||[]).some(x=>x.id===r.id) && button("แก้รายการ",()=>{const x=account.portfolioEntries.find(x=>x.id===r.id);onEdit(x.type,x);})))),
+            currency==="USD" ? h(React.Fragment,null,
+                box("สรุปเงินบาทที่แลกกลับในช่วงนี้",
+                    pair("รับจริงทั้งหมด",baht(returnsInPeriod.reduce((s,r)=>s+r.received,0))),
+                    pair("ส่วนเงินต้น",baht(sourceSum("principal","thb"))),
+                    pair("กำไร ดอกเบี้ย และปันผลสุทธิที่ระบุได้",baht(incomeTHB)),
+                    unknownUSD>1e-8 && pair("ยังระบุที่มาไม่ได้",money(unknownUSD)+" / "+baht(sourceSum("unknown","thb"))),
+                    note("ใช้สัดส่วนของเงินสด USD ก่อนถอนแต่ละครั้ง รวมประวัติซื้อขายและโอนข้ามบัญชี วันเดียวกันใช้เวลาใน Statement")) ,
+                ...["trade","interest","dividend"].map(remittanceCard),
+                box("ส่วนต่างค่าเงินตอนแลกกลับ",
+                    pair("เทียบต้นทุนเงินบาทที่ติดตามได้",resultText(sum(rows.filter(r=>r.kind==="fxCash"),"thb"),baht)),
+                    note("แสดงประกอบส่วนเงินต้นและรายได้ที่แบ่งด้านบน")),
+                h("details",null,h("summary",null,"ที่มาของ USD ที่ยังเป็นเงินสด"),
+                    ...["principal","trade","interest","dividend","unknown"].map(k=>pair(({principal:"เงินต้น",trade:"กำไรที่ขายแล้ว",interest:"ดอกเบี้ย",dividend:"ปันผล",unknown:"ยังระบุที่มาไม่ได้"})[k],money((remaining?.cash||[]).filter(l=>l.kind===k).reduce((s,l)=>s+l.value,0))))),
+                note("ยอดเงินบาทของแต่ละหมวดคำนวณเฉพาะส่วนที่แลกกลับด้วยเรทรับจริง ยอดที่ยังอยู่เป็น USD แสดงตามวันเกิดรายได้"),
+                note("การแบ่งตามสัดส่วนเป็นวิธีติดตามในแอป ภาษีต้องประเมินเงินต้นและรายได้ตามหลักฐานจริง และตรวจวันที่นำเงินเข้าไทยประกอบ การแลกสกุลเงินกับการนำเงินเข้าไทยอาจคนละวัน"),
+                button("ส่งออก CSV · เงินต้นและรายได้ที่แลกกลับ",exportRemittance),
+                h("a",{href:"https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf",target:"_blank",rel:"noopener noreferrer",style:{fontSize:12,textDecoration:"underline"}},"กรมสรรพากร · คำถาม 9–12 เงินต้นและอัตราแลกเปลี่ยน"))
+                : h(React.Fragment,null,...Object.keys(guidance).map(metric),button("ส่งออก CSV · สรุปและรายการในช่วงนี้",exportReport)),
+            currency!=="USD" && missing.length>0 && h("details",null,h("summary",null,"ตรวจรายการที่ขาดเรทหรือต้นทุน"),...missing.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date+" · "+r.title),note(({trade:"ตรวจต้นทุนหุ้นและเรทวันขาย",fxAsset:"ตรวจเรทวันขายและต้นทุนเงินบาทของหุ้นที่ซื้อ",fxCash:"ตรวจต้นทุน USD ในรายละเอียดการแลกเงิน",interest:"ระบุเรทวันที่รับดอกเบี้ย",dividend:"ระบุเรทวันที่รับปันผล"})[r.kind]),!account.archived && (account.portfolioEntries||[]).some(x=>x.id===r.id) && button("แก้รายการ",()=>{const x=account.portfolioEntries.find(x=>x.id===r.id);onEdit(x.type,x);})))),
             h("details",null,h("summary",null,"มูลค่าที่ยังถืออยู่และเรทประเมิน"),currency!=="THB"&&h(React.Fragment,null,h(Input,{label:"เรทประเมินวันที่เลือก · บาทต่อ 1 "+currency,type:"number",value:rate || account.portfolioMarketRates?.[day] || "",onChange:v=>{setRate(v);setMsg("");}}),!account.archived&&button("บันทึกเรทของวันที่เลือก",()=>record("portfolioMarketRates",rate || account.portfolioMarketRates?.[day],true)),msg&&note(msg)),
                 currency!=="THB"&&pair("ส่วนต่างค่าเงินสดที่ยังไม่แลก",format(cashValue===null || wallet.cash.cost===null || close<0 ? null : cashValue-wallet.cash.cost,baht)),
                 ...held.map(p=>{const mv=p.quote?p.units*p.quote.amount:null, basis=wallet.positions.get(p.symbol)?.thb.cost;
@@ -8988,6 +9033,99 @@ try {
         if (!(q > 0 && price > 0)) return "";
         const value = convertFromTHB ? q/price : q*price;
         return Number.isFinite(value) ? String(Number(value.toFixed(8))) : "";
+    }
+    // Track the source of USD through cash, reinvestments and partial conversions.
+    // A withdrawal consumes each cash source proportionally. Dates and amounts remain auditable.
+    function usdRemittanceBook(accounts, events) {
+        const wallets=new globalThis.Map(), conversions=[];
+        const lot=(kind,value,date="",id="")=>({kind,value,date,id});
+        const total=lots=>lots.reduce((sum,l)=>sum+l.value,0);
+        const scale=(lots,factor)=>lots.map(l=>({...l,value:l.value*factor}));
+        function take(lots,amount) {
+            if(!(amount>0))return [];
+            const available=total(lots), used=Math.min(amount,Math.max(0,available));
+            const removed=available>0 ? scale(lots,used/available) : [];
+            const remain=available>0 ? scale(lots,1-used/available) : [];
+            lots.splice(0,lots.length,...remain.filter(l=>l.value>1e-10));
+            if(amount>used+1e-8){
+                removed.push(lot("unknown",amount-used));
+                lots.debt=(lots.debt||0)+amount-used;
+            }
+            return removed;
+        }
+        function put(lots,added){
+            const debt=lots.debt||0;
+            if(debt>0){
+                const paid=Math.min(debt,total(added));
+                take(added,paid);
+                lots.debt=debt-paid;
+            }
+            lots.push(...added);
+        }
+        for(const a of accounts)if(accountCurrency(a)==="USD"){
+            const n=Number(a.startBalance)||0;
+            const cash=n>0?[lot("unknown",n)]:[];
+            cash.debt=Math.max(0,-n);
+            wallets.set(a.id,{cash,positions:new globalThis.Map()});
+        }
+        for(const e of events){
+            const r=e.row, w=wallets.get(e.accountId);
+            if(e.kind==="transfer"){
+                const from=wallets.get(r.fromAccountId), to=wallets.get(r.toAccountId);
+                const sourceCurrency=accountCurrency(accounts.find(a=>a.id===r.fromAccountId));
+                const targetCurrency=accountCurrency(accounts.find(a=>a.id===r.toAccountId));
+                const amount=Number(r.amount), received=transferReceived(r);
+                if(!(amount>0 && received>0))continue;
+                const moved=from ? take(from.cash,amount) : [];
+                const fee=Number(r.transferFee)||0;
+                // The fee is paid after the converted amount and is not counted as remitted income.
+                if(from)take(from.cash,fee);
+                if(to){
+                    const sources=from ? scale(moved,received/amount) : [lot(sourceCurrency==="THB"?"principal":"unknown",received,e.date,r.id)];
+                    put(to.cash,sources);
+                }
+                if(from && targetCurrency==="THB"){
+                    conversions.push({id:r.id,date:e.date,accountId:r.fromAccountId,amount,received,fee,rate:received/amount,
+                        sources:moved.map(l=>({...l,thb:l.value*received/amount}))});
+                }
+                continue;
+            }
+            if(!w || r.investmentFeeFor)continue;
+            if(e.kind==="portfolio" && ["buy","opening","sell"].includes(r.type)){
+                const position=w.positions.get(r.symbol)||{units:0,lots:[]};
+                w.positions.set(r.symbol,position);
+                const feeUnits=r.feeUnit==="asset" ? Number(r.fee)||0 : 0;
+                if(r.type==="sell"){
+                    const units=Number(r.units)+feeUnits;
+                    const basis=position.units>0 ? total(position.lots)*Math.min(1,units/position.units) : 0;
+                    const sources=take(position.lots,basis);
+                    if(units>position.units+1e-8 || sources.some(l=>l.kind==="unknown") || basis<=0){
+                        put(w.cash,[lot("unknown",Math.max(0,e.delta),e.date,r.id)]);
+                    }else{
+                        if(e.delta<basis)put(w.cash,scale(sources,Math.max(0,e.delta)/basis));
+                        else {
+                            if(e.delta>basis)sources.push(lot("trade",e.delta-basis,e.date,r.id));
+                            put(w.cash,sources);
+                        }
+                    }
+                    position.units=Math.max(0,position.units-units);
+                }else{
+                    const cost=r.type==="buy" ? -e.delta : Number(r.amount)||0;
+                    position.lots.push(...(r.type==="buy" ? take(w.cash,cost) : [lot("unknown",cost,e.date,r.id)]));
+                    position.units+=Number(r.units)-feeUnits;
+                }
+                continue;
+            }
+            if(e.delta>0){
+                const kind=e.kind==="portfolio" && ["interest","dividend"].includes(r.type) ? r.type
+                    : e.kind==="ordinary" && r.kind==="in" ? ({"ดอกเบี้ย":"interest","เงินปันผล":"dividend"})[r.category] : null;
+                put(w.cash,[lot(kind||"unknown",e.delta,e.date,r.id)]);
+            }else if(e.delta<0)take(w.cash,-e.delta);
+            if(e.kind==="portfolio" && r.type==="cash"){
+                w.cash=[lot("unknown",Math.max(0,Number(r.amount)),e.date,r.id)];
+            }
+        }
+        return {wallets,conversions};
     }
     function portfolioFxFlows(events, accountId, accounts, detailRows) {
         const totals = {USD:{in:0,out:0}, THB:{in:0,out:0}, count:0};
