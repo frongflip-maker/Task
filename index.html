@@ -428,7 +428,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-portfolio-order-v40";
+window.__TASKROUTINE_BUILD__="2026-11-05-portfolio-newest-v41";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -2182,7 +2182,7 @@ try {
         const income = filtered.filter(r => ["dividend","interest"].includes(r.type));
         const gross = income.reduce((s,r)=>s+r.amount,0), tax = income.reduce((s,r)=>s+r.tax,0);
         const types = totalOnly ? ["snapshot","interest","dividend","fee_refund","fee_charge"] : ["buy","sell","interest","dividend","fee_refund","fee_charge","opening","cash","quote"];
-        const history = [...filtered].sort((a,b)=>b.date.localeCompare(a.date)||portfolioEntryCompare(a,b));
+        const history = [...filtered].reverse().sort((a,b)=>portfolioEntryCompare(b,a));
         const historyDays = new globalThis.Map();
         for(const row of history){
             if(!historyDays.has(row.date))historyDays.set(row.date,[]);
@@ -2331,10 +2331,10 @@ try {
                 : h(React.Fragment,null,h(FinanceSelect,{label:"ปีของ Statement พอร์ต",value:year,onChange:setYear,options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,y])])}),
                     income.length>0 && h("section",{className:"pf-stack"},numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะปีที่เลือก")),
                     !history.length && text("ยังไม่มีรายการภายในพอร์ต"),
-                    text("วันล่าสุดอยู่บน · ภายในวันทำจากบนลงล่าง"),
-                    !account.archived && text("กดค้างที่รายการเพื่อลากในวันเดียวกัน · ลำดับนี้ใช้คำนวณด้วย"),
+                    text("รายการล่าสุดอยู่บน · รายการเก่าอยู่ล่าง"),
+                    !account.archived && text("กดค้างลากในวันเดียวกัน · ระบบคำนวณจากเก่าไปใหม่"),
                     ...Array.from(historyDays,([day,items])=>h(PortfolioHistoryDay,{key:day,day,items,readOnly:account.archived,
-                        onReorder:reorderHistory,onReset:day=>reorderHistory(day,null),renderRow:(r,index,drag)=>{
+                        onReorder:(day,ids)=>reorderHistory(day,[...ids].reverse()),onReset:day=>reorderHistory(day,null),renderRow:(r,index,drag)=>{
                             const delta=portfolioCash(r), cashRow=["buy","sell","interest","dividend","fee_refund","fee_charge"].includes(r.type);
                             const amount=cashRow?Math.abs(delta):r.amount;
                             return h("details",{key:r.id,...drag.props,style:drag.style},
