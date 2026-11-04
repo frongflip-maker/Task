@@ -377,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-statement-inline-accounts-v22";
+window.__TASKROUTINE_BUILD__="2026-11-04-grouped-statement-suggestions-v24";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -861,7 +861,7 @@ try {
     const SYNC_QUEUE_KEY = "discipline_os_sync_pending_v1";
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
-    const HISTORY_MAX_BYTES = 1500000;
+    const HISTORY_MAX_BYTES = 12000000;
     const SCHEMA_VERSION = 20;
     const localAdapter = {
         load() { try {
@@ -880,53 +880,167 @@ try {
         } },
     };
     const storage = localAdapter;
+    // Large local recovery records live outside localStorage's small quota.
+    function createAuxiliaryStore(idb, legacy, dbName = "taskroutine_aux_v1") {
+        const cache = new globalThis.Map(), tails = new globalThis.Map(), versions = new globalThis.Map();
+        let database = null, backend = "legacy", initError = null, readyPromise = null, initialized = false;
+        const managed = key => key === HISTORY_KEY || key.startsWith(SYNC_QUEUE_KEY + ":");
+        const clone = value => JSON.parse(JSON.stringify(value));
+        const serial = (key, operation) => {
+            const next = (tails.get(key) || Promise.resolve()).then(operation, operation);
+            tails.set(key, next.then(() => {}, () => {}));
+            return next;
+        };
+        const transaction = (mode, operation) => new Promise((resolve, reject) => {
+            let tx, output;
+            try {
+                tx = database.transaction("records", mode);
+                tx.oncomplete = () => resolve(output);
+                tx.onabort = () => reject(tx.error || new Error("การบันทึกข้อมูลถูกยกเลิก"));
+                tx.onerror = () => {};
+                output = operation(tx.objectStore("records"));
+            } catch (error) {
+                try { tx?.abort(); } catch {}
+                reject(error);
+            }
+        });
+        const getRecord = async key => {
+            const req = await transaction("readonly", store => store.get(key));
+            return req.result;
+        };
+        const open = () => new Promise((resolve, reject) => {
+            if (!idb) return reject(new Error("เบราว์เซอร์นี้ไม่เปิดให้ใช้พื้นที่จัดเก็บเพิ่มเติม"));
+            let settled = false, request;
+            const finish = (error, db) => {
+                if (settled) { db?.close(); return; }
+                settled = true;
+                clearTimeout(timer);
+                error ? reject(error) : resolve(db);
+            };
+            const timer = setTimeout(() => finish(new Error("เปิดพื้นที่จัดเก็บเพิ่มเติมไม่สำเร็จ กรุณาลองเปิดแอปใหม่")), 4000);
+            try {
+                request = idb.open(dbName, 1);
+                request.onupgradeneeded = () => {
+                    if (!request.result.objectStoreNames.contains("records")) request.result.createObjectStore("records");
+                };
+                request.onerror = () => finish(request.error);
+                request.onblocked = () => finish(new Error("ปิดแท็บเก่าของแอป แล้วเปิดใหม่เพื่อตั้งค่าพื้นที่จัดเก็บ"));
+                request.onsuccess = () => finish(null, request.result);
+            } catch (error) { finish(error); }
+        });
+        const ready = () => {
+            if (readyPromise) return readyPromise;
+            readyPromise = (async () => {
+                const originals = new globalThis.Map();
+                try {
+                    if (legacy) for (let i = 0; i < legacy.length; i++) {
+                        const key = legacy.key(i);
+                        if (!key || !managed(key)) continue;
+                        const raw = legacy.getItem(key);
+                        if (raw == null) continue;
+                        try {
+                            const value = JSON.parse(raw);
+                            if (key === HISTORY_KEY ? !Array.isArray(value) : !value?.snapshot) continue;
+                            originals.set(key, { raw, value });
+                            cache.set(key, value);
+                        } catch (error) { initError ||= error; }
+                    }
+                } catch (error) { initError ||= error; }
+                try {
+                    database = await open();
+                    database.onversionchange = () => { database.close(); database = null; };
+                    const requests = await transaction("readonly", store => ({ keys: store.getAllKeys(), values: store.getAll() }));
+                    const persisted = new globalThis.Map(requests.keys.result.map((key, i) => [key, requests.values.result[i]]));
+                    persisted.forEach((value, key) => cache.set(key, value));
+                    backend = "indexeddb";
+                    const imports = [...originals].filter(([key]) => !persisted.has(key));
+                    if (imports.length) await transaction("readwrite", store => imports.forEach(([key, item]) => store.put(item.value, key)));
+                    // Delete only an unchanged legacy copy verified by reading back the committed record.
+                    for (const [key, item] of originals) {
+                        const saved = await getRecord(key);
+                        if (JSON.stringify(saved) !== JSON.stringify(item.value)) continue;
+                        if (legacy.getItem(key) === item.raw) legacy.removeItem(key);
+                    }
+                } catch (error) { initError ||= error; }
+                initialized = true;
+                return { ok: !initError, backend, error: initError };
+            })();
+            return readyPromise;
+        };
+        const write = (key, value) => {
+            if (!initialized) return ready().then(() => write(key, value));
+            let captured;
+            try { captured = clone(value); } catch (error) { return Promise.resolve({ ok: false, error }); }
+            versions.set(key, (versions.get(key) || 0) + 1);
+            cache.set(key, captured); // Cloud sends this newest version even if persistence fails.
+            return serial(key, async () => {
+                try {
+                    if (backend === "indexeddb") await transaction("readwrite", store => store.put(captured, key));
+                    else {
+                        if (!legacy) throw new Error("ไม่สามารถบันทึกข้อมูลบนอุปกรณ์นี้ได้");
+                        legacy.setItem(key, JSON.stringify(captured));
+                    }
+                    return { ok: true };
+                } catch (error) { return { ok: false, error }; }
+            });
+        };
+        const remove = (key, expected, conditional = false) => {
+            if (!initialized) return ready().then(() => remove(key, expected, conditional));
+            if (conditional && cache.get(key) !== expected) return Promise.resolve({ ok: true, skipped: true });
+            const previous = cache.get(key), version = (versions.get(key) || 0) + 1;
+            versions.set(key, version);
+            cache.delete(key);
+            return serial(key, async () => {
+                try {
+                    if (backend === "indexeddb") {
+                        const outcome = { skipped: false, persisted: undefined };
+                        await transaction("readwrite", store => {
+                            if (!conditional) { store.delete(key); return; }
+                            const request = store.get(key);
+                            request.onsuccess = () => {
+                                if (JSON.stringify(request.result) !== JSON.stringify(expected)) {
+                                    outcome.skipped = true;
+                                    outcome.persisted = request.result;
+                                } else store.delete(key);
+                            };
+                        });
+                        if (outcome.skipped) {
+                            if (versions.get(key) === version && outcome.persisted !== undefined) cache.set(key, outcome.persisted);
+                            return { ok: true, skipped: true };
+                        }
+                    }
+                    else {
+                        if (!legacy) throw new Error("ไม่สามารถบันทึกข้อมูลบนอุปกรณ์นี้ได้");
+                        legacy.removeItem(key);
+                    }
+                    return { ok: true };
+                } catch (error) {
+                    if (versions.get(key) === version && previous !== undefined) cache.set(key, previous);
+                    return { ok: false, error };
+                }
+            });
+        };
+        return { ready, read: key => cache.get(key), write, remove,
+            get error() { return initError; }, get backend() { return backend; } };
+    }
+    let auxiliaryLegacy = null, auxiliaryIDB = null;
+    try { auxiliaryLegacy = window.localStorage; auxiliaryIDB = window.indexedDB; } catch {}
+    const auxiliaryStore = createAuxiliaryStore(auxiliaryIDB, auxiliaryLegacy);
     const syncQueue = {
         key(userId) { return `${SYNC_QUEUE_KEY}:${userId || "anonymous"}`; },
-        load(userId) { try {
-            const raw = localStorage.getItem(this.key(userId));
-            return raw ? JSON.parse(raw) : null;
-        }
-        catch {
-            return null;
-        } },
-        save(userId, item) { try {
-            localStorage.setItem(this.key(userId), JSON.stringify(item));
-            return { ok: true };
-        }
-        catch (error) {
-            return { ok: false, error };
-        } },
-        clear(userId) { try {
-            localStorage.removeItem(this.key(userId));
-            return { ok: true };
-        }
-        catch (error) {
-            return { ok: false, error };
-        } },
+        load(userId) { return auxiliaryStore.read(this.key(userId)) || null; },
+        save(userId, item) { return auxiliaryStore.write(this.key(userId), item); },
+        clear(userId, expected) { return auxiliaryStore.remove(this.key(userId), expected, arguments.length > 1); },
     };
+    function newestRecoverySnapshot(localSnapshot, pendingSnapshot) {
+        if (!pendingSnapshot) return localSnapshot;
+        if (!localSnapshot) return pendingSnapshot;
+        return (Date.parse(localSnapshot.savedAt) || 0) > (Date.parse(pendingSnapshot.savedAt) || 0) ? localSnapshot : pendingSnapshot;
+    }
     const historyStore = {
-        load() { try {
-            const raw = localStorage.getItem(HISTORY_KEY);
-            const entries = raw ? JSON.parse(raw) : [];
-            return Array.isArray(entries) ? entries : [];
-        }
-        catch {
-            return [];
-        } },
-        save(entries) { try {
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
-            return { ok: true };
-        }
-        catch (error) {
-            return { ok: false, error };
-        } },
-        clear() { try {
-            localStorage.removeItem(HISTORY_KEY);
-            return { ok: true };
-        }
-        catch (error) {
-            return { ok: false, error };
-        } },
+        load() { return auxiliaryStore.read(HISTORY_KEY) || []; },
+        save(entries) { return auxiliaryStore.write(HISTORY_KEY, entries); },
+        clear() { return auxiliaryStore.remove(HISTORY_KEY); },
     };
     function migrate(snap) {
         if (!snap || typeof snap !== "object")
@@ -1497,9 +1611,10 @@ try {
     };
     function AccountBadge({ account, accounts = [], compact = false }) {
         const child = !!account?.parentAccountId;
+        const tiny = compact === "tiny";
         const base = accountBackground(account);
         const soft = "#" + [1,3,5].map(i => Math.round(parseInt(base.slice(i,i+2),16)*.3 + 255*.7).toString(16).padStart(2,"0")).join("");
-        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: compact ? 4 : 5, maxWidth: "100%", minWidth: 0, padding: compact ? (child ? "2px 6px" : "3px 7px") : child ? "3px 7px" : "6px 10px", borderRadius: compact ? 7 : child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: compact ? (child ? 11 : 11.5) : child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: compact ? 1.5 : 1.6, whiteSpace: compact ? "nowrap" : undefined, overflow: compact ? "hidden" : undefined, overflowWrap: compact ? undefined : "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
+        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: compact ? 4 : 5, maxWidth: "100%", minWidth: 0, padding: tiny ? "2px 5px" : compact ? (child ? "2px 6px" : "3px 7px") : child ? "3px 7px" : "6px 10px", borderRadius: compact ? 7 : child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: tiny ? (child ? 9.5 : 10) : compact ? (child ? 11 : 11.5) : child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: tiny ? 1.4 : compact ? 1.5 : 1.6, whiteSpace: compact ? "nowrap" : undefined, overflow: compact ? "hidden" : undefined, overflowWrap: compact ? undefined : "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
             child && React.createElement("span", { "aria-hidden": true, style: { fontSize: 13, flexShrink: 0 } }, "↳"),
             React.createElement("span", { style: { minWidth: 0, overflow: compact ? "hidden" : undefined, textOverflow: compact ? "ellipsis" : undefined, overflowWrap: compact ? undefined : "anywhere" } }, account?.name || "ไม่ระบุบัญชี"));
     }
@@ -1774,11 +1889,12 @@ try {
         const cloudApplying = React.useRef(false);
         const cloudLoadAttempted = React.useRef(false);
         const [cloudConflict, setCloudConflict] = useState(null);
-        const [localSaveError, setLocalSaveError] = useState("");
+        const [localSaveError, setLocalSaveError] = useState(auxiliaryStore.error ? `เตรียมพื้นที่จัดเก็บไม่สำเร็จ: ${auxiliaryStore.error.message} · สำเนาเดิมยังถูกเก็บไว้` : "");
         const [hasPendingSync, setHasPendingSync] = useState(false);
         const [historyEntries, setHistoryEntries] = useState(() => historyStore.load());
         const historyLastAuto = React.useRef(0);
         const historySaveReady = React.useRef(false);
+        const localRecoverySnapshot = React.useRef(null);
         const [installPrompt, setInstallPrompt] = useState(null);
         const [pwaInstalled, setPwaInstalled] = useState(() => window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true);
         const pwaIsIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1866,7 +1982,7 @@ try {
                 fireToast("บันทึกข้อมูลในเครื่องไม่สำเร็จ", "err");
             }
         };
-        const saveHistoryCheckpoint = (snapshotOrGet, reason, force = false) => {
+        const saveHistoryCheckpoint = async (snapshotOrGet, reason, force = false) => {
             const now = Date.now();
             if (!force && now - historyLastAuto.current < 10 * 60 * 1000)
                 return false;
@@ -1882,22 +1998,25 @@ try {
                 reportLocalSaveError("เก็บประวัติไม่สำเร็จ", new Error("ข้อมูลหนึ่งชุดมีขนาดใหญ่เกินพื้นที่ประวัติ"));
                 return false;
             }
-            const result = historyStore.save(next);
+            historyLastAuto.current = now;
+            const result = await historyStore.save(next);
             if (!result.ok) {
+                if (historyLastAuto.current === now) historyLastAuto.current = 0;
                 reportLocalSaveError("เก็บประวัติไม่สำเร็จ", result.error);
                 return false;
             }
             historyLastAuto.current = now;
-            setHistoryEntries(next);
+            setHistoryEntries(historyStore.load());
+            setLocalSaveError(current => current.startsWith("เก็บประวัติไม่สำเร็จ") ? "" : current);
             return true;
         };
-        const clearHistory = () => {
-            const result = historyStore.clear();
+        const clearHistory = async () => {
+            const result = await historyStore.clear();
             if (!result.ok) {
                 reportLocalSaveError("ล้างประวัติไม่สำเร็จ", result.error);
                 return false;
             }
-            setHistoryEntries([]);
+            setHistoryEntries(historyStore.load());
             fireToast("ล้างประวัติแล้ว");
             return true;
         };
@@ -1915,15 +2034,17 @@ try {
                 fireToast("กำลังติดตั้ง TaskRoutine");
             return choice?.outcome === "accepted";
         };
-        const savePendingSync = (snapshot = buildSnapshot(), baseUpdatedAt = cloudUpdatedAt.current, baseRevision = cloudRevision.current) => {
+        const savePendingSync = async (snapshot = buildSnapshot(), baseUpdatedAt = cloudUpdatedAt.current, baseRevision = cloudRevision.current) => {
             if (!authUser?.id)
                 return false;
-            const result = syncQueue.save(authUser.id, { snapshot, baseUpdatedAt, baseRevision: Number(baseRevision) || 0, queuedAt: new Date().toISOString() });
+            const pendingWrite = syncQueue.save(authUser.id, { snapshot, baseUpdatedAt, baseRevision: Number(baseRevision) || 0, queuedAt: new Date().toISOString() });
+            setHasPendingSync(true);
+            const result = await pendingWrite;
             if (!result.ok) {
                 reportLocalSaveError("เก็บคิวซิงก์ไม่สำเร็จ", result.error);
                 return false;
             }
-            setHasPendingSync(true);
+            setLocalSaveError(current => current.startsWith("เก็บคิวซิงก์ไม่สำเร็จ") ? "" : current);
             return true;
         };
         const syncCloudNow = async (manual = false, override = null) => {
@@ -2013,24 +2134,28 @@ try {
                 cloudUpdatedAt.current = saved.updated_at;
                 cloudRevision.current = Number(saved.data?.revision) || nextRevision;
                 setCloudConflict(null);
-                const cleared = syncQueue.clear(authUser.id);
+                const cleared = await syncQueue.clear(authUser.id, queued);
                 if (!cleared.ok)
                     reportLocalSaveError("ล้างคิวซิงก์ที่ส่งแล้วไม่สำเร็จ", cleared.error);
-                else
-                    setHasPendingSync(false);
+                const remaining = syncQueue.load(authUser.id);
+                if (remaining) {
+                    await savePendingSync(remaining.snapshot, saved.updated_at, cloudRevision.current);
+                    cloudDirty.current = true;
+                }
+                setHasPendingSync(!!syncQueue.load(authUser.id));
                 succeeded = true;
                 cloudReady.current = true;
                 cloudRetryDelay.current = 4000;
                 if (cloudRetryTimer.current)
                     clearTimeout(cloudRetryTimer.current);
                 cloudRetryTimer.current = null;
-                setCloudState("synced");
-                setCloudMsg("ซิงก์ Supabase แล้ว");
+                setCloudState(syncQueue.load(authUser.id) ? "pending" : "synced");
+                setCloudMsg(syncQueue.load(authUser.id) ? "ส่งชุดก่อนแล้ว · กำลังซิงก์รายการล่าสุด" : "ซิงก์ Supabase แล้ว");
             }
             catch (error) {
                 const info = cloudErrorInfo(error, "ซิงก์");
                 cloudDirty.current = true;
-                savePendingSync(attemptedSnapshot, attemptedBaseUpdatedAt, attemptedBaseRevision);
+                if (!syncQueue.load(authUser.id)) await savePendingSync(attemptedSnapshot, attemptedBaseUpdatedAt, attemptedBaseRevision);
                 setCloudState(info.retryable ? "pending" : "error");
                 setCloudMsg(info.message);
                 if (info.retryable && !cloudRetryTimer.current) {
@@ -2118,14 +2243,14 @@ try {
             if (s.fitnessConfirmed)
                 setFitnessConfirmed(s.fitnessConfirmed);
         };
-        const restoreHistory = (historyId) => {
+        const restoreHistory = async (historyId) => {
             const entry = historyStore.load().find(item => item?.id === historyId);
             const snapshot = migrate(entry?.snapshot);
             if (!snapshot) {
                 fireToast("ไม่พบข้อมูลชุดนี้", "err");
                 return false;
             }
-            saveHistoryCheckpoint(buildSnapshot(), "ก่อนกู้คืนข้อมูล", true);
+            if (!await saveHistoryCheckpoint(buildSnapshot(), "ก่อนกู้คืนข้อมูล", true)) return false;
             cloudApplying.current = false;
             applySnapshot(snapshot);
             setDataMsg(`กู้คืนข้อมูลจาก ${new Date(entry.at).toLocaleString("th-TH")} แล้ว ✓`);
@@ -2137,14 +2262,14 @@ try {
             if (!conflict)
                 return;
             if (choice === "cloud") {
-                saveHistoryCheckpoint(buildSnapshot(), "ก่อนใช้ข้อมูล Cloud", true);
+                if (!await saveHistoryCheckpoint(buildSnapshot(), "ก่อนใช้ข้อมูล Cloud", true)) return;
                 cloudApplying.current = true;
                 applySnapshot(migrate(conflict.data));
                 cloudUpdatedAt.current = conflict.updatedAt;
                 cloudRevision.current = conflict.revision;
                 cloudDirty.current = false;
                 setCloudConflict(null);
-                const cleared = syncQueue.clear(authUser?.id);
+                const cleared = await syncQueue.clear(authUser?.id);
                 if (!cleared.ok)
                     reportLocalSaveError("ล้างคิวซิงก์ไม่สำเร็จ", cleared.error);
                 else
@@ -2154,8 +2279,7 @@ try {
                 fireToast("โหลดข้อมูลล่าสุดจาก Cloud แล้ว");
                 return;
             }
-            if (conflict.data)
-                saveHistoryCheckpoint(migrate(conflict.data), "ข้อมูล Cloud ก่อนใช้ข้อมูลเครื่องนี้", true);
+            if (conflict.data && !await saveHistoryCheckpoint(migrate(conflict.data), "ข้อมูล Cloud ก่อนใช้ข้อมูลเครื่องนี้", true)) return;
             cloudApplying.current = false;
             savePendingSync(buildSnapshot(), conflict.updatedAt, conflict.revision);
             setCloudConflict(null);
@@ -2192,7 +2316,7 @@ try {
                     fireToast("ข้อมูลชนกัน — เลือกข้อมูลที่จะใช้ในหน้าตั้งค่า", "err");
                     return "conflict";
                 }
-                saveHistoryCheckpoint(buildSnapshot(), "ก่อนดึงข้อมูลล่าสุดจาก Cloud", true);
+                if (!await saveHistoryCheckpoint(buildSnapshot(), "ก่อนดึงข้อมูลล่าสุดจาก Cloud", true)) return "skip";
                 cloudApplying.current = true;
                 applySnapshot(migrate(remote.data));
                 cloudUpdatedAt.current = remote.updated_at;
@@ -2270,7 +2394,7 @@ try {
             });
             return () => { active = false; sub.subscription.unsubscribe(); };
         }, []);
-        useEffect(() => { const s = migrate(storage.load()); if (s)
+        useEffect(() => { const raw = storage.load(); localRecoverySnapshot.current = raw; const s = migrate(raw); if (s)
             applySnapshot(s); setLoaded(true); }, []);
         useEffect(() => { try {
             localStorage.setItem("taskroutine_last_tab", tab);
@@ -2392,11 +2516,14 @@ try {
         useEffect(() => {
             if (!loaded)
                 return;
-            if (historySaveReady.current)
+            const snapshot = buildSnapshot();
+            if (historySaveReady.current) {
                 saveHistoryCheckpoint(() => migrate(storage.load()), "บันทึกอัตโนมัติ");
+                localRecoverySnapshot.current = snapshot;
+            }
             else
                 historySaveReady.current = true;
-            const result = storage.save(buildSnapshot());
+            const result = storage.save(snapshot);
             if (!result.ok)
                 reportLocalSaveError("บันทึกข้อมูลในเครื่องไม่สำเร็จ", result.error);
             else {
@@ -2428,6 +2555,9 @@ try {
                 if (pending?.snapshot) {
                     const remoteUpdatedAt = data?.updated_at || null;
                     const remoteRevision = Number(data?.data?.revision) || 0;
+                    const recovery = newestRecoverySnapshot(localRecoverySnapshot.current, pending.snapshot);
+                    cloudApplying.current = true;
+                    applySnapshot(migrate(recovery));
                     if ((pending.baseUpdatedAt || null) !== remoteUpdatedAt) {
                         cloudUpdatedAt.current = remoteUpdatedAt;
                         cloudRevision.current = remoteRevision;
@@ -2439,6 +2569,7 @@ try {
                     }
                     cloudUpdatedAt.current = remoteUpdatedAt;
                     cloudRevision.current = remoteRevision;
+                    savePendingSync(recovery, remoteUpdatedAt, remoteRevision);
                     cloudReady.current = true;
                     cloudDirty.current = true;
                     setCloudState("pending");
@@ -2450,7 +2581,8 @@ try {
                     const snapshot = migrate(data.data);
                     const currentLocal = migrate(storage.load());
                     if (currentLocal && Number(currentLocal.revision) !== Number(snapshot?.revision))
-                        saveHistoryCheckpoint(currentLocal, "ก่อนโหลดข้อมูล Cloud", true);
+                        if (!await saveHistoryCheckpoint(currentLocal, "ก่อนโหลดข้อมูล Cloud", true)) return;
+                    if (cancelled) return;
                     cloudUpdatedAt.current = data.updated_at || null;
                     cloudRevision.current = Number(snapshot?.revision) || 0;
                     cloudApplying.current = true;
@@ -2552,11 +2684,11 @@ try {
         };
         const importData = (file) => {
             const r = new FileReader();
-            r.onload = () => {
+            r.onload = async () => {
                 try {
                     const s = migrate(JSON.parse(r.result));
                     if (s) {
-                        saveHistoryCheckpoint(buildSnapshot(), "ก่อนนำเข้า JSON", true);
+                        if (!await saveHistoryCheckpoint(buildSnapshot(), "ก่อนนำเข้า JSON", true)) return;
                         applySnapshot(s);
                         setDataMsg("นำเข้าข้อมูลสำเร็จ ✓");
                     }
@@ -2569,8 +2701,8 @@ try {
             };
             r.readAsText(file);
         };
-        const clearAllData = () => {
-            saveHistoryCheckpoint(buildSnapshot(), "ก่อนล้างข้อมูลทั้งหมด", true);
+        const clearAllData = async () => {
+            if (!await saveHistoryCheckpoint(buildSnapshot(), "ก่อนล้างข้อมูลทั้งหมด", true)) return;
             setEvents([]);
             setBookings([]);
             setIncomeSources([]);
@@ -5553,12 +5685,29 @@ try {
     function ExpensePresetPicker({ presets = [], value, onPick, onAddPreset, onUpdatePreset, onReorder, onRenamePreset, onDeletePreset, onUseRecent, hasRecent = false, smartSaved = false, rememberAmount = false, onRememberAmountChange, title = "รายการ", recentTitles = [] }) {
         const [reorderOpen, setReorderOpen] = useState(false);
         const [focused, setFocused] = useState(false);
+        const [activeSuggestion, setActiveSuggestion] = useState(-1);
+        const picker = React.useRef(null);
+        const listId = React.useId();
+        useEffect(() => {
+            const outside = e => { if (picker.current && !picker.current.contains(e.target)) { setFocused(false); setActiveSuggestion(-1); } };
+            document.addEventListener("pointerdown", outside, true);
+            return () => document.removeEventListener("pointerdown", outside, true);
+        }, []);
         const query = String(value || "").trim().toLocaleLowerCase("th");
-        const suggestions = [...new Set([...presets, ...recentTitles].filter(Boolean))].filter(name => !query || (name.toLocaleLowerCase("th").includes(query) && name.toLocaleLowerCase("th") !== query)).slice(0,4);
-        return React.createElement("div", { style: { marginBottom: 14 } },
+        const names = [...new Set([...presets, ...recentTitles].map(name => String(name || "").trim()).filter(Boolean))];
+        const matches = names.filter(name => !query || (name.toLocaleLowerCase("th").includes(query) && name.toLocaleLowerCase("th") !== query));
+        const suggestions = [...matches.filter(name => name.toLocaleLowerCase("th").startsWith(query)), ...matches.filter(name => !name.toLocaleLowerCase("th").startsWith(query))].slice(0,6);
+        const choose = name => { onPick(name); setFocused(false); setActiveSuggestion(-1); };
+        return React.createElement("div", { ref: picker, onBlur: e => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) { setFocused(false); setActiveSuggestion(-1); } }, style: { marginBottom: 14 } },
             React.createElement(Label, null, "ชื่อรายการ"),
-            React.createElement("input", { "aria-label": "ชื่อรายการ", value, onFocus: () => setFocused(true), onBlur: () => setFocused(false), onChange: e => onPick(e.target.value, true), placeholder: "เช่น ค่าอาหาร / ดอกเบี้ย", style: { width: "100%", padding: "11px 12px", borderRadius: 12, background: T.surf2, color: T.text, border: `1px solid ${T.border}`, fontSize: 16, outline: "none" } }),
-            focused && suggestions.length > 0 && React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingTop: 7 } }, suggestions.map(name => React.createElement("button", { key: name, type: "button", onPointerDown: e => e.preventDefault(), onClick: () => { onPick(name); setFocused(false); }, style: { flexShrink: 0, maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "7px 10px", borderRadius: 9, border: `1px solid ${T.border}`, color: T.sub, background: T.surf, fontSize: 12 } }, name))),
+            React.createElement("input", { "aria-label": "ชื่อรายการ", role: "combobox", "aria-autocomplete": "list", "aria-expanded": focused && suggestions.length > 0, "aria-controls": listId, "aria-activedescendant": focused && activeSuggestion >= 0 && suggestions[activeSuggestion] ? `${listId}-${activeSuggestion}` : undefined,
+                value, onFocus: () => setFocused(true), onChange: e => { onPick(e.target.value, true); setFocused(true); setActiveSuggestion(-1); },
+                onKeyDown: e => {
+                    if (e.key === "Escape") { setFocused(false); setActiveSuggestion(-1); }
+                    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && suggestions.length) { e.preventDefault(); setFocused(true); setActiveSuggestion(i => i < 0 ? (e.key === "ArrowDown" ? 0 : suggestions.length - 1) : (i + (e.key === "ArrowDown" ? 1 : -1) + suggestions.length) % suggestions.length); }
+                    if (e.key === "Enter" && focused && activeSuggestion >= 0 && suggestions[activeSuggestion]) { e.preventDefault(); choose(suggestions[activeSuggestion]); }
+                }, placeholder: "เช่น ค่าอาหาร / ดอกเบี้ย", style: { width: "100%", padding: "11px 12px", borderRadius: 12, background: T.surf2, color: T.text, border: `1px solid ${T.border}`, fontSize: 16, outline: "none" } }),
+            focused && suggestions.length > 0 && React.createElement("div", { id: listId, role: "listbox", "aria-label": "ชื่อรายการที่แนะนำ", style: { marginTop: 6, maxHeight: 228, overflowY: "auto", border: `1px solid ${T.border}`, borderRadius: 12, background: T.surf, boxShadow: "0 5px 14px rgba(60,50,35,.08)" } }, suggestions.map((name,index) => React.createElement("button", { key: name, id: `${listId}-${index}`, role: "option", "aria-selected": activeSuggestion === index, type: "button", onClick: () => choose(name), style: { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "11px 12px", textAlign: "left", border: "none", borderTop: index ? `1px solid ${T.border}` : "none", background: activeSuggestion === index ? hex(T.blue,.1) : T.surf, color: T.text, fontSize: 14, touchAction: "manipulation" } }, React.createElement(History, { size: 14, style: { flexShrink: 0, color: T.muted } }), React.createElement("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name)))),
             (onAddPreset || onReorder) && React.createElement("details", { style: { marginTop: 7, fontSize: 11, color: T.muted } },
                 React.createElement("summary", { style: { cursor: "pointer", padding: "4px 0" } }, "รายการที่ใช้บ่อย"),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 } }, presets.map(name => React.createElement("button", { key: name, type: "button", onClick: () => onPick(name), style: { padding: "7px 9px", borderRadius: 8, background: T.surf2, border: `1px solid ${T.border}`, color: T.sub, fontSize: 12 } }, name))),
@@ -5967,9 +6116,16 @@ try {
       const currentTemplate = txnTemplateDefaults?.[currentTemplateKey] || null;
       const [templateRememberAmount, setTemplateRememberAmount] = useState(!!currentTemplate?.rememberAmount);
       useEffect(() => { setTemplateRememberAmount(!!currentTemplate?.rememberAmount); }, [currentTemplateKey, !!currentTemplate?.rememberAmount]);
-      const latestMatchingTransaction = (title = f.title, kind = f.kind) => transactions.map((transaction, index) => ({ transaction, index }))
+      const recentIncomeRecords = payments.map(payment => {
+        const source = incomeSources.find(item => item.id === payment.incomeSourceId);
+        if (!source?.title) return null;
+        const principal = paymentAllocationRows(payment, source.category || "Work").find(row => row.role === "principal");
+        return { ...payment, kind: "in", title: source.title, category: principal?.category || source.category || "Work", moneyType: "work_income", date: payment.date || source.dueDate, studioService: source.subtype || "room" };
+      }).filter(Boolean);
+      const suggestionTransactions = [...transactions, ...recentIncomeRecords];
+      const latestMatchingTransaction = (title = f.title, kind = f.kind) => suggestionTransactions.map((transaction, index) => ({ transaction, index }))
         .filter(({ transaction }) => transaction.kind === kind && String(transaction.paymentBaseTitle || transaction.title || "").trim().toLocaleLowerCase("th") === String(title || "").trim().toLocaleLowerCase("th"))
-        .sort((a, b) => String(b.transaction.date || "").localeCompare(String(a.transaction.date || "")) || b.index - a.index)[0]?.transaction || null;
+        .sort((a, b) => String(b.transaction.date || "").localeCompare(String(a.transaction.date || "")) || String(b.transaction.createdAt || "").localeCompare(String(a.transaction.createdAt || "")) || b.index - a.index)[0]?.transaction || null;
       const templateDefaultsFromTransaction = transaction => transaction ? {
         category: transaction.category || "",
         accountId: transaction.accountId || null,
@@ -6789,7 +6945,7 @@ try {
                       : setExpensePresets,
                   onRenamePreset: studioMode ? null : renameSmartTemplate,
                   onDeletePreset: studioMode ? null : deleteSmartTemplate,
-                  recentTitles: studioMode ? [] : [...new Set(transactions.filter(t => t.kind === f.kind && String(t.title || "").trim()).map(t => String(t.title).trim()))],
+                  recentTitles: studioMode ? [] : [...new Set([...suggestionTransactions].sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).filter(t => t.kind === f.kind && String(t.title || "").trim()).map(t => String(t.title).trim()))],
                 }),
                 templateHint && React.createElement("div", { className: "text-[10px] font-semibold -mt-1 mb-1", style: { color: T.green } }, templateHint),
                 (advancedOpen || linkedAllocations.length > 1) && renderManualIncomeAllocation(),
@@ -8231,16 +8387,16 @@ try {
             if (box.current) observer.observe(box.current);
             return () => { disposed = true; observer.disconnect(); };
         }, [children, fontSize]);
-        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "0 1 auto" : undefined, maxWidth: inline ? "72%" : "100%", minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
+        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "1 1 0" : undefined, maxWidth: "100%", minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
             React.createElement("span", { ref: content, style: { display: "inline-flex", width: "max-content", alignItems: "baseline", gap: 5, fontSize, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.4 } }, children));
     }
     function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
         const dnd = useLongPressSort(rows, (from, to) => onReorder(date, reorderListItem(rows, from, to).map(row => String(row.id))), `statement-${String(date).replace(/[^a-zA-Z0-9_-]/g, "-")}`, 320, false, true);
-        return React.createElement("div", null,
+        return React.createElement("section", { "data-statement-day": date },
             React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "12px 0 7px", fontSize: 12, fontWeight: 700, color: dnd.dragging ? T.blue : T.sub } },
                 parseK(date).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
                 dnd.dragging && React.createElement("span", { style: { fontSize: 10, color: T.blue } }, "กำลังลาก · ปล่อยเพื่อวาง")),
-            rows.map((row, index) => {
+            React.createElement("div", { role: "group", "aria-label": `รายการวันที่ ${shortDate(date)}`, "data-statement-day-frame": true, style: { background: T.surf, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" } }, rows.map((row, index) => {
                 const t = row.raw || {}, transfer = t.kind === "transfer";
                 const account = accounts.find(a => a.id === row.accountId);
                 const currency = accountCurrency(account);
@@ -8249,35 +8405,36 @@ try {
                 const color = transfer ? TRANSFER_COLOR : row.dir === "in" ? T.green : T.orange;
                 const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
                 const flow = transfer ? investmentDirection(t, accounts) : "none";
+                const heading = transfer ? (["invest","withdraw"].includes(t.transferPurpose) ? "โอนย้ายบัญชี" : TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี") : row.title;
                 return React.createElement("button", { key: row.id, type: "button", ...dnd.itemProps(index),
                     "aria-label": `ดูรายการ ${row.title}`, title: "แตะเพื่อดูรายละเอียด · กดค้างเพื่อลาก",
                     onContextMenu: e => e.preventDefault(),
                     onClick: e => { if (dnd.suppressClick()) { e.preventDefault(); return; } onOpen(row); },
-                    style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", marginBottom: 7, padding: "10px 11px", borderRadius: 14, background: T.surf, color: T.text, overflow: "hidden", border: `1px solid ${active || armed ? T.blue : T.border}` } },
+                    style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", margin: 0, padding: "11px 11px", borderRadius: 0, background: active || armed ? hex(T.blue,.06) : T.surf, color: T.text, overflow: "hidden", border: "none", borderTop: index ? `1px solid ${T.border}` : "none", outline: active || armed ? `1px solid ${T.blue}` : "none", outlineOffset: -1 } },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, minWidth: 0 } },
                         React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 16, style: { color, flexShrink: 0 } }),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 } },
-                            React.createElement("span", { title: row.title, style: { fontSize: 15, fontWeight: 750, lineHeight: 1.45, flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, transfer ? TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี" : row.title),
-                            !transfer && React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts, compact: true }))),
-                        flow !== "none" && INVESTMENT_FLOWS[flow] !== TRANSFER_PURPOSES[t.transferPurpose] && React.createElement("span", { style: { color: T.blue, fontSize: 10, flexShrink: 0 } }, INVESTMENT_FLOWS[flow]),
+                            React.createElement("span", { title: heading, style: { fontSize: transfer ? 14 : 15, fontWeight: 750, lineHeight: 1.45, flex: transfer ? "0 0 auto" : "0 1 auto", maxWidth: transfer ? "44%" : undefined, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, heading),
+                            transfer ? React.createElement("span", { "data-transfer-route": true, style: { display: "flex", alignItems: "center", gap: 3, flex: "1 1 auto", minWidth: 0 } },
+                                React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: from, accounts, compact: "tiny" })),
+                                React.createElement("span", { style: { color: T.muted, fontSize: 10, flexShrink: 0 } }, "→"),
+                                React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: to, accounts, compact: "tiny" }))) :
+                                React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts, compact: true }))),
                         React.createElement(ChevronRight, { size: 13, style: { color: T.muted, flexShrink: 0 } })),
+                    flow !== "none" && React.createElement("div", { "data-investment-flow": flow, style: { color: T.blue, fontSize: 11, fontWeight: 600, paddingLeft: 23, marginTop: 2, lineHeight: 1.5 } }, INVESTMENT_FLOWS[flow]),
                     transfer ? React.createElement(React.Fragment, null,
-                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 5, minWidth: 0 } },
-                            React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: from, accounts, compact: true })),
-                            React.createElement("span", { style: { color: T.muted, fontSize: 12 } }, "→"),
-                            React.createElement("span", { style: { display: "flex", minWidth: 0, maxWidth: "47%" } }, React.createElement(AccountBadge, { account: to, accounts, compact: true }))),
                         React.createElement(StatementMoney, { fontSize: 15 },
                             React.createElement("span", { style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
                             React.createElement("span", { style: { color: T.muted } }, "→"),
                             React.createElement("span", { style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`))) :
                         React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 4, paddingLeft: 23, minWidth: 0 } },
-                            React.createElement("span", { style: { color: T.sub, fontSize: 13, lineHeight: 1.5, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag !== row.title ? row.tag || "อื่นๆ" : ""),
+                            React.createElement("span", { style: { color: T.sub, fontSize: 13, lineHeight: 1.5, flex: "0 1 auto", maxWidth: "42%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag !== row.title ? row.tag || "อื่นๆ" : ""),
                             React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`))),
                     transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
                     !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
                     !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
                     !transfer && row.detailSummary && React.createElement("div", { style: { fontSize: 10, color: T.muted, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.detailSummary));
-            }));
+            })));
     }
     function TransactionRows({ rows, accounts, onOpen, onReorder }) {
         const groups = [];
@@ -8288,7 +8445,7 @@ try {
         });
         const draggable = groups.some(group => group.rows.length > 1);
         return React.createElement("div", null,
-            draggable && React.createElement("div", { style: { fontSize: 10, color: T.muted, padding: "2px 0 5px" } }, "แตะเพื่อดูรายละเอียด · กดค้างตรงไหนของการ์ดก็ได้เพื่อลากเรียงภายในวันเดียวกัน"),
+            draggable && React.createElement("div", { style: { fontSize: 10, color: T.muted, padding: "2px 0 5px" } }, "แตะดูรายละเอียด · กดค้างที่รายการเพื่อลากเรียงในวันเดียวกัน"),
             groups.map(group => React.createElement(StatementDayRows, { key: group.date, date: group.date, rows: group.rows, accounts, onOpen, onReorder })));
     }
     function TransferDetail({ transaction: t, accounts }) {
@@ -12053,9 +12210,16 @@ try {
             throw new Error(`Core self-test failed: ${failed.map(result => result.name).join(", ")}`);
         console.info("TaskRoutine core self-test: PASS");
     }
+    const renderPreparedApp = () => {
     window.__TASKROUTINE_BOOT_PHASE__="rendering";
     createRoot(document.getElementById("root")).render(React.createElement(TaskRoutineErrorBoundary, null, React.createElement(App, null)));
     requestAnimationFrame(() => { window.__TASKROUTINE_BOOT_PHASE__="ready"; const boot = document.getElementById("boot"); if (boot) boot.style.display = "none"; });
+    };
+    if (new URLSearchParams(location.search).get("selftest") === "1") renderPreparedApp();
+    else {
+        setBootStatus("กำลังเตรียมข้อมูลในเครื่อง…");
+        auxiliaryStore.ready().then(renderPreparedApp).catch(error => showErr("เปิดข้อมูลไม่สำเร็จ", String(error)));
+    }
 }
 catch (err) {
     showErr("แอปทำงานผิดพลาด", err && err.stack ? err.stack : String(err));
