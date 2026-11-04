@@ -440,7 +440,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-statement-layout-v42";
+window.__TASKROUTINE_BUILD__="2026-11-05-linked-exchange-tax-v45";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -925,7 +925,7 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 12000000;
-    const SCHEMA_VERSION = 20;
+    const SCHEMA_VERSION = 21;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1265,6 +1265,7 @@ try {
         s.expenseTargets ?? (s.expenseTargets = {});
         s.investmentPlans ?? (s.investmentPlans = []);
         s.taxTypeMap ?? (s.taxTypeMap = {});
+        s.foreignTax = normalizeForeignTax(s.foreignTax);
         delete s.quests;
         delete s.questTemplates;
         delete s.activityTypes;
@@ -1792,6 +1793,434 @@ try {
         return { assets, realized, profit: unknownProfit ? null : profit, snapshot };
     }
 
+    const FOREIGN_TAX_TYPES={trade:"40(4)(ช)",interest:"40(4)(ก)",dividend:"40(4)(ข)",review:"รอตรวจประเภท"};
+    const FOREIGN_TAX_LABELS={trade:"กำไรขายหุ้น/ETF",interest:"ดอกเบี้ย",dividend:"ปันผล",review:"รายการต้องตรวจ"};
+    function normalizeForeignTax(value){
+        const v=value && typeof value==="object" && !Array.isArray(value)?value:{};
+        return {...v,version:1,residency:v.residency&&typeof v.residency==="object"&&!Array.isArray(v.residency)?v.residency:{},
+            incomeMeta:v.incomeMeta&&typeof v.incomeMeta==="object"&&!Array.isArray(v.incomeMeta)?v.incomeMeta:{},
+            rateMethod:["bot_buying","bank_buying"].includes(v.rateMethod)?v.rateMethod:"bot_buying",
+            exchangeExclusions:v.exchangeExclusions&&typeof v.exchangeExclusions==="object"&&!Array.isArray(v.exchangeExclusions)?v.exchangeExclusions:{},
+            remittances:Array.isArray(v.remittances)?v.remittances.filter(r=>r&&typeof r==="object").map(r=>({...r,allocations:Array.isArray(r.allocations)?r.allocations.filter(a=>a&&typeof a==="object"):[]})):[]};
+    }
+    function taxAccountLocation(a){return ["TH","foreign"].includes(a?.taxLocation)?a.taxLocation:"unknown";}
+    function taxCountryCode(v){const s=String(v||"").trim().toUpperCase();return /^[A-Z]{2}$/.test(s)?s:"";}
+    function taxResidentStatus(state,year){
+        const value=state.residency?.[String(year)];
+        const maxDays=(Date.UTC(Number(year)+1,0,1)-Date.UTC(Number(year),0,1))/86400000;
+        if(value==null || value==="" || !Number.isInteger(Number(value)) || Number(value)<0 || Number(value)>maxDays)return "unknown";
+        return Number(value)>=180?"resident":"nonresident";
+    }
+    function investmentTaxIncome(accounts,transactions,state={}){
+        const items=[],issues=[];
+        const add=(a,r,kind,id,gross,tax,net,pnl=null)=>{
+            const meta=state.incomeMeta?.[id]||{};
+            const canClassify=id.startsWith("transaction:") || ["interest","dividend"].includes(r.type);
+            if(canClassify && ["review","interest","dividend"].includes(meta.kind))kind=meta.kind;
+            if(id.startsWith("transaction:") && meta.withheldTax!=="" && meta.withheldTax!=null){tax=Number(meta.withheldTax);gross=net+tax;}
+            const country=taxCountryCode(meta.sourceCountry||a.taxIncomeCountry);
+            const crypto=r.tradeMode==="crypto";
+            items.push({id,rowId:r.id,accountId:a.id,accountName:a.name,date:r.date,year:String(r.date||"").slice(0,4),
+                title:(FOREIGN_TAX_LABELS[kind]||kind)+(r.symbol?" · "+r.symbol:r.title?" · "+r.title:""),kind,
+                currency:accountCurrency(a),gross,tax,net,pnl,sourceCountry:country,
+                taxType:crypto?"รอตรวจประเภท":FOREIGN_TAX_TYPES[kind],crypto,canClassify,
+                evidence:meta.evidence||"",domesticRate:accountCurrency(a)==="THB"?1:Number(meta.domesticRate||r.thbRate||r.sourceRateTHB)||null});
+        };
+        for(const a of accounts){
+            let book;
+            try{book=portfolioBook(a.portfolioEntries||[]);}catch(e){issues.push(a.name+": "+e.message);}
+            for(const r of a.portfolioEntries||[]){
+                if(!r.date)continue;
+                const id="portfolio:"+a.id+":"+r.id;
+                if(r.type==="sell"){
+                    const pnl=book?.realized.get(r.id)??null;
+                    add(a,r,"trade",id,pnl==null?null:Math.max(0,pnl),0,pnl==null?null:Math.max(0,pnl),pnl);
+                }else if(["interest","dividend"].includes(r.type)){
+                    add(a,r,r.type,id,Number(r.amount)||0,Number(r.tax)||0,(Number(r.amount)||0)-(Number(r.tax)||0));
+                }else if(["fee_refund","fee_charge"].includes(r.type)){
+                    add(a,r,"review",id,Number(r.amount)||0,0,Math.max(0,portfolioCash(r)));
+                }
+            }
+        }
+        for(const t of transactions){
+            if(t.kind!=="in" || t.investmentFeeFor)continue;
+            const kind=({"ดอกเบี้ย":"interest","เงินปันผล":"dividend","เงินปันผล/กำไรลงทุน":"review"})[t.category];
+            const a=accounts.find(a=>a.id===t.accountId);
+            if(kind && a)add(a,t,kind,"transaction:"+t.id,nativeAmount(t),0,nativeAmount(t));
+        }
+        items.sort((a,b)=>b.date.localeCompare(a.date)||a.id.localeCompare(b.id));
+        return {items,issues};
+    }
+    function taxIncomeEligibility(item,state){
+        if(item.crypto || item.kind==="review")return {status:"pending",reason:"ตรวจประเภทสินทรัพย์/รายการก่อน"};
+        if(item.gross==null || item.net==null)return {status:"pending",reason:"ต้นทุนไม่ครบ"};
+        if(![item.gross,item.tax,item.net].every(Number.isFinite) || item.tax<0 || item.net<0 || Math.abs(item.gross-item.tax-item.net)>1e-7)return {status:"pending",reason:"ตรวจยอดก่อนหัก ภาษี และยอดสุทธิ"};
+        if(item.kind==="trade" && item.pnl<=0)return {status:"excluded",reason:"ขายไม่มีกำไร ไม่ใช้หักกลบกำไรอื่น"};
+        if(!item.sourceCountry)return {status:"pending",reason:"ยังไม่ระบุประเทศแหล่งเงินได้"};
+        if(item.sourceCountry==="TH")return {status:"domestic",reason:"เงินได้แหล่งไทย แยกจากรายได้ต่างประเทศ"};
+        if(Number(item.year)<2024)return {status:"excluded",reason:"เกิดก่อน 1 ม.ค. 2567"};
+        const resident=taxResidentStatus(state,item.year);
+        if(resident==="unknown")return {status:"pending",reason:"ยังไม่ระบุจำนวนวันที่อยู่ไทยในปีเกิดรายได้"};
+        if(resident==="nonresident")return {status:"excluded",reason:"ปีเกิดรายได้อยู่ไทยไม่ถึง 180 วัน"};
+        return {status:"foreign",reason:"เงินได้ต่างประเทศ รอตรวจส่วนที่นำเข้าไทย"};
+    }
+    function taxIncomeFingerprint(item,state){
+        const n=x=>x==null?null:Math.round(x*1e8)/1e8;
+        return JSON.stringify([item.id,item.date,item.currency,item.kind,n(item.gross),n(item.tax),n(item.net),n(item.pnl),
+            item.sourceCountry,item.taxType,taxIncomeEligibility(item,state).status]);
+    }
+    function taxAllocatedIncome(state,incomeId,exceptId){
+        return state.remittances.filter(r=>r.status==="confirmed" && r.id!==exceptId)
+            .flatMap(r=>r.allocations||[]).filter(a=>a.incomeId===incomeId).reduce((n,a)=>n+(Number(a.amount)||0),0);
+    }
+    function taxRemittanceParts(record,items,state){
+        return (record.allocations||[]).map(a=>{
+            const item=items.find(i=>i.id===a.incomeId),cash=Number(a.amount)||0;
+            if(!item || !(item.net>0))return {incomeId:a.incomeId,cash,error:"ไม่พบรายได้ต้นทาง"};
+            const fraction=cash/item.net,eligibility=taxIncomeEligibility(item,state);
+            const gross=item.gross*fraction,withheld=item.tax*fraction;
+            const rate=record.currency==="THB"?1:Number(record.taxRate);
+            return {incomeId:item.id,date:item.date,year:item.year,kind:item.kind,taxType:item.taxType,country:item.sourceCountry,
+                cash,gross,withheld,taxable:eligibility.status==="foreign",status:eligibility.status,reason:eligibility.reason,
+                grossTHB:gross*rate,withheldTHB:withheld*rate};
+        });
+    }
+    function suggestTaxRemittance(record,accounts,transactions,payments,items,state){
+        if(record.currency!=="USD" || !record.linkedTransferId)throw new Error("ตัวช่วยสัดส่วนใช้กับรายการโอน USD ที่เชื่อมไว้เท่านั้น");
+        const events=portfolioTimeline(accounts,transactions,payments),index=events.findIndex(e=>e.kind==="transfer" && e.row.id===record.linkedTransferId);
+        if(index<0)throw new Error("ไม่พบการโอนต้นทาง");
+        const cash=usdRemittanceBook(accounts,events.slice(0,index)).wallets.get(record.fromAccountId)?.cash||[];
+        const total=cash.reduce((n,l)=>n+l.value,0),amount=Number(record.amount);
+        if(!(total>0 && amount>0))throw new Error("ไม่มีที่มาเงินสดก่อนโอนพอให้เสนอแบ่ง");
+        const factor=Math.min(1,amount/total),byIncome=new globalThis.Map();let principal=0;
+        for(const lot of cash){
+            if(lot.kind==="principal"){principal+=lot.value*factor;continue;}
+            const item=items.find(i=>i.rowId===lot.id && i.kind===lot.kind && i.currency==="USD");
+            if(item)byIncome.set(item.id,(byIncome.get(item.id)||0)+lot.value*factor);
+        }
+        const allocations=[...byIncome].map(([incomeId,value])=>{
+            const item=items.find(i=>i.id===incomeId),remaining=Math.max(0,item.net-taxAllocatedIncome(state,incomeId,record.id));
+            return {incomeId,amount:Math.floor(Math.min(value,remaining)*100+1e-7)/100};
+        }).filter(a=>a.amount>0);
+        principal=Math.floor(principal*100+1e-7)/100;
+        return {...record,principal,allocations,allocationConfirmed:false,status:"draft"};
+    }
+    function taxTransferFingerprint(t,accounts){
+        const from=accounts.find(a=>a.id===t.fromAccountId),to=accounts.find(a=>a.id===t.toAccountId);
+        return JSON.stringify([t.id,t.date,t.eventTime||"",t.fromAccountId,t.toAccountId,t.fromCurrency||accountCurrency(from),t.toCurrency||accountCurrency(to),Number(t.amount),transferReceived(t),Number(t.transferFee||0)]);
+    }
+    function taxExchangeTransfers(accounts,transactions){
+        return transactions.filter(t=>{
+            const from=accounts.find(a=>a.id===t.fromAccountId),to=accounts.find(a=>a.id===t.toAccountId);
+            const fc=t.fromCurrency||accountCurrency(from),tc=t.toCurrency||accountCurrency(to);
+            return t.kind==="transfer" && from && to && from.id!==to.id && fc!=="THB" && tc==="THB";
+        });
+    }
+    function taxRemittanceFromTransfer(t,accounts,state){
+        const from=accounts.find(a=>a.id===t.fromAccountId),to=accounts.find(a=>a.id===t.toAccountId);
+        const fc=t.fromCurrency||accountCurrency(from),tc=t.toCurrency||accountCurrency(to);
+        const amount=fc===tc?transferReceived(t):Number(t.amount),received=transferReceived(t);
+        return {id:"exchange:"+t.id,date:t.date,fromAccountId:t.fromAccountId,toAccountId:t.toAccountId,currency:fc,
+            amount,principal:"",allocations:[],linkedTransferId:t.id,origin:fc!=="THB"&&tc==="THB"?"exchange":"transfer",status:"draft",taxRate:fc==="THB"?1:"",
+            rateMethod:state.rateMethod,rateReference:"",evidence:"",allocationConfirmed:false,
+            receivedTHB:tc==="THB"?received:null,cashRate:tc==="THB" && amount>0?received/amount:null,workingFingerprint:taxTransferFingerprint(t,accounts)};
+    }
+    function taxRemittanceRecords(accounts,transactions,state){
+        const exchange=taxExchangeTransfers(accounts,transactions),linked=new Set(state.remittances.map(r=>r.linkedTransferId).filter(Boolean));
+        const automatic=exchange.filter(t=>!linked.has(t.id) && !state.exchangeExclusions?.[t.id] &&
+            taxAccountLocation(accounts.find(a=>a.id===t.fromAccountId))!=="TH" && taxAccountLocation(accounts.find(a=>a.id===t.toAccountId))!=="foreign")
+            .map(t=>taxRemittanceFromTransfer(t,accounts,state));
+        return {records:[...state.remittances,...automatic],automatic,exchange,ignored:exchange.filter(t=>state.exchangeExclusions?.[t.id]).map(t=>({...t,taxSourceCurrency:t.fromCurrency||accountCurrency(accounts.find(a=>a.id===t.fromAccountId))}))};
+    }
+    function validateTaxRemittance(record,accounts,transactions,items,state,confirm=false){
+        const errors=[],amount=Number(record.amount),principal=Number(record.principal||0);
+        const from=accounts.find(a=>a.id===record.fromAccountId),to=accounts.find(a=>a.id===record.toAccountId);
+        if(!record.id)errors.push("ไม่พบรหัสรายการ");
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(record.date||"") || !Number.isFinite(Date.parse(record.date)) || new Date(record.date+"T12:00:00Z").toISOString().slice(0,10)!==record.date || record.date>dkey(new Date()))errors.push("ตรวจวันที่นำเข้าไทย");
+        if(!from || !to || from.id===to.id)errors.push("เลือกบัญชีต้นทางและปลายทางคนละบัญชี");
+        if(from && record.currency!==accountCurrency(from))errors.push("สกุลเงินไม่ตรงบัญชีต้นทาง");
+        if(!(amount>0) || !Number.isFinite(amount))errors.push("กรอกจำนวนเงินที่นำเข้าไทยมากกว่า 0");
+        if(!Number.isFinite(principal) || principal<0)errors.push("เงินต้นต้องไม่ติดลบ");
+        const ids=new Set();let allocated=principal;
+        for(const a of record.allocations||[]){
+            const item=items.find(i=>i.id===a.incomeId),value=Number(a.amount);
+            if(ids.has(a.incomeId))errors.push("เลือกรายได้ต้นทางซ้ำ");ids.add(a.incomeId);
+            if(!item || !(value>0) || !Number.isFinite(value)){errors.push("ตรวจรายได้ต้นทางและยอดที่นำเข้า");continue;}
+            allocated+=value;
+            if(item.currency!==record.currency || item.date>record.date)errors.push("รายได้ต้องเกิดก่อนนำเข้าและเป็นสกุลเดียวกัน");
+            if(value+taxAllocatedIncome(state,item.id,record.id)>(item.net||0)+1e-7)errors.push("ใช้รายได้ต้นทางเกินยอดที่มี หรือเคยนำเข้าแล้ว");
+            if(confirm && taxIncomeEligibility(item,state).status==="pending")errors.push(item.title+": "+taxIncomeEligibility(item,state).reason);
+            if(confirm && record.status==="confirmed" && a.sourceFingerprint!==taxIncomeFingerprint(item,state))errors.push("ข้อมูลรายได้ต้นทางเปลี่ยน ต้องตรวจและยืนยันใหม่");
+        }
+        if(allocated>amount+1e-7)errors.push("ยอดเงินต้นและรายได้รวมเกินยอดนำเข้า");
+        if(record.linkedTransferId){
+            const linked=transactions.find(t=>t.id===record.linkedTransferId && t.kind==="transfer");
+            if(!linked)errors.push("ไม่พบรายการโอนที่เชื่อมไว้");
+            else {
+                const originalCurrency=linked.fromCurrency||accountCurrency(from),targetCurrency=linked.toCurrency||accountCurrency(to);
+                const originalAmount=originalCurrency===targetCurrency?transferReceived(linked):Number(linked.amount);
+                if(originalCurrency!==record.currency || targetCurrency!==accountCurrency(to))errors.push("สกุลเงินของรายการโอนเปลี่ยน ต้องตรวจใหม่");
+                if(linked.fromAccountId!==record.fromAccountId || linked.toAccountId!==record.toAccountId || Math.abs(originalAmount-amount)>1e-7)errors.push("ยอดหรือบัญชีของรายการโอนเปลี่ยน ต้องตรวจใหม่");
+                if(confirm && record.status==="confirmed" && record.linkedFingerprint!==taxTransferFingerprint(linked,accounts))errors.push("ตรวจการเชื่อม วันที่ และยอดรับจากรายการแลกเงิน แล้วกดยืนยันใหม่");
+            }
+            if(state.remittances.some(r=>r.id!==record.id && r.linkedTransferId===record.linkedTransferId))errors.push("รายการโอนนี้ถูกเชื่อมแล้ว");
+        }
+        if(confirm){
+            if(taxAccountLocation(from)!=="foreign" || taxAccountLocation(to)!=="TH")errors.push("ยืนยันที่ตั้งบัญชีก่อน: ต่างประเทศ → ไทย");
+            if(Math.abs(amount-allocated)>1e-7)errors.push("ยังมีเงินที่ไม่ได้แยกว่าเป็นเงินต้นหรือรายได้");
+            if(record.currency!=="THB" && (!(Number(record.taxRate)>0) || !Number.isFinite(Number(record.taxRate))))errors.push("กรอกเรทใช้ประกอบภาษี ณ วันนำเข้า");
+            if(record.rateMethod!==state.rateMethod)errors.push("วิธีเลือกเรทต้องตรงกับวิธีที่ตั้งค่าไว้");
+            if(!String(record.evidence||"").trim())errors.push("กรอกหลักฐานโอนและหลักฐานแยกเงินต้น/รายได้");
+            if(!String(record.rateReference||"").trim() && record.currency!=="THB")errors.push("ระบุแหล่งอ้างอิงเรทของวันนำเข้า");
+            if(!record.allocationConfirmed)errors.push("ติ๊กยืนยันการแยกที่มาของเงินตามหลักฐาน");
+            if(state.remittances.some(r=>r.id!==record.id && r.status==="confirmed" && r.date===record.date && r.fromAccountId===record.fromAccountId && r.toAccountId===record.toAccountId && Number(r.amount)===amount && r.evidence===record.evidence))errors.push("พบรายการนำเข้าที่มีวัน ยอด บัญชี และหลักฐานเดียวกันแล้ว");
+        }
+        return [...new Set(errors)];
+    }
+    function buildInvestmentTaxReport(accounts,transactions,state,year){
+        const {items,issues}=investmentTaxIncome(accounts,transactions,state),ready=[],pending=[];
+        const {records,automatic,ignored,exchange}=taxRemittanceRecords(accounts,transactions,state);
+        for(const r of records.filter(r=>String(r.date).startsWith(String(year)))){
+            const errors=validateTaxRemittance(r,accounts,transactions,items,state,true);
+            if(r.status!=="confirmed" || errors.length)pending.push({record:r,errors});
+            else ready.push({record:r,parts:taxRemittanceParts(r,items,state)});
+        }
+        const parts=ready.flatMap(r=>r.parts);
+        const foreign=parts.filter(p=>p.taxable);
+        const domestic=items.filter(i=>i.year===String(year) && taxIncomeEligibility(i,state).status==="domestic");
+        return {items,issues,ready,pending,parts,foreign,domestic,records,automatic,exchange,ignored:ignored.filter(t=>String(t.date).startsWith(String(year))),
+            incomeTHB:foreign.reduce((n,p)=>n+p.grossTHB,0),foreignWithheldTHB:foreign.reduce((n,p)=>n+p.withheldTHB,0),
+            principal:ready.map(r=>({currency:r.record.currency,amount:Number(r.record.principal)||0}))};
+    }
+    function taxReportCSV(report,state,year){
+        const out=[["รายงานประกอบตรวจภาษีเงินลงทุน · ไม่ใช่แบบยื่นภาษี"],["ปีภาษี",year],["วิธีเรท",state.rateMethod],
+            ["เงินได้ต่างประเทศที่นำเข้าและยืนยันแล้ว THB",report.incomeTHB],["ภาษีต่างประเทศที่เกี่ยวข้อง THB (ยังไม่ใช่เครดิตที่ใช้ได้)",report.foreignWithheldTHB],
+            ["รายการนำเข้ารอตรวจ",report.pending.length],[],
+            ["วันนำเข้าไทย","รหัสนำเข้า","รายการโอนที่เชื่อม","ประเภท","มาตรา","ประเทศแหล่งเงินได้","ปีเกิดเงินได้","รหัสรายได้","สกุล","เงินสดนำเข้า","ก่อนหักภาษี","ภาษีต่างประเทศที่เกี่ยวข้อง","เรทภาษี","วิธีเรท","แหล่งเรท","เงินได้ THB","ภาษีต่างประเทศ THB","การพิจารณา","หลักฐาน","บาทรับจริงรวมเงินต้น","เรทแลกจริง"]];
+        for(const {record:r,parts} of report.ready){
+            out.push([r.date,r.id,r.linkedTransferId||"","เงินต้น","","","","",r.currency,Number(r.principal)||0,"","",r.taxRate,r.rateMethod,r.rateReference,"","","ไม่รวมเป็นเงินได้",r.evidence,r.receivedTHB??"",r.cashRate??""]);
+            for(const p of parts)out.push([r.date,r.id,r.linkedTransferId||"",FOREIGN_TAX_LABELS[p.kind],p.taxType,p.country,p.year,p.incomeId,r.currency,p.cash,p.gross,p.withheld,r.taxRate,r.rateMethod,r.rateReference,p.taxable?p.grossTHB:0,p.taxable?p.withheldTHB:0,p.reason,r.evidence]);
+        }
+        out.push([],["เงินได้แหล่งไทย · ตรวจการเลือกเสียภาษีและหนังสือรับรองก่อนยื่น"],["วันที่","รหัส","ประเภท","ประเทศ","สกุล","ก่อนหัก","ภาษีไทยหักไว้","สุทธิ","เรทวันรับ","ก่อนหัก THB","ภาษีไทย THB","หลักฐาน"]);
+        for(const i of report.domestic)out.push([i.date,i.id,FOREIGN_TAX_LABELS[i.kind],i.sourceCountry,i.currency,i.gross,i.tax,i.net,i.domesticRate,i.domesticRate?i.gross*i.domesticRate:"รอเรท",i.domesticRate?i.tax*i.domesticRate:"รอเรท",i.evidence]);
+        out.push([],["รายการรอตรวจ · ไม่รวมยอดยืนยัน"],["วันที่","รหัส","สถานะ","รายการโอนที่เชื่อม","สกุล","ยอดนำเข้า","บาทรับจริง","สาเหตุ"]);
+        for(const {record:r,errors} of report.pending)out.push([r.date,r.id,r.status,r.linkedTransferId||"",r.currency,r.amount,r.receivedTHB??"",errors.join(" · ")]);
+        out.push([],["รายการแลกกลับที่ผู้ใช้เลือกไม่นับเป็นการนำเข้าไทย"],["วันที่","รหัสรายการแลกเงิน","จากบัญชี","เข้าบัญชี","สกุลต้นทาง","ยอดต้นทาง","บาทรับจริง","เหตุผล"]);
+        for(const t of report.ignored||[])out.push([t.date,t.id,t.fromAccountId,t.toAccountId,t.taxSourceCurrency,t.amount,transferReceived(t),state.exchangeExclusions?.[t.id]?.reason||"ผู้ใช้เลือกไม่นับ"]);
+        out.push([],["รายได้ที่เกิดขึ้น · ใช้ตรวจต้นทุน ไม่ใช้ยอดสุทธิเป็นฐานภาษี"],["วันที่","รหัส","บัญชี","ประเภท","ประเทศ","สกุล","กำไร/ขาดทุน","ก่อนหัก","ภาษีหักไว้","สุทธิ","สถานะ"]);
+        for(const i of report.items.filter(i=>i.year===String(year)))out.push([i.date,i.id,i.accountName,FOREIGN_TAX_LABELS[i.kind],i.sourceCountry,i.currency,i.pnl,i.gross,i.tax,i.net,taxIncomeEligibility(i,state).reason]);
+        out.push([],["หมายเหตุ","รายการแลกเงินกลับเข้าบัญชีไทยเชื่อมเป็นข้อมูลนำเข้าไทยได้ในรายการเดียว ต้องตรวจเส้นทางและวันรับจริง รายงานเฉพาะเงินลงทุน ไม่รวมรายได้งานและค่าลดหย่อนทั้งหมด เครดิตภาษีต่างประเทศมีเพดาน ต้องตรวจในแบบ/เครื่องมือกรมสรรพากร"],
+            ["แหล่งอ้างอิง","https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf"],["เครดิตภาษี","https://www.rd.go.th/68221.html"]);
+        return out;
+    }
+
+    function ForeignTaxPanel({accounts,transactions,payments,foreignTax,setForeignTax,setAccounts}){
+        const h=React.createElement,state=normalizeForeignTax(foreignTax);
+        const [tab,setTab]=useState("summary"),[year,setYear]=useState(String(new Date().getFullYear()));
+        const [draft,setDraft]=useState(null),[metaEdit,setMetaEdit]=useState(null),[profile,setProfile]=useState(null);
+        const [message,setMessage]=useState(""),[removeId,setRemoveId]=useState(null),[query,setQuery]=useState(""),[limit,setLimit]=useState(30),[sourcePick,setSourcePick]=useState("");
+        const report=useMemo(()=>buildInvestmentTaxReport(accounts,transactions,state,year),[accounts,transactions,foreignTax,year]);
+        const pair=(label,value)=>h("div",{className:"pf-pair"},h("span",null,label),h("strong",null,value));
+        const note=text=>h("small",{style:{display:"block",color:T.sub}},text);
+        const box=(title,...children)=>h("section",{className:"pf-receipt"},h("strong",null,title),...children);
+        const button=(text,onClick,primary=false,disabled=false)=>h("button",{type:"button",disabled,onClick,className:"rounded-xl px-3 py-2 text-xs font-bold",style:{background:primary?T.purple:T.surf2,color:primary?"#fff":T.text,opacity:disabled?0.5:1}},text);
+        const buttons=(...children)=>h("div",{className:"pf-actions"},...children);
+        const money=(n,c="THB")=>n==null?"รอตรวจ":moneyIn(n,c);
+        const change=patch=>{setDraft(d=>({...d,...patch,allocationConfirmed:false}));setMessage("");};
+        const update=fn=>setForeignTax(old=>fn(normalizeForeignTax(old)));
+        const years=[...new Set([String(new Date().getFullYear()),...report.items.map(i=>i.year),...report.records.map(r=>String(r.date).slice(0,4)),...report.exchange.map(t=>String(t.date).slice(0,4)),...Object.keys(state.residency)])].filter(y=>/^\d{4}$/.test(y)).sort().reverse();
+        const exchangeIds=new Set(report.exchange.map(t=>t.id));
+        const yearInput=h(FinanceSelect,{label:"ปีภาษี",value:year,onChange:v=>{setYear(v);setLimit(30);setMessage("");},options:Object.fromEntries(years.map(y=>[y,String(Number(y)+543)+" / "+y]))});
+        const candidateTransfers=transactions.filter(t=>t.kind==="transfer" && String(t.date).startsWith(year) && !report.records.some(r=>r.linkedTransferId===t.id) && !state.exchangeExclusions[t.id] && !exchangeIds.has(t.id) &&
+            (taxAccountLocation(accounts.find(a=>a.id===t.fromAccountId))==="foreign" || accountCurrency(accounts.find(a=>a.id===t.fromAccountId))!=="THB"))
+            .sort((a,b)=>b.date.localeCompare(a.date));
+        function begin(record=null,transfer=null){
+            setMessage("");setSourcePick("");setRemoveId(null);
+            if(record){
+                let next={...record,allocations:(record.allocations||[]).map(a=>({...a})),status:"draft",allocationConfirmed:false};
+                const linked=transactions.find(t=>t.id===record.linkedTransferId && t.kind==="transfer");
+                if(linked){
+                    const current=taxRemittanceFromTransfer(linked,accounts,state);
+                    next={...next,fromAccountId:current.fromAccountId,toAccountId:current.toAccountId,currency:current.currency,amount:current.amount,receivedTHB:current.receivedTHB,cashRate:current.cashRate,workingFingerprint:current.workingFingerprint};
+                    if(current.currency!==record.currency){next.allocations=[];next.principal="";next.taxRate="";}
+                    if(record.origin==="exchange" && !state.remittances.some(r=>r.id===record.id)){
+                        try{next=suggestTaxRemittance(next,accounts,transactions,payments,report.items,state);setMessage("ดึงรายการแลกเงินและเสนอแบ่งที่มาแล้ว · ตรวจสัดส่วนกับหลักฐานก่อนยืนยัน");}
+                        catch{setMessage("ดึงรายการแลกเงินแล้ว · เลือกเงินต้นและรายได้ต้นทางก่อนยืนยัน");}
+                    }
+                }
+                setDraft(next);return;
+            }
+            if(transfer){begin(taxRemittanceFromTransfer(transfer,accounts,state));return;}
+            const from=accounts.find(a=>a.id===transfer?.fromAccountId)||accounts.find(a=>taxAccountLocation(a)==="foreign");
+            const to=accounts.find(a=>a.id===transfer?.toAccountId)||accounts.find(a=>taxAccountLocation(a)==="TH" && a.id!==from?.id);
+            const fc=transfer?.fromCurrency||accountCurrency(from),tc=transfer?.toCurrency||accountCurrency(to);
+            const amount=transfer?(fc===tc?transferReceived(transfer):Number(transfer.amount)):"";
+            setDraft({id:uid(),date:transfer?.date||TK,fromAccountId:from?.id||"",toAccountId:to?.id||"",currency:fc,
+                amount,principal:"",allocations:[],linkedTransferId:transfer?.id||"",status:"draft",taxRate:fc==="THB"?1:"",
+                rateMethod:state.rateMethod,rateReference:"",evidence:"",allocationConfirmed:false,
+                cashRate:transfer && tc==="THB" && Number(transfer.amount)>0?transferReceived(transfer)/Number(transfer.amount):null});
+        }
+        function save(confirm){
+            const record={...draft,status:"draft",amount:Number(draft.amount),principal:Number(draft.principal||0),taxRate:draft.currency==="THB"?1:Number(draft.taxRate),
+                allocations:(draft.allocations||[]).map(a=>({incomeId:a.incomeId,amount:Number(a.amount)})),rateMethod:state.rateMethod};
+            const errors=validateTaxRemittance(record,accounts,transactions,report.items,state,confirm);
+            const linked=transactions.find(t=>t.id===record.linkedTransferId && t.kind==="transfer");
+            if(linked && draft.workingFingerprint!==taxTransferFingerprint(linked,accounts))errors.push("รายการโอนถูกแก้ไขระหว่างกรอก กดอัปเดตจากรายการเดิมก่อนยืนยัน");
+            if(errors.length){setMessage(errors.join(" · "));return;}
+            record.status=confirm?"confirmed":"draft";
+            if(confirm && linked)record.linkedFingerprint=taxTransferFingerprint(linked,accounts);
+            if(confirm)record.allocations=record.allocations.map(a=>({...a,sourceFingerprint:taxIncomeFingerprint(report.items.find(i=>i.id===a.incomeId),state)}));
+            record.updatedAt=new Date().toISOString();
+            update(old=>{const exchangeExclusions={...old.exchangeExclusions};if(record.linkedTransferId)delete exchangeExclusions[record.linkedTransferId];return {...old,exchangeExclusions,remittances:old.remittances.some(r=>r.id===record.id)?old.remittances.map(r=>r.id===record.id?record:r):[...old.remittances,record]};});
+            setYear(record.date.slice(0,4));setDraft(null);setTab("remit");setMessage(confirm?"ยืนยันข้อมูลนำเข้าไทยแล้ว":"เก็บร่างแล้ว · ยังไม่รวมยอดยืนยัน");
+        }
+        function editMeta(item){setMetaEdit({id:item.id,...(state.incomeMeta[item.id]||{}),sourceCountry:item.sourceCountry,domesticRate:item.domesticRate??""});setMessage("");}
+        function saveMeta(){
+            const country=taxCountryCode(metaEdit.sourceCountry);
+            if(metaEdit.sourceCountry && !country){setMessage("ใช้รหัสประเทศ 2 ตัว เช่น TH, US, SG");return;}
+            if(metaEdit.withheldTax!=="" && metaEdit.withheldTax!=null && (!(Number(metaEdit.withheldTax)>=0)||!Number.isFinite(Number(metaEdit.withheldTax)))){setMessage("ตรวจยอดภาษีหักไว้");return;}
+            if(metaEdit.domesticRate!=="" && metaEdit.domesticRate!=null && (!(Number(metaEdit.domesticRate)>0)||!Number.isFinite(Number(metaEdit.domesticRate)))){setMessage("เรทวันรับเงินต้องมากกว่า 0");return;}
+            update(old=>({...old,incomeMeta:{...old.incomeMeta,[metaEdit.id]:{...metaEdit,sourceCountry:country}}}));
+            setMetaEdit(null);setMessage("บันทึกข้อมูลรายได้แล้ว รายการนำเข้าที่อ้างอิงจะตรวจใหม่ให้อัตโนมัติ");
+        }
+        function saveProfile(){
+            const country=taxCountryCode(profile.taxIncomeCountry),custody=taxCountryCode(profile.custodyCountry);
+            if(profile.taxIncomeCountry && !country || profile.taxLocation==="foreign" && !custody){setMessage("ระบุรหัสประเทศ 2 ตัวให้ครบ เช่น US หรือ SG");return;}
+            setAccounts(list=>list.map(a=>a.id===profile.id?{...a,taxLocation:profile.taxLocation||"unknown",custodyCountry:profile.taxLocation==="TH"?"TH":custody,taxIncomeCountry:country,taxEntity:profile.taxEntity||"",taxLocationEvidence:profile.taxLocationEvidence||""}:a));
+            setProfile(null);setMessage("บันทึกข้อมูลบัญชีแล้ว · ไม่ได้ย้ายเงินจริง");
+        }
+        function editor(){
+            const linked=transactions.find(t=>t.id===draft.linkedTransferId && t.kind==="transfer");
+            const allocated=Number(draft.principal||0)+(draft.allocations||[]).reduce((n,a)=>n+(Number(a.amount)||0),0);
+            const residual=(Number(draft.amount)||0)-allocated;
+            const options=report.items.filter(i=>i.net>0 && i.currency===draft.currency && i.date<=draft.date && i.kind!=="review" && !i.crypto && !draft.allocations.some(a=>a.incomeId===i.id));
+            const addSource=()=>{if(sourcePick)change({allocations:[...draft.allocations,{incomeId:sourcePick,amount:""}]});setSourcePick("");};
+            const selected=taxRemittanceParts(draft,report.items,state);
+            return h("div",{className:"pf-stack"},
+                buttons(button("กลับ",()=>{setDraft(null);setMessage("");}),button("เก็บร่าง",()=>save(false))),
+                box("บันทึกนำเงินเข้าไทย",note("ข้อมูลภาษีแยกจากรายการเงินสด ไม่เพิ่มรายรับหรือโอนซ้ำ"),
+                    h(Input,{label:"วันที่เงินเข้าไทยจริง",type:"date",value:draft.date,onChange:v=>change({date:v})}),
+                    draft.linkedTransferId ? h(React.Fragment,null,
+                        note(accountLabel(accounts.find(a=>a.id===draft.fromAccountId),accounts)+" → "+accountLabel(accounts.find(a=>a.id===draft.toAccountId),accounts)),
+                        pair("ยอดออกจากรายการเดิม",money(draft.amount,draft.currency)),draft.receivedTHB!=null&&pair("บาทรับจริง",money(draft.receivedTHB)),
+                        linked&&note("วันที่รายการเดิม "+linked.date+" · วันที่เงินเข้าไทยแก้ตามหลักฐานได้"),
+                        button("อัปเดตจากรายการเดิม",()=>begin(draft)),
+                        ...[draft.fromAccountId,draft.toAccountId].map((id,index)=>{const a=accounts.find(a=>a.id===id);return a&&button("ข้อมูลบัญชี"+(index===0?"ต้นทาง":"ปลายทาง"),()=>{setProfile({...a,taxLocation:taxAccountLocation(a),custodyCountry:a.custodyCountry||"",taxIncomeCountry:a.taxIncomeCountry||""});setMessage("");});})) : h(React.Fragment,null,
+                    h(FinanceSelect,{label:"จากบัญชี",value:draft.fromAccountId,options:{"":"เลือกบัญชี",...Object.fromEntries(accounts.map(a=>[a.id,accountLabel(a,accounts)]))},onChange:v=>{const a=accounts.find(a=>a.id===v);change({fromAccountId:v,currency:accountCurrency(a),allocations:[],principal:"",taxRate:"",cashRate:null});}}),
+                    h(FinanceSelect,{label:"เข้าบัญชีในไทย",value:draft.toAccountId,options:{"":"เลือกบัญชี",...Object.fromEntries(accounts.filter(a=>a.id!==draft.fromAccountId).map(a=>[a.id,accountLabel(a,accounts)]))},onChange:v=>change({toAccountId:v})}),
+                    h(Input,{label:"ยอดนำเข้า ("+draft.currency+")",type:"number",value:draft.amount,onChange:v=>change({amount:v})}))),
+                box("แยกที่มาของเงิน",h(Input,{label:"ส่วนเงินต้น ("+draft.currency+")",type:"number",value:draft.principal,onChange:v=>change({principal:v})}),
+                    ...draft.allocations.map((a,index)=>{
+                        const item=report.items.find(i=>i.id===a.incomeId),status=item?taxIncomeEligibility(item,state):null;
+                        return h("div",{className:"pf-entry",key:a.incomeId},h("strong",null,item?.title||"ไม่พบรายได้เดิม"),
+                            note(item?item.date+" · "+item.accountName+" · รับสุทธิ "+money(item.net,item.currency):"ตรวจต้นทางก่อนยืนยัน"),
+                            h(Input,{label:"ส่วนที่นำเข้าจากรายได้นี้ ("+draft.currency+")",type:"number",value:a.amount,onChange:v=>change({allocations:draft.allocations.map((x,i)=>i===index?{...x,amount:v}:x)})}),
+                            status && note(status.reason),
+                            buttons(item&&button("ข้อมูลต้นทาง",()=>editMeta(item)),button("เอาออก",()=>change({allocations:draft.allocations.filter((_,i)=>i!==index)}))));
+                    }),
+                    h(FinanceSelect,{label:"เลือกรายได้ต้นทาง · รวมข้ามบัญชี",value:sourcePick,options:{"":"เลือกหุ้น/ปันผล/ดอกเบี้ย",...Object.fromEntries(options.map(i=>[i.id,i.date+" · "+i.title+" · "+i.accountName]))},onChange:setSourcePick}),
+                    button("เพิ่มรายได้ต้นทาง",addSource,false,!sourcePick),
+                    draft.currency==="USD" && draft.linkedTransferId && button("เสนอแบ่งตามสัดส่วน · รอตรวจ",()=>{try{setDraft(suggestTaxRemittance(draft,accounts,transactions,payments,report.items,state));setMessage("เสนอแบ่งแล้ว ต้องเทียบหลักฐานและแก้ยอดก่อนยืนยัน วิธีสัดส่วนไม่ใช่กฎภาษีบังคับ");}catch(e){setMessage(e.message);}}),
+                    pair("ยังไม่ได้แยกที่มา",Math.abs(residual)>1e-7 && Math.abs(residual)<.01 ? Math.abs(residual).toLocaleString("en-US",{maximumFractionDigits:8})+" "+draft.currency+(residual<0?" · แยกเกินยอด":"") : money(Math.abs(residual),draft.currency)+(residual<-.000001?" · แยกเกินยอด":""))),
+                box("เรทและหลักฐาน",
+                    draft.cashRate>0 && note("เรทแลกจริงที่เชื่อมไว้ "+draft.cashRate.toLocaleString("en-US",{maximumFractionDigits:6})+" · แยกจากเรทภาษี"),
+                    draft.currency!=="THB" && h(Input,{label:"เรทภาษีวันนำเข้า · บาทต่อ 1 "+draft.currency,type:"number",value:draft.taxRate,onChange:v=>change({taxRate:v})}),
+                    note("วิธีเรท: "+(state.rateMethod==="bot_buying"?"ธปท. อัตราซื้อถัวเฉลี่ย":"ธนาคารพาณิชย์ อัตราซื้อ")),
+                    draft.currency!=="THB" && h(Input,{label:"แหล่งเรท / วันที่ / เลขอ้างอิง",value:draft.rateReference,onChange:v=>change({rateReference:v}),placeholder:"เช่น BOT วันที่ ... หรือชื่อธนาคารและอัตราที่ประกาศ"}),
+                    h(Input,{label:"หลักฐานโอนและที่มาของเงิน",value:draft.evidence,onChange:v=>change({evidence:v}),placeholder:"ชื่อไฟล์ Statement / เลขรายการ / หลักฐานเงินต้น"}),
+                    selected.some(p=>p.taxable) && pair("เงินได้ต่างประเทศก่อนหักภาษี",Number(draft.taxRate)>0?money(selected.filter(p=>p.taxable).reduce((n,p)=>n+p.grossTHB,0)):"รอเรท"),
+                    h("label",{style:{display:"flex",gap:9,fontSize:12,alignItems:"flex-start"}},h("input",{type:"checkbox",checked:!!draft.allocationConfirmed,onChange:e=>setDraft(d=>({...d,allocationConfirmed:e.target.checked})),style:{marginTop:3}}),"ตรวจวันที่ เรท และการแยกเงินต้น/รายได้กับหลักฐานแล้ว")),
+                message && h("div",{role:"alert",style:{fontSize:12,lineHeight:1.6,color:T.red}},message),
+                button("ยืนยันข้อมูลนำเข้าไทย",()=>save(true),true));
+        }
+        function incomeEditor(){
+            const item=report.items.find(i=>i.id===metaEdit.id);
+            return box("ข้อมูลต้นทาง · "+(item?.title||""),note("ประเทศแหล่งเงินได้อาจต่างจากประเทศที่ตั้งบัญชี"),
+                item?.canClassify && h(FinanceSelect,{label:"ประเภทตามหลักฐาน",value:metaEdit.kind||item.kind,options:{review:"รอตรวจประเภท",interest:"ดอกเบี้ย · 40(4)(ก)",dividend:"ปันผล · 40(4)(ข)"},onChange:v=>setMetaEdit(m=>({...m,kind:v}))}),
+                h(Input,{label:"ประเทศแหล่งเงินได้ (รหัส 2 ตัว)",value:metaEdit.sourceCountry,onChange:v=>setMetaEdit(m=>({...m,sourceCountry:v.toUpperCase()})),placeholder:"US / TH / SG"}),
+                item?.id.startsWith("transaction:") && h(Input,{label:"ภาษีหักไว้เพิ่มจากยอดรับสุทธิ",type:"number",value:metaEdit.withheldTax??"",onChange:v=>setMetaEdit(m=>({...m,withheldTax:v})),placeholder:"0"}),
+                item?.currency!=="THB" && metaEdit.sourceCountry==="TH" && h(Input,{label:"เรทวันรับเงิน · ใช้กับเงินได้ไทย",type:"number",value:metaEdit.domesticRate,onChange:v=>setMetaEdit(m=>({...m,domesticRate:v})),placeholder:"ตรวจหนังสือรับรอง/อัตราวันรับ"}),
+                h(Input,{label:"หลักฐาน / หมายเหตุประเภทเงินได้",value:metaEdit.evidence||"",onChange:v=>setMetaEdit(m=>({...m,evidence:v})),placeholder:"เช่น Statement / ใบรับรองภาษี / เอกสารกองทุน"}),
+                note("ใช้ยอดก่อนหักและภาษีหักไว้ตามเอกสาร เงินจ่าย ETF ให้ตรวจลักษณะเงินจ่ายก่อนจัดประเภท กำไรหุ้นให้ใช้รายการซื้อขายในพอร์ต"),
+                buttons(button("ยกเลิก",()=>setMetaEdit(null)),button("บันทึกข้อมูลต้นทาง",saveMeta,true)));
+        }
+        function summary(){
+            const yearly=report.items.filter(i=>i.year===year),currencies=[...new Set(yearly.map(i=>i.currency))];
+            return h(React.Fragment,null,
+                box("เงินได้ต่างประเทศที่นำเข้าไทย",h("div",{className:"pf-result"},report.ready.length?money(report.incomeTHB):"ยังไม่ยืนยัน"),
+                    note("เฉพาะส่วนที่ยืนยันแล้ว · ก่อนหักภาษีต่างประเทศ · ไม่รวมเงินต้น"),
+                    pair("ยืนยันแล้ว / รอตรวจ",report.ready.length+" / "+report.pending.length+" รายการ"),
+                    pair("ภาษีต่างประเทศที่เกี่ยวข้อง",money(report.foreignWithheldTHB)),
+                    note("ยังไม่ใช่ยอดภาษีที่ต้องจ่ายหรือเครดิตที่ใช้ได้ ต้องคำนวณเพดานเครดิตและรวมรายได้อื่นในแบบยื่น")),
+                !report.ready.length && note("รายการแลกเงินกลับเป็นบาทถูกดึงมารอตรวจอัตโนมัติ เริ่มที่ตั้งค่าบัญชี → ตรวจรายได้ → ยืนยันรายการแลกกลับ"),
+                report.pending.length>0 && button("ตรวจรายการนำเข้า",()=>setTab("remit")),
+                box("ผลลงทุน · แยกจากยอดประกอบภาษี",...currencies.map(currency=>{
+                    const trades=yearly.filter(i=>i.kind==="trade"&&i.currency===currency&&i.pnl!=null),gain=trades.reduce((n,i)=>n+Math.max(0,i.pnl),0),loss=trades.reduce((n,i)=>n+Math.min(0,i.pnl),0);
+                    return h("div",{key:currency},pair("กำไรจากรายการบวก · "+currency,money(gain,currency)),pair("ขาดทุน · "+currency,money(Math.abs(loss),currency)),pair("ผลลงทุนสุทธิ · "+currency,money(gain+loss,currency)));
+                }),!currencies.length&&note("ยังไม่มีรายได้จากพอร์ตในปีนี้"),note("ผลลงทุนสุทธิไม่ใช่ฐานภาษี หุ้นต่างประเทศต้องพิจารณารายการกำไรและส่วนที่นำเข้าไทย")),
+                h("details",null,h("summary",null,"แยกเงินได้ที่ยืนยันตามประเภท"),...["trade","interest","dividend"].map(kind=>h("details",{key:kind},h("summary",null,FOREIGN_TAX_LABELS[kind]+" · "+money(report.foreign.filter(p=>p.kind===kind).reduce((n,p)=>n+p.grossTHB,0))+"  !"),note(FOREIGN_TAX_TYPES[kind]+" · "+({trade:"พิจารณาส่วนกำไรต่อการขายจากต้นทุน ไม่ใช้เงินขายทั้งหมด และไม่หักกลบขาดทุนรายการอื่นให้อัตโนมัติ",interest:"แยกยอดก่อนหักภาษี ภาษีที่หักไว้ และยอดรับสุทธิ ดอกเบี้ยบัญชีธนาคารไทยแยกในเงินได้แหล่งไทย",dividend:"ใช้หลักฐานปันผลก่อนหักภาษี ตรวจเงินจ่าย ETF ว่าเป็นปันผล เงินคืนทุน หรือเงินจ่ายประเภทอื่น"})[kind])))),
+                h("details",null,h("summary",null,"เงินได้แหล่งไทย ("+report.domestic.length+")"),note("รวมข้อมูลก่อนหักและภาษีไทยหักไว้ให้ตรวจต่างหาก ไม่ใช่เครดิตภาษีต่างประเทศ และต้องตรวจสิทธิเลือกเสียภาษีก่อนยื่น"),...report.domestic.map(i=>h("div",{key:i.id,className:"pf-entry"},h("strong",null,i.title),note(i.date+" · "+i.accountName),pair("ก่อนหัก / ภาษีไทยหักไว้",money(i.gross,i.currency)+" / "+money(i.tax,i.currency)),pair("ก่อนหักคิดเป็นบาท",i.domesticRate?money(i.gross*i.domesticRate):"รอเรทวันรับ"),button("ตรวจข้อมูล",()=>editMeta(i))))),
+                report.issues.length>0 && note(report.issues.join(" · ")),
+                button("ส่งออก CSV · ข้อมูลประกอบภาษี",()=>downloadCSV("TaskRoutine_Investment_Tax_"+year+".csv",taxReportCSV(report,state,year))),
+                h("details",null,h("summary",null,"วิธีใช้และหลักเกณฑ์ !"),note("1 ตั้งค่าบัญชีและจำนวนวันที่อยู่ไทย 2 ตรวจรายได้ 3 บันทึกวันนำเข้าไทยและจับคู่ที่มา 4 ตรวจยอดยืนยันแล้วส่งออก การแลกเงินไม่ใช่การนำเข้าไทยทุกครั้ง และการถอนต่ำกว่าเงินต้นไม่ใช่หลักฐานว่าเป็นเงินต้นทั้งหมด"),
+                    h("a",{href:"https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf",target:"_blank",rel:"noopener noreferrer"},"คำถาม–คำตอบ กรมสรรพากร"),
+                    h("a",{href:"https://www.rd.go.th/68221.html",target:"_blank",rel:"noopener noreferrer"},"เครื่องมือเครดิตภาษีต่างประเทศ")));
+        }
+        function incomeList(){
+            const list=report.items.filter(i=>i.year===year && (!query || (i.title+" "+i.accountName+" "+i.date).toLowerCase().includes(query.toLowerCase())));
+            return h(React.Fragment,null,h(Input,{label:"ค้นหารายได้ / หุ้น",value:query,onChange:v=>{setQuery(v);setLimit(30);},placeholder:"ชื่อหุ้น บัญชี หรือวันที่"}),
+                note("ยอดขายที่เป็นกำไรแยกจากขาดทุน · ปันผลและดอกเบี้ยแสดงก่อนหักภาษี"),
+                ...list.slice(0,limit).map(i=>{
+                    const eligibility=taxIncomeEligibility(i,state);
+                    return h("details",{key:i.id},h("summary",null,i.date+" · "+i.title+" · "+money(i.kind==="trade"?i.pnl:i.gross,i.currency)),
+                        note(i.accountName+" · "+(i.sourceCountry||"รอประเทศ")+" · "+i.taxType),note(eligibility.reason),
+                        pair("ก่อนหัก / ภาษีหักไว้",money(i.gross,i.currency)+" / "+money(i.tax,i.currency)),pair("รับสุทธิส่วนรายได้",money(i.net,i.currency)),
+                        pair("จับคู่กับรายการยืนยันแล้ว",money(taxAllocatedIncome(state,i.id),i.currency)),button("จัดประเภทและหลักฐาน",()=>editMeta(i)));
+                }),list.length>limit&&button("แสดงเพิ่ม",()=>setLimit(n=>n+30)),!list.length&&note("ไม่มีรายการในปีที่เลือก"));
+        }
+        function remitList(){
+            const records=report.records.filter(r=>String(r.date).startsWith(year)).sort((a,b)=>b.date.localeCompare(a.date));
+            return h(React.Fragment,null,note("รายการแลกกลับเป็นบาทดึงจาก Statement อัตโนมัติ · ตรวจเส้นทาง เงินต้น และรายได้แล้วกดยืนยันได้เลย"),
+                ...records.slice(0,limit).map(r=>{
+                    const automatic=report.automatic.some(x=>x.id===r.id),pending=report.pending.find(x=>x.record.id===r.id),status=r.status==="confirmed"&&!pending?"ยืนยันแล้ว":r.status==="confirmed"?"ต้องตรวจใหม่":automatic?"จากรายการแลกเงิน · รอยืนยัน":"ร่าง · รอตรวจ";
+                    const isExchange=exchangeIds.has(r.linkedTransferId);
+                    const removeLabel=isExchange?"ไม่นับเป็นการนำเข้าไทย":"ลบข้อมูลภาษี";
+                    return h("section",{key:r.id,className:"pf-receipt"},h("strong",null,r.date+" · "+status),pair("ยอดจากรายการเดิม",money(r.amount,r.currency)+(r.receivedTHB!=null?" → "+money(r.receivedTHB):"")),note(accountLabel(accounts.find(a=>a.id===r.fromAccountId),accounts)+" → "+accountLabel(accounts.find(a=>a.id===r.toAccountId),accounts)),
+                        pending?.errors.length>0&&h("details",null,h("summary",null,"ข้อมูลที่ต้องตรวจ ("+pending.errors.length+")"),note(pending.errors.join(" · "))),
+                        buttons(button("ตรวจ / แก้ไข",()=>begin(r)),button(removeId===r.id?"ยืนยัน · "+removeLabel:removeLabel,()=>{
+                            if(removeId!==r.id){setRemoveId(r.id);return;}
+                            update(old=>({...old,remittances:old.remittances.filter(x=>x.id!==r.id),exchangeExclusions:isExchange?{...old.exchangeExclusions,[r.linkedTransferId]:{reason:"ผู้ใช้ตรวจแล้วเลือกไม่นับเป็นการนำเข้าไทย",updatedAt:new Date().toISOString()}}:old.exchangeExclusions}));setRemoveId(null);setMessage(isExchange?"เลือกไม่นับรายการนี้แล้ว · ตรวจย้อนหลังและนำกลับมาตรวจได้ด้านล่าง":"ลบข้อมูลภาษีแล้ว");
+                        })));
+                }),records.length>limit&&button("แสดงรายการนำเข้าเพิ่ม",()=>setLimit(n=>n+30)),!records.length&&note("ยังไม่มีรายการแลกกลับที่รอตรวจในปีนี้ บัญชีที่ตั้งว่าเงินอยู่ไทยแล้วจะไม่ถูกดึงเป็นการนำเข้ารอบใหม่"),
+                button("+ บันทึกนำเงินเข้าไทย",()=>begin()),
+                h("details",null,h("summary",null,"เชื่อมรายการโอนอื่น ("+candidateTransfers.length+")"),note("ใช้กรณีนำเงินเข้าไทยด้วยช่องทางอื่น เลือกรายการเดิมเพื่อเชื่อมได้"),
+                    ...candidateTransfers.slice(0,limit).map(t=>button(t.date+" · "+accountLabel(accounts.find(a=>a.id===t.fromAccountId),accounts)+" → "+accountLabel(accounts.find(a=>a.id===t.toAccountId),accounts)+" · "+money(t.amount,t.fromCurrency||accountCurrency(accounts.find(a=>a.id===t.fromAccountId))),()=>begin(null,t))),candidateTransfers.length>limit&&button("แสดงรายการโอนเพิ่ม",()=>setLimit(n=>n+30))),
+                report.ignored.length>0&&h("details",null,h("summary",null,"รายการที่เลือกไม่นับ ("+report.ignored.length+")"),...report.ignored.map(t=>h("div",{key:t.id,className:"pf-entry"},note(t.date+" · "+money(t.amount,t.taxSourceCurrency)+" → "+money(transferReceived(t))),button("นำกลับมาตรวจ · "+t.date,()=>update(old=>{const exchangeExclusions={...old.exchangeExclusions};delete exchangeExclusions[t.id];return {...old,exchangeExclusions};}))))));
+        }
+        function settings(){
+            return h(React.Fragment,null,
+                box("สถานะอยู่ไทยในปีเกิดรายได้",h(Input,{label:"จำนวนวันที่อยู่ไทย ปี "+(Number(year)+543),type:"number",value:state.residency[year]??"",onChange:v=>update(old=>({...old,residency:{...old.residency,[year]:v===""?"":Number(v)}})),placeholder:"0–366 วัน ตามที่อยู่จริง"}),
+                    note(({unknown:"ยังไม่ยืนยัน",resident:"ตั้งแต่ 180 วันขึ้นไป",nonresident:"ต่ำกว่า 180 วัน"})[taxResidentStatus(state,year)]),note("กรอกรายปีตามปีที่รายได้เกิด แม้นำเงินกลับไทยภายหลัง")),
+                box("วิธีเลือกเรทประกอบภาษี",h(FinanceSelect,{label:"ใช้วิธีเดียวกันอย่างสม่ำเสมอ",value:state.rateMethod,disabled:state.remittances.some(r=>r.status==="confirmed"),options:{bot_buying:"ธปท. อัตราซื้อถัวเฉลี่ย",bank_buying:"ธนาคารพาณิชย์ อัตราซื้อ"},onChange:v=>update(old=>({...old,rateMethod:v}))}),note("เรทแต่ละครั้งกรอกตามวันนำเข้า พร้อมแหล่งอ้างอิง ไม่ใช้เรทแลกเงินจริงแทนให้อัตโนมัติ วิธีเรทล็อกเมื่อมีรายการยืนยัน")),
+                box("ที่ตั้งบัญชีและแหล่งรายได้",note("ข้อมูลของแต่ละบัญชีแยกกัน ไม่สืบทอดจากบัญชีหลัก และไม่เดาจากชื่อหรือสกุลเงิน"),
+                    ...accounts.map(a=>h("div",{key:a.id,className:"pf-entry"},h("strong",null,accountLabel(a,accounts)),note(({TH:"บัญชีอยู่ไทย",foreign:"บัญชีอยู่ต่างประเทศ",unknown:"ยังไม่ยืนยันที่ตั้ง"})[taxAccountLocation(a)]+" · แหล่งรายได้ "+(a.taxIncomeCountry||"รอยืนยัน")),button("ตั้งค่าข้อมูลบัญชี",()=>{setProfile({...a,taxLocation:taxAccountLocation(a),custodyCountry:a.custodyCountry||"",taxIncomeCountry:a.taxIncomeCountry||""});setMessage("");})))));
+        }
+        return h("div",{className:"pf-stack","data-investment-tax":true},note("ภาษีเงินลงทุน · รวมทุกบัญชี · รุ่นตรวจและเตรียมข้อมูล"),
+            !draft && !metaEdit && !profile && yearInput,
+            message && (!draft || metaEdit || profile) && h("div",{role:"status",style:{fontSize:12,lineHeight:1.6,color:T.blue}},message),
+            metaEdit?incomeEditor():profile?box("ข้อมูลภาษีบัญชี · "+profile.name,
+                h(FinanceSelect,{label:"เงินในบัญชีนี้อยู่ที่ไหน",value:profile.taxLocation,options:{unknown:"ยังไม่ยืนยัน",TH:"ไทย",foreign:"ต่างประเทศ"},onChange:v=>setProfile(p=>({...p,taxLocation:v}))}),
+                profile.taxLocation==="foreign" && h(Input,{label:"ประเทศที่ตั้งบัญชี (รหัส 2 ตัว)",value:profile.custodyCountry,onChange:v=>setProfile(p=>({...p,custodyCountry:v.toUpperCase()})),placeholder:"ตรวจเอกสารผู้ให้บริการ เช่น US / SG"}),
+                h(Input,{label:"ผู้ให้บริการ / ผู้รับฝากเงิน",value:profile.taxEntity||"",onChange:v=>setProfile(p=>({...p,taxEntity:v}))}),
+                h(Input,{label:"เอกสารยืนยันที่ตั้งบัญชี",value:profile.taxLocationEvidence||"",onChange:v=>setProfile(p=>({...p,taxLocationEvidence:v})),placeholder:"ชื่อเอกสาร / คำยืนยันจากโบรกเกอร์"}),
+                h(Input,{label:"ประเทศแหล่งรายได้เริ่มต้น (รหัส 2 ตัว)",value:profile.taxIncomeCountry,onChange:v=>setProfile(p=>({...p,taxIncomeCountry:v.toUpperCase()})),placeholder:"เช่น หุ้น US: US / ดอกเบี้ยธนาคารไทย: TH"}),
+                note("ยืนยันจากบัญชีและเอกสารจริง แหล่งรายได้แก้แยกแต่ละรายการได้ ดอกเบี้ย FCD ของธนาคารไทยไม่ใช่เงินได้ต่างประเทศเพียงเพราะเป็น USD"),
+                buttons(button("ยกเลิก",()=>setProfile(null)),button("บันทึกข้อมูลบัญชี",saveProfile,true)))
+                :draft?editor():h(React.Fragment,null,
+                    h("nav",{className:"pf-tabs","aria-label":"หน้าภาษีเงินลงทุน"},...[["summary","สรุป"],["income","รายได้"],["remit","นำเข้าไทย"],["settings","ตั้งค่า"]].map(([id,label])=>button(label,()=>{setTab(id);setMessage("");},tab===id))),
+                    tab==="summary"?summary():tab==="income"?incomeList():tab==="remit"?remitList():settings()));
+    }
+
     function BrokerReport({mode,account,accounts,transactions,payments,setAccounts,onEdit}) {
         const h=React.createElement, currency=accountCurrency(account);
         const [day,setDay]=useState(TK),[actual,setActual]=useState(""),[rate,setRate]=useState(""),[msg,setMsg]=useState("");
@@ -1873,7 +2302,7 @@ try {
             data.push([],["ประวัติรายได้ USD ถึงวันตัดยอด (ใช้ตรวจที่มา)","รหัส","ชื่อ","ประเภท","ก่อนหัก USD","ภาษีหักไว้ USD","สุทธิ USD"]);
             for(const r of analysis.results.filter(r=>r.accountId===account.id && ["trade","interest","dividend","commission"].includes(r.kind)))
                 data.push([r.date,r.id,r.title,r.kind,r.gross,r.tax,r.native]);
-            data.push([],["วิธีคิด","แบ่งตามสัดส่วนเงินสดก่อนแลกกลับ ค่าธรรมเนียมหักแยก ยอดรายได้เป็นยอดสุทธิหลังภาษีต่างประเทศ"],["ตรวจประกอบภาษี","ตรวจข้อเท็จจริง เงินต้น ปีที่เกิดเงินได้ และวันที่นำเข้าไทย การแลกเป็นบาทใช้เป็นจุดคำนวณในแอป"],
+            data.push([],["วิธีคิด","แบ่งตามสัดส่วนเงินสดก่อนแลกกลับ ค่าธรรมเนียมหักแยก ยอดรายได้เป็นยอดสุทธิหลังภาษีต่างประเทศ"],["ตรวจประกอบภาษี","ยอดติดตามเงิน ไม่ใช่ยอดยืนยันภาษี ใช้หน้าภาษีเงินลงทุนเพื่อตรวจวันนำเข้าไทย ที่มาเงิน และเรทประกอบภาษี"],
                 ["แหล่งอ้างอิง","https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf"]);
             downloadCSV("TaskRoutine_USD_to_THB_"+account.id+"_"+period+"_"+day+".csv",data);
         }
@@ -1985,6 +2414,7 @@ try {
         };
         return h("div",{className:"pf-stack"},dateField,
             h("nav",{className:"si-nav","aria-label":"ช่วงสรุปผลตอบแทน"},...[["all","สะสม"],["month","รายเดือน"],["year","รายปี"]].map(([id,label])=>h("button",{key:id,"aria-current":period===id?"page":undefined,onClick:()=>setPeriod(id)},label))),
+            note("ยอดติดตามผลลงทุน · ใช้หน้าภาษีเงินลงทุนเพื่อตรวจและยืนยันข้อมูลประกอบภาษี"),
             note("ช่วงรายงาน "+range+" · ใช้วันที่เกิดรายการ"),
             currency!=="USD" && box("เงินสดคงเหลือ",h("strong",{style:{fontSize:28}},money(close)),
                 note(saved == null ? "ยังไม่มี Statement เทียบ ณ วันที่เลือก" : gap(saved,close)===0 ? "ตรงกับ Statement ณ วันที่เลือก" : "ต่างจาก Statement "+money(gap(saved,close)))),
@@ -2025,7 +2455,7 @@ try {
                     count:items.length
                 })))));
     }
-    function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, onClose }) {
+    function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, foreignTax, setForeignTax, onClose }) {
         const h = React.createElement, currency = accountCurrency(account);
         const entries = account.portfolioEntries || [];
         const totalOnly = account.portfolioMode === "summary";
@@ -2325,8 +2755,8 @@ try {
                 isTrade(type) && !editing && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
             : h("div",{className:"pf-stack"},
-                h("div",{className:"pf-tabs"},!totalOnly && button("กำไร/ขาดทุน",()=>setTab("profit"),tab==="profit"),button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns")),
-                tab==="profit" ? tradeProfitView() : (tab==="audit" || tab==="returns") ? h(BrokerReport,{key:tab,mode:tab,account,accounts,transactions,payments,setAccounts,onEdit:begin}) : tab==="assets" ? h(React.Fragment,null,
+                h("div",{className:"pf-tabs"},!totalOnly && button("กำไร/ขาดทุน",()=>setTab("profit"),tab==="profit"),button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns"),setForeignTax && button("ภาษี",()=>setTab("tax"),tab==="tax")),
+                tab==="tax" ? h(ForeignTaxPanel,{accounts,transactions,payments,setAccounts,foreignTax,setForeignTax}) : tab==="profit" ? tradeProfitView() : (tab==="audit" || tab==="returns") ? h(BrokerReport,{key:tab,mode:tab,account,accounts,transactions,payments,setAccounts,onEdit:begin}) : tab==="assets" ? h(React.Fragment,null,
                     totalOnly ? h(React.Fragment,null,numbers(stat("มูลค่าล่าสุด",latest ? money(latest.amount) : "—"),stat("วันที่อัปเดต",latest?.date || "—")),
                     first && latest && first.id!==latest.id && text("ผลต่างจากยอดครั้งแรก หลังหักโอนสุทธิ "+money(latest.amount-first.amount-fundingSince))) :
                     h(React.Fragment,null,h("section",{className:"pf-total"},h("small",null,"มูลค่าพอร์ต · "+currency),h("b",null,balances===null ? "รอราคาประเมิน" : money(cash+balances)),pair("เงินสด",money(cash)),pair("มูลค่าสินทรัพย์",balances===null ? "รอราคาประเมิน" : money(balances))),
@@ -2579,6 +3009,7 @@ try {
         const [expenseTargets, setExpenseTargets] = useState({});
         const [investmentPlans, setInvestmentPlans] = useState([]);
         const [taxTypeMap, setTaxTypeMap] = useState({});
+        const [foreignTax, setForeignTax] = useState(()=>normalizeForeignTax());
         const [accounts, setAccounts] = useState([]);
         const [txnCategories, setTxnCategories] = useState({ income: [], expense: [] });
         const [fitnessSplit, setFitnessSplit] = useState(null);
@@ -2686,7 +3117,7 @@ try {
                 return changed ? next : imports;
             });
         };
-        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed });
+        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed });
         const reportLocalSaveError = (label, error) => {
             const message = `${label}: ${error?.message || "พื้นที่จัดเก็บอาจเต็มหรือ Safari ปฏิเสธการบันทึก"}`;
             setLocalSaveError(message);
@@ -2946,6 +3377,7 @@ try {
                 setExpenseTargets(s.expenseTargets);
             if (s.taxTypeMap)
                 setTaxTypeMap(s.taxTypeMap);
+            setForeignTax(normalizeForeignTax(s.foreignTax));
             if (s.accounts)
                 setAccounts(s.accounts);
             if (s.txnCategories)
@@ -3244,7 +3676,7 @@ try {
                 setLocalSaveError(current => current.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ") ? "" : current);
                 localErrorShown.current = false;
             }
-        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             if (!loaded || !authUser || !sb)
                 return;
@@ -3370,7 +3802,7 @@ try {
             cloudTimer.current = setTimeout(() => cloudSyncFn.current?.(), 2500);
             return () => { if (cloudTimer.current)
                 clearTimeout(cloudTimer.current); };
-        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             const flush = () => { if (cloudDirty.current) cloudSyncFn.current?.(); };
             const pull = () => { cloudPullFn.current?.(); };
@@ -3445,6 +3877,7 @@ try {
             setExpenseTargets({});
             setInvestmentPlans([]);
             setTaxTypeMap({});
+            setForeignTax(normalizeForeignTax());
             setTxnTemplateDefaults({});
             setDataMsg("ล้างข้อมูลแล้ว — เริ่มจากศูนย์ ✓");
             fireToast("ล้างข้อมูลทั้งหมดแล้ว");
@@ -4242,7 +4675,7 @@ try {
             exportEventICS, exportDayICS, exportWeekICS, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase,
             fitnessSplit, saveFitnessSplit, fitnessStartDay, setFitnessStartDay, fitnessConfirmed, confirmFitnessWeek,
             workouts, updateWorkouts: setWorkouts,
-            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, taxTypeMap, setTaxTypeMap,
+            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, taxTypeMap, setTaxTypeMap, foreignTax, setForeignTax,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
             toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab, todos, addTodo, toggleTodo, delTodo, updateIncomeSourceExpected };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
@@ -7031,7 +7464,7 @@ try {
         React.createElement(
           "div",
           { className: "mb-3" },
-          React.createElement(Label, null, isTransfer ? `ยอดโอนต้นทาง · ไม่รวมค่าธรรมเนียม (${fromCurrency})` : "จำนวนเงิน"),
+          React.createElement(Label, null, isTransfer ? `${crossCurrency?"ยอดแลกออก":"ยอดโอน"} (${fromCurrency})` : "จำนวนเงิน"),
           React.createElement(
             "div",
             {
@@ -7408,7 +7841,7 @@ try {
           TxnSectionCard,
           {
             title: "ข้อมูลหลัก",
-            bare: !isTransfer && !linkedIncomeSource,
+            bare: !linkedIncomeSource,
             subtitle: studioMode
               ? "กรอกยอดบิลเต็ม แล้วแบ่งส่วนห้องซ้อมและส่วนตัวด้านล่าง"
               : "เลือกประเภท ใส่ยอด และวันที่",
@@ -7493,6 +7926,7 @@ try {
                 TxnSectionCard,
                 {
                   title: "เส้นทางเงิน",
+                  bare: true,
                   subtitle:
                     "เงินย้ายระหว่างบัญชีของคุณ ไม่ถูกนับเป็นรายรับหรือรายจ่าย",
                   color: TRANSFER_COLOR,
@@ -7516,33 +7950,29 @@ try {
                 React.createElement(FinanceSelect, { label: "วัตถุประสงค์การโอน", value: transferPurpose, options: { general: "โอนย้ายบัญชี", deposit: "ฝากเงิน", exchange: "แลกสกุลเงิน" }, onChange: v => setF({ ...f, transferPurpose: v }) }),
                 transferPurpose === "deposit" && React.createElement("p", { style: { fontSize: 11, color: T.sub, lineHeight: 1.7, marginBottom: 12 } }, "เช่น ฝากเงินสดเข้าธนาคาร: เลือกต้นทางเป็นบัญชีเงินสด และปลายทางเป็นบัญชีที่รับฝาก ยอดฝากไม่ถูกนับเป็นรายรับเพิ่ม"),
                 !purposeValid && React.createElement("p", { className: "text-xs mb-3", style: { color: T.red } }, "แลกสกุลเงิน: เลือกบัญชีคนละสกุล"),
-                React.createElement("fieldset", { style: { padding: 12, marginBottom: 16, border: `1px solid ${T.border}`, borderRadius: 14, background: T.surf } },
-                    React.createElement("legend", { style: { fontSize: 12, fontWeight: 700, color: T.sub, padding: "0 5px" } }, "กำกับเงินลงทุน (ไม่บังคับ)"),
-                    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, [["add", "เติมเงินลงทุน"], ["withdraw", "ถอนเงินลงทุน"]].map(([key, text]) => React.createElement("label", { key, style: { display: "flex", alignItems: "center", gap: 8, flex: "1 1 140px", padding: "12px 10px", borderRadius: 11, fontSize: 12, fontWeight: 700, background: investmentFlow === key ? hex(T.blue,.12) : T.surf2, color: investmentFlow === key ? T.blue : T.sub, border: `1px solid ${investmentFlow === key ? T.blue : T.border}`, cursor: "pointer" } },
-                        React.createElement("input", { type: "checkbox", "aria-label": text, checked: investmentFlow === key, onChange: e => setF(current => ({ ...current, investmentFlow: e.target.checked ? key : "none" })), style: { width: 18, height: 18, accentColor: T.blue, flexShrink: 0 } }), text))),
-                    React.createElement("p", { style: { fontSize: 11, color: T.muted, lineHeight: 1.7, marginTop: 9 } }, "เลือกได้ครั้งละหนึ่งอย่าง ใช้ร่วมกับโอนย้ายบัญชีหรือแลกสกุลเงินได้ทุกประเภทบัญชี"),
-                    investmentFlow !== "none" && React.createElement("p", { style: { fontSize: 11, color: T.blue, lineHeight: 1.7, marginTop: 6 } }, investmentFlow === "add" ? `นับเงินเติมให้บัญชีปลายทาง: ${toAcc?.name || "ยังไม่เลือก"}` : `นับเงินถอนจากบัญชีต้นทาง: ${fromAcc?.name || "ยังไม่เลือก"}`),
-                    React.createElement("p", { style: { fontSize: 10, color: T.muted, lineHeight: 1.7, marginTop: 6 } }, "โอนหรือแลกเงินที่ลงทุนแล้วระหว่างบัญชีของตัวเอง เว้นทั้งสองช่องเพื่อไม่ให้นับยอดลงทุนซ้ำ")),
-                (buyingFX || sellingFX) && React.createElement(Input,{label:`เรทที่แลก · บาทต่อ 1 ${buyingFX ? toCurrency : fromCurrency} (ถ้ามี)`,type:"number",value:f.fxBuyPrice ?? "",placeholder:"กรอกเรทเพื่อคำนวณยอดรับ หรือกรอกยอดรับจริงด้านล่าง",onChange:v=>setF(current=>({...current,fxBuyPrice:v,receivedAmount:purchaseValue(current.amount,v,buyingFX)}))}),
-                crossCurrency && React.createElement(Input, { label: `ยอดรับจริงปลายทาง (${toCurrency})`, type: "number", value: f.receivedAmount || "", onChange: v => setF({ ...f, receivedAmount: v }), placeholder: "จำนวนที่เข้าบัญชีจริง" }),
-                fromCurrency !== "THB" && toCurrency !== "THB" && React.createElement(React.Fragment, null,
-                    React.createElement(Input, { label: `เรทวันโอน · 1 ${fromCurrency} = กี่บาท${needsTHBRate ? " (จำเป็น)" : " (ไม่บังคับ)"}`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF({ ...f, sourceRateTHB: v }), placeholder: needsTHBRate ? "กรอกเรทมากกว่า 0" : "เว้นว่างได้" }),
-                    React.createElement("p", { style: { fontSize: 11, lineHeight: 1.7, marginBottom: 12, color: needsTHBRate && !(rates.sourceRate > 0) ? T.red : T.muted } }, needsTHBRate ? "ต้องใช้เรทเพื่อคิดค่าธรรมเนียมหรือยอดเติม–ถอนลงทุนเป็นเงินบาท" : `โอน ${fromCurrency} ระหว่างบัญชีได้โดยไม่กรอกเรท ยอดเงินบาทจะยังไม่ระบุ`)),
-                React.createElement(Input, { label: `ค่าธรรมเนียมจ่ายเพิ่มจากต้นทาง (${fromCurrency})`, type: "number", value: f.transferFee ?? "", onChange: v => setF({ ...f, transferFee: v }), placeholder: "0" }),
-                React.createElement("div", { className: "p-3 rounded-xl mb-3 text-xs leading-relaxed", style: { background: hex(T.blue, .09), color: T.sub } },
-                    `ต้นทางออก ${moneyIn((Number(f.amount) || 0) + (Number.isFinite(transferFee) ? transferFee : 0), fromCurrency)} → ปลายทางรับ ${moneyIn(receivedAmount, toCurrency)}`,
-
-                    rates.amountTHB > 0 ? ` · มูลค่าโอน ${moneyIn(rates.amountTHB)}` : "",
-                    React.createElement("div", { className: "mt-1 text-[10px]" }, "กรอกยอดโอนหลังแยกค่าธรรมเนียมแล้ว ค่าธรรมเนียมช่องนี้หักเพิ่มจากต้นทางและลงรายจ่ายแยก หากรวมอยู่ในเรทแล้วอย่ากรอกซ้ำ")),
-                (fromCurrency!=="THB" || toCurrency!=="THB") && React.createElement("details",null,React.createElement("summary",{className:"text-xs py-2"},"เวลาตาม Statement (ถ้าทราบ)"),React.createElement(Input,{type:"time",label:"เวลาทำรายการ",value:f.eventTime || "",onChange:v=>setF({...f,eventTime:v})})),
-                crossCurrency && React.createElement(ExchangeSummary,{figures:fxFigures,manual:!!f.fxCostOverride}),
-                sellingFX && React.createElement(Input,{label:`เรทต้นทุนที่ทราบ · บาทต่อ 1 ${fromCurrency} (กรอกแทนค่าเฉลี่ยได้)`,type:"number",value:f.fxCostOverride ?? "",placeholder:fxAuto ? String(Number(fxAuto.toFixed(6))) : "เว้นว่างได้",onChange:v=>setF({...f,fxCostOverride:v})}),
-                React.createElement(Input, {
-                  label: "โน้ต (ไม่บังคับ)",
-                  value: f.transferNote,
-                  onChange: (v) => setF({ ...f, transferNote: v }),
-                  placeholder: "เช่น ฝากเงินสดเข้าบัญชี",
-                }),
+                React.createElement("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}},
+                    [["add","เติมเงินลงทุน"],["withdraw","ถอนเงินลงทุน"]].map(([key,text])=>React.createElement("label",{key,style:{display:"flex",alignItems:"center",gap:7,padding:"9px 10px",borderRadius:10,fontSize:12,fontWeight:650,background:investmentFlow===key?hex(T.blue,.1):T.surf2,color:investmentFlow===key?T.blue:T.sub,border:`1px solid ${investmentFlow===key?T.blue:T.border}`}},
+                        React.createElement("input",{type:"checkbox","aria-label":text,checked:investmentFlow===key,onChange:e=>setF(current=>({...current,investmentFlow:e.target.checked?key:"none"})),style:{width:17,height:17,accentColor:T.blue}}),text))),
+                crossCurrency && React.createElement(Input,{label:`ยอดรับจริง (${toCurrency})`,type:"number",value:f.receivedAmount??"",onChange:v=>setF({...f,receivedAmount:v,fxBuyPrice:""}),placeholder:"จำนวนที่เข้าบัญชี"}),
+                (buyingFX||sellingFX) && React.createElement("details",{style:{marginBottom:12}},
+                    React.createElement("summary",{className:"text-xs py-2",style:{color:T.blue}},"กรอกด้วยเรทแทนยอดรับ"),
+                    React.createElement(Input,{label:`บาทต่อ 1 ${buyingFX?toCurrency:fromCurrency}`,type:"number",value:f.fxBuyPrice??"",placeholder:fxFigures?String(Number(fxFigures.raw.toFixed(6))):"เช่น 33.20",
+                        onChange:v=>setF(current=>({...current,fxBuyPrice:v,receivedAmount:purchaseValue(current.amount,v,buyingFX)}))})),
+                fxFigures && React.createElement("div",{style:{fontSize:12,color:T.sub,marginBottom:12}},
+                    `เรทจริง 1 ${fxFigures.symbol} = ${fxFigures.raw.toLocaleString("en-US",{maximumFractionDigits:6})} บาท`),
+                React.createElement("details",{"data-transfer-extra":true,open:needsTHBRate && !(rates.sourceRate>0)?true:undefined,style:{marginBottom:12,borderTop:`1px solid ${T.border}`,paddingTop:4}},
+                    React.createElement("summary",{className:"text-xs py-2",style:{color:T.sub}},
+                        "ข้อมูลเพิ่มเติม"+(transferFee>0?" · ค่าธรรมเนียม "+moneyIn(transferFee,fromCurrency):"")),
+                    React.createElement(Input,{label:`ค่าธรรมเนียมเพิ่ม (${fromCurrency})`,type:"number",value:f.transferFee??"",onChange:v=>setF({...f,transferFee:v}),placeholder:"0"}),
+                    React.createElement("p",{style:{fontSize:11,color:T.muted,marginBottom:12}},"กรอกเฉพาะค่าธรรมเนียมที่หักเพิ่ม ไม่รวมที่อยู่ในเรทแล้ว"),
+                    transferFee>0 && React.createElement("div",{style:{fontSize:12,color:T.sub,marginBottom:12}},
+                        "ต้นทางถูกหักรวม "+moneyIn((Number(f.amount)||0)+transferFee,fromCurrency)),
+                    fromCurrency!=="THB" && toCurrency!=="THB" && React.createElement(Input,{label:`บาทต่อ 1 ${fromCurrency}${needsTHBRate?" (จำเป็น)":" (ถ้าทราบ)"}`,type:"number",value:f.sourceRateTHB||"",onChange:v=>setF({...f,sourceRateTHB:v}),placeholder:needsTHBRate?"กรอกเรทเพื่อคิดยอดเงินบาท":"เว้นว่างได้"}),
+                    (fromCurrency!=="THB"||toCurrency!=="THB") && React.createElement(Input,{type:"time",label:"เวลาทำรายการ (ถ้าทราบ)",value:f.eventTime||"",onChange:v=>setF({...f,eventTime:v})}),
+                    sellingFX && React.createElement(Input,{label:`เรทต้นทุนต่อ 1 ${fromCurrency} (ถ้าทราบ)`,type:"number",value:f.fxCostOverride??"",placeholder:fxAuto?String(Number(fxAuto.toFixed(6))):"เว้นว่างได้",onChange:v=>setF({...f,fxCostOverride:v})}),
+                    crossCurrency && React.createElement("details",{style:{marginBottom:12}},React.createElement("summary",{className:"text-xs py-2"},"ตรวจต้นทุนและส่วนต่างค่าเงิน"),
+                        React.createElement(ExchangeSummary,{figures:fxFigures,manual:!!f.fxCostOverride})),
+                    React.createElement(Input,{label:"โน้ต",value:f.transferNote,onChange:v=>setF({...f,transferNote:v}),placeholder:"ไม่บังคับ"})),
               ),
               !extendedTransfer && React.createElement(AdvancedToggle, null),
               advancedOpen && !extendedTransfer &&
@@ -8495,7 +8925,7 @@ try {
             expensePocket === "mixed" && React.createElement("p", { style: { color: pocketValid ? T.sub : T.red, fontSize: 11 } }, pocketValid ? `ห้องซ้อม ${moneyIn(billStudio)} · ส่วนตัว ${moneyIn(billPersonal)}` : "ส่วนห้องซ้อมต้องอยู่ระหว่าง 0 ถึงยอดบิลรวม")),
         pocketRouting && f.kind === "in" && React.createElement("p",{className:"text-[11px] mb-3 leading-relaxed",style:{color:T.muted}},"บัญชีนี้แยกกระเป๋าอยู่ หากต้องโอนต่อ ให้บันทึกรับเงินก่อน แล้วใช้เมนูโอนย้ายเพื่อเลือกว่าส่วนตัวหรือห้องซ้อม"),
         isTransfer && (fromAcc?.pocketEnabled||toAcc?.pocketEnabled||initial?.pocketOwner==="studio")&&React.createElement(TxnSectionCard,{title:"ส่วนของเงินที่โอน",subtitle:"ย้ายเงินจริงระหว่างบัญชี โดยรักษาว่าเงินเป็นของส่วนไหน",color:T.purple},React.createElement(FinanceSelect,{label:"เงินโอนเป็นของ",value:transferPocket,options:{personal:"ส่วนตัว",studio:"Blurryroom Studio"},onChange:setTransferPocket})),
-        !linkedIncomeSource && (isTransfer || f.sharedExpense || f.splitExpense || f.sharedIncome || transferOnward || linkedAllocations.length > 1) && React.createElement(TxnSummary, null),
+        !linkedIncomeSource && !isTransfer && (f.sharedExpense || f.splitExpense || f.sharedIncome || transferOnward || linkedAllocations.length > 1) && React.createElement(TxnSummary, null),
         React.createElement(
           "div",
           {
@@ -9514,6 +9944,7 @@ try {
     }
 
     function Budget(props) {
+        const { foreignTax, setForeignTax } = props;
         const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder = {}, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, offerUndo, fireToast } = props;
         const B_SUBS = ["summary", "transactions", "due", "monthclose"];
         const [sub, setSubRaw] = useState(() => { try {
@@ -9531,6 +9962,7 @@ try {
         const [budgetView, setBudgetView] = useState("overview");
         const [openFamilies,setOpenFamilies]=useState({});
         const [portfolioId, setPortfolioId] = useState(null);
+        const [taxOpen, setTaxOpen] = useState(false);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId && a.portfolioEnabled);
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
@@ -9939,6 +10371,7 @@ try {
                 React.createElement("button",{onClick:()=>setBudgetView("reports")},"รายงาน"),
                 React.createElement("button",{onClick:()=>setSub("monthclose")},"ตรวจ Statement และปิดเดือน")),
             sub==="summary" && budgetView==="accounts" && React.createElement("button",{className:"si-link",style:{order:2},onClick:()=>setBudgetView("investment")},"แผนลงทุนและพอร์ตทั้งหมด"),
+            sub==="summary" && budgetView==="accounts" && React.createElement("button",{className:"si-link",style:{order:3},onClick:()=>setTaxOpen(true)},"ภาษีเงินลงทุน"),
             (sub==="due" || sub==="monthclose" || sub==="summary" && ["reports","investment"].includes(budgetView)) && React.createElement("h2",{className:"text-base font-bold"},sub==="due"?"ค้างรับ":sub==="monthclose"?"ตรวจ Statement และปิดเดือน":budgetView==="reports"?"รายงาน":"แผนลงทุนและพอร์ต"),
             sub === "summary" && budgetView === "overview" && React.createElement("div", { className: "flex items-center justify-between gap-2", style: { order: -1 } }, React.createElement("button", { "aria-label": "เดือนก่อนหน้า", onClick: () => setMk(value => addMonthKey(value,-1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronLeft,{size:18})), React.createElement("input", { type: "month", "aria-label": "เดือนภาพรวมบัญชี", value: mk, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setMk(e.target.value); } }, style: { padding: "8px 10px", maxWidth: 170, borderRadius: 10, background: T.surf, color: T.text, border: `1px solid ${T.border}`, fontSize: 13 } }), React.createElement("button", { "aria-label": "เดือนถัดไป", onClick: () => setMk(value => addMonthKey(value,1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronRight,{size:18}))),
             sub === "summary" && budgetView === "investment" && React.createElement(Glass,{className:"p-4"},React.createElement("div",{className:"font-bold text-sm"},"พอร์ตลงทุน"),accounts.some(a=>a.portfolioEnabled) ? React.createElement("div",{className:"flex flex-wrap gap-2 mt-2"},accounts.filter(a=>a.portfolioEnabled).map(a=>React.createElement("button",{key:a.id,onClick:()=>setPortfolioId(a.id),className:"px-3 py-2 rounded-xl font-bold text-xs",style:{background:T.surf2,color:T.purple}},accountLabel(a,accounts)))) : React.createElement("button",{onClick:()=>{setBudgetView("accounts");setShowAccounts(true);},className:"text-xs py-2",style:{color:T.purple}},"ไปที่บัญชี แล้วติ๊กเปิดพอร์ตลงทุนในการแก้ไขบัญชี")),
@@ -10610,7 +11043,8 @@ try {
                     setFixedCosts(fs => fs.map(x => x.id === payFc.id ? { ...x, lastAccountId: accId, fixedCostTrackingVersion: 2 } : x));
                     setPayFc(null);
                 } }),
-            selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id, account:selectedPortfolio, accounts, transactions, payments, setAccounts, onClose:()=>setPortfolioId(null) }),
+            selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id, account:selectedPortfolio, accounts, transactions, payments, setAccounts, foreignTax, setForeignTax, onClose:()=>setPortfolioId(null) }),
+            taxOpen && React.createElement(Sheet,{title:"ภาษีเงินลงทุน",onClose:()=>setTaxOpen(false)},React.createElement(ForeignTaxPanel,{accounts,transactions,payments,setAccounts,foreignTax,setForeignTax})),
             editAcc && (React.createElement(Sheet, { onClose: () => setEditAcc(null), title: editAcc.id ? "แก้ไขบัญชี" : "เพิ่มบัญชี" },
                 React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D\u0E1A\u0E31\u0E0D\u0E0A\u0E35", value: editAcc.name, onChange: v => setEditAcc({ ...editAcc, name: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E01\u0E2A\u0E34\u0E01\u0E23\u0E44\u0E17\u0E22, \u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14" }),
                 React.createElement(FinanceSelect, { label: "อยู่ใต้บัญชีหลัก", value: editAcc.parentAccountId || "", disabled: accounts.some(a => a.parentAccountId === editAcc.id), options: { "": "ไม่มี · เป็นบัญชีหลัก", ...Object.fromEntries(accounts.filter(a => a.id !== editAcc.id && !a.parentAccountId && !a.archived).map(a => [a.id, a.name])), ...(editAcc.parentAccountId && !accounts.some(a => a.id === editAcc.parentAccountId && !a.archived) ? { [editAcc.parentAccountId]: accounts.find(a => a.id === editAcc.parentAccountId)?.name || "บัญชีหลักเดิม" } : {}) }, onChange: v => { const parent = accounts.find(a => a.id === v); setEditAcc({ ...editAcc, parentAccountId: v || null, platform: editAcc.platform || parent?.platform || parent?.name || "" }); } }),
