@@ -1609,14 +1609,21 @@ try {
         const channels = [1,3,5].map(i => { const v = parseInt(color.slice(i,i+2),16)/255; return v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4; });
         return channels[0]*.2126 + channels[1]*.7152 + channels[2]*.0722 > .179 ? "#20231E" : "#FFFFFF";
     };
-    function AccountBadge({ account, accounts = [], compact = false }) {
+    function AccountBadge({ account, accounts = [] }) {
         const child = !!account?.parentAccountId;
-        const tiny = compact === "tiny";
         const base = accountBackground(account);
         const soft = "#" + [1,3,5].map(i => Math.round(parseInt(base.slice(i,i+2),16)*.3 + 255*.7).toString(16).padStart(2,"0")).join("");
-        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style: { display: "inline-flex", alignItems: "center", gap: compact ? 4 : 5, maxWidth: "100%", minWidth: 0, padding: tiny ? "2px 5px" : compact ? (child ? "2px 6px" : "3px 7px") : child ? "3px 7px" : "6px 10px", borderRadius: compact ? 7 : child ? 7 : 9, background: child ? soft : base, color: child ? "#30362C" : accountForeground(account), fontSize: tiny ? (child ? 9.5 : 10) : compact ? (child ? 11 : 11.5) : child ? 10 : 12, fontWeight: child ? 600 : 800, lineHeight: tiny ? 1.4 : compact ? 1.5 : 1.6, whiteSpace: compact ? "nowrap" : undefined, overflow: compact ? "hidden" : undefined, overflowWrap: compact ? undefined : "anywhere", border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)" } },
-            child && React.createElement("span", { "aria-hidden": true, style: { fontSize: 13, flexShrink: 0 } }, "↳"),
-            React.createElement("span", { style: { minWidth: 0, overflow: compact ? "hidden" : undefined, textOverflow: compact ? "ellipsis" : undefined, overflowWrap: compact ? undefined : "anywhere" } }, account?.name || "ไม่ระบุบัญชี"));
+        const style = {
+            display: "inline-flex", alignItems: "center", verticalAlign: "middle",
+            boxSizing: "border-box", height: 20, maxWidth: "100%", minWidth: 0,
+            padding: "0 5px", gap: 3, borderRadius: 7, fontSize: 10, fontWeight: 800,
+            lineHeight: "14px", whiteSpace: "nowrap", overflow: "hidden",
+            background: child ? soft : base, color: child ? "#30362C" : accountForeground(account),
+            border: child ? `1px dashed ${base}` : "1px solid rgba(0,0,0,.07)"
+        };
+        return React.createElement("span", { title: accountLabel(account,accounts), "data-account-level": child ? "child" : "parent", style },
+            child && React.createElement("span", { "aria-hidden": true, style: { fontSize: "inherit", lineHeight: 1, flexShrink: 0 } }, "↳"),
+            React.createElement("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, account?.name || "ไม่ระบุบัญชี"));
     }
     function AccountColorPicker({ account, onChange }) {
         return React.createElement("div", { style: { marginBottom: 16 } },
@@ -8589,10 +8596,10 @@ try {
                         React.createElement("div", { style: { display: "flex", alignItems: "center", flexWrap: "nowrap", gap: 6, flex: 1, minWidth: 0 } },
                             React.createElement("span", { title: heading, style: { fontSize: transfer ? 14 : 15, fontWeight: 750, lineHeight: 1.45, flex: transfer ? "0 0 auto" : "0 1 auto", maxWidth: transfer ? "44%" : undefined, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, heading),
                             transfer ? React.createElement("span", { "data-transfer-route": true, style: { display: "flex", alignItems: "center", gap: 3, flex: "1 1 0%", minWidth: 0 } },
-                                React.createElement("span", { style: { display: "flex", minWidth: 0, flex: "0 1 auto", overflow: "hidden" } }, React.createElement(AccountBadge, { account: from, accounts, compact: "tiny" })),
+                                React.createElement("span", { style: { display: "flex", minWidth: 0, flex: "0 1 auto", overflow: "hidden" } }, React.createElement(AccountBadge, { account: from, accounts })),
                                 React.createElement("span", { style: { color: T.muted, fontSize: 10, flexShrink: 0 } }, "→"),
-                                React.createElement("span", { style: { display: "flex", minWidth: 0, flex: "0 1 auto", overflow: "hidden" } }, React.createElement(AccountBadge, { account: to, accounts, compact: "tiny" }))) :
-                                React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts, compact: "tiny" }))),
+                                React.createElement("span", { style: { display: "flex", minWidth: 0, flex: "0 1 auto", overflow: "hidden" } }, React.createElement(AccountBadge, { account: to, accounts }))) :
+                                React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts }))),
                         flow !== "none" && React.createElement("span", { "data-investment-flow": flow, style: { marginLeft: "auto", flexShrink: 0, color: T.blue, fontSize: "clamp(9px, 2.35vw, 10.5px)", fontWeight: 650, lineHeight: "20px", whiteSpace: "nowrap", textAlign: "right" } }, INVESTMENT_FLOWS[flow])),
                     transfer ? React.createElement(React.Fragment, null,
                         React.createElement(StatementMoney, { fontSize: 15 },
