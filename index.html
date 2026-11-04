@@ -423,7 +423,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-buy-total-input-v36";
+window.__TASKROUTINE_BUILD__="2026-11-05-commissions-simple-form-v37";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1709,12 +1709,14 @@ try {
         return [...clean, transfer, ...(fee ? [fee] : [])];
     }
     // Portfolio activity is owned by one account. Only its cash delta enters the account balance.
-    const portfolioTypes = { buy: "ซื้อ", sell: "ขาย", interest: "ดอกเบี้ย", dividend: "เงินปันผล", opening: "สินทรัพย์ตั้งต้น", cash: "ตั้งเงินสดเริ่มติดตาม", quote: "อัปเดตราคา", snapshot: "บันทึกมูลค่ารวม" };
+    const portfolioTypes = { buy: "ซื้อ", sell: "ขาย", fee_refund:"คืนค่าคอมมิชชัน",fee_charge:"หักค่าคอมมิชชันเพิ่ม",interest: "ดอกเบี้ย", dividend: "เงินปันผล", opening: "สินทรัพย์ตั้งต้น", cash: "ตั้งเงินสดเริ่มติดตาม", quote: "อัปเดตราคา", snapshot: "บันทึกมูลค่ารวม" };
     function portfolioCash(row) {
         const fee = row.feeUnit === "asset" ? 0 : row.fee || 0;
         switch (row.type) {
             case "buy": return -row.amount - fee;
             case "sell": return row.amount - fee;
+            case "fee_refund": return row.amount;
+            case "fee_charge": return -row.amount;
             case "interest":
             case "dividend": return row.amount - row.tax;
             case "cash": return row.delta;
@@ -1801,6 +1803,7 @@ try {
         const sum=(list,key)=>list.some(r=>r[key]==null)?null:list.reduce((n,r)=>n+r[key],0);
         const format=(n,fn)=>n===null?"ข้อมูลไม่ครบ":fn(n);
         const guidance={
+            commission:["คืน/หักค่าคอมมิชชัน","บันทึกเงินคืนหรือเงินที่ถูกหักเพิ่มเติมตามวันที่เกิดจริง ตรวจเอกสารโบรกเกอร์ว่าต้องปรับต้นทุนหรือค่าธรรมเนียมของรายการใดก่อนใช้ประกอบภาษี"],
             trade:["ผลจากการขายสินทรัพย์","หุ้นและหน่วยลงทุนโดยทั่วไปดู ม.40(4)(ช) ส่วนคริปโทหรือโทเคนดู ม.40(4)(ฌ) ตรวจชนิดสินทรัพย์และสิทธิยกเว้นของปีภาษีตามหลักฐาน รายงานพอร์ตใช้ต้นทุนเฉลี่ยและรวมรายการขาดทุนด้วย"],
             interest:["ดอกเบี้ย","ดอกเบี้ยเงินฝากและตราสารหนี้โดยทั่วไปดู ม.40(4)(ก) ใช้ยอดก่อนหักภาษีและเก็บหลักฐานภาษีที่ถูกหักไว้ตรวจสอบ"],
             dividend:["เงินปันผล","เงินปันผลจากบริษัทโดยทั่วไปดู ม.40(4)(ข) สำหรับ ETF ให้ตรวจเอกสารแจกแจงเงินจ่ายของกองทุน โดยเฉพาะเงินคืนทุนและเงินจ่ายประเภทอื่น"],
@@ -1813,6 +1816,7 @@ try {
         const sourceSum=(kind,key)=>remittedSources.filter(r=>r.kind===kind).reduce((s,r)=>s+r[key],0);
         const unknownUSD=sourceSum("unknown","value");
         const incomeTHB=["trade","interest","dividend"].reduce((s,k)=>s+sourceSum(k,"thb"),0);
+        const commissionRows=rows.filter(r=>r.kind==="commission");
         const remaining=remittance?.wallets.get(account.id);
         function remittanceCard(kind){
             const [title,explanation]=guidance[kind],list=rows.filter(r=>r.kind===kind);
@@ -1831,7 +1835,7 @@ try {
                 [],["วันแลกกลับ","รหัสแลกกลับ","วันเกิดเงินต้น/รายได้","รหัสต้นทาง","หมวด","USD","เรทบาท","THB"]];
             for(const r of returnsInPeriod)for(const l of r.sources)data.push([r.date,r.id,l.date,l.id,l.kind,l.value,r.rate,l.thb]);
             data.push([],["ประวัติรายได้ USD ถึงวันตัดยอด (ใช้ตรวจที่มา)","รหัส","ชื่อ","ประเภท","ก่อนหัก USD","ภาษีหักไว้ USD","สุทธิ USD"]);
-            for(const r of analysis.results.filter(r=>r.accountId===account.id && ["trade","interest","dividend"].includes(r.kind)))
+            for(const r of analysis.results.filter(r=>r.accountId===account.id && ["trade","interest","dividend","commission"].includes(r.kind)))
                 data.push([r.date,r.id,r.title,r.kind,r.gross,r.tax,r.native]);
             data.push([],["วิธีคิด","แบ่งตามสัดส่วนเงินสดก่อนแลกกลับ ค่าธรรมเนียมหักแยก ยอดรายได้เป็นยอดสุทธิหลังภาษีต่างประเทศ"],["ตรวจประกอบภาษี","ตรวจข้อเท็จจริง เงินต้น ปีที่เกิดเงินได้ และวันที่นำเข้าไทย การแลกเป็นบาทใช้เป็นจุดคำนวณในแอป"],
                 ["แหล่งอ้างอิง","https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf"]);
@@ -1900,6 +1904,10 @@ try {
                     unknownUSD>1e-8 && pair("ยังระบุที่มาไม่ได้",money(unknownUSD)+" / "+baht(sourceSum("unknown","thb"))),
                     note("ใช้สัดส่วนของเงินสด USD ก่อนถอนแต่ละครั้ง รวมประวัติซื้อขายและโอนข้ามบัญชี วันเดียวกันใช้เวลาใน Statement")) ,
                 ...["trade","interest","dividend"].map(remittanceCard),
+                commissionRows.length>0 && box("คืน/หักค่าคอมมิชชันเพิ่มเติม",
+                    pair("ได้รับคืน (USD)",money(commissionRows.filter(r=>r.native>0).reduce((s,r)=>s+r.native,0))),
+                    pair("ถูกหักเพิ่ม (USD)",money(-commissionRows.filter(r=>r.native<0).reduce((s,r)=>s+r.native,0))),
+                    note("เงินคืนคอมมิชชันที่แลกกลับรวมอยู่ในยอดรอตรวจที่มา ให้ตรวจอ้างอิงจากเอกสารโบรกเกอร์")),
                 box("ส่วนต่างค่าเงินตอนแลกกลับ",
                     pair("เทียบต้นทุนเงินบาทที่ติดตามได้",resultText(sum(rows.filter(r=>r.kind==="fxCash"),"thb"),baht)),
                     note("แสดงประกอบส่วนเงินต้นและรายได้ที่แบ่งด้านบน")),
@@ -2034,6 +2042,9 @@ try {
                         return result;
                     }
                     result.amount = type === "opening" && (row.amount === "" || row.amount == null) ? null : numeric(row.amount,"จำนวนเงิน",["opening","cash","snapshot","quote"].includes(type));
+                    if(["fee_refund","fee_charge"].includes(type)){
+                        result.note=String(row.note||"").trim();
+                    }
                     if (["buy","sell","opening"].includes(type)) result.units = numeric(row.units,"จำนวนหน่วย");
                     if (["buy","sell"].includes(type)) {
                         result.tradeMode = "stock";
@@ -2075,7 +2086,7 @@ try {
         const filtered = entries.filter(r => year === "all" || r.date.startsWith(year));
         const income = filtered.filter(r => ["dividend","interest"].includes(r.type));
         const gross = income.reduce((s,r)=>s+r.amount,0), tax = income.reduce((s,r)=>s+r.tax,0);
-        const types = totalOnly ? ["snapshot","interest","dividend"] : ["buy","sell","interest","dividend","opening","cash","quote"];
+        const types = totalOnly ? ["snapshot","interest","dividend","fee_refund","fee_charge"] : ["buy","sell","interest","dividend","fee_refund","fee_charge","opening","cash","quote"];
         const history = [...filtered].reverse().sort((a,b)=>b.date.localeCompare(a.date));
         const historyDays = new globalThis.Map();
         for(const row of history){
@@ -2087,6 +2098,7 @@ try {
         const first = snapshots[0], latest = book.snapshot;
         const fundingSince = first && latest ? transferHistory.filter(r=>r.date > first.date && r.date <= latest.date).reduce((sum,r)=>sum+(r.toAccountId===account.id ? transferReceived(r) : -Number(r.amount)),0) : 0;
         function description(r) {
+            if(["fee_refund","fee_charge"].includes(r.type))return (r.type==="fee_refund"?"รับคืน ":"จ่ายเพิ่ม ")+money(r.amount)+(r.note?" · "+r.note:"");
             if (["interest","dividend"].includes(r.type)) return "ก่อนหัก " + money(r.amount) + " · ภาษีหัก " + money(r.tax) + " · รับสุทธิ " + money(portfolioCash(r));
             if (r.type === "quote") return money(r.amount) + " / หน่วย";
             if (r.type === "snapshot" || r.type === "cash") return money(r.amount);
@@ -2119,44 +2131,44 @@ try {
                 h(Input,{label:"วันที่",type:"date",value:date,onChange:setDate}),
                 rows.map((r,i)=>h("div",{key:r.id,className:"pf-fields"},
                     rows.length>1 && group(text("รายการที่ "+(i+1)),button("เอาออก",()=>setRows(rows.filter(x=>x.id!==r.id)))),
-                    isTrade(type) && h(FinanceSelect,{label:"วิธีบันทึก",value:r.tradeMode,options:{stock:"ซื้อขายทั่วไป · ระบุค่าธรรมเนียม",crypto:"คริปโต · คำนวณจากอัตรา ไม่มีค่าธรรมเนียม"},onChange:v=>{setRows(list=>list.map((item,j)=>j===i ? {...item,tradeMode:v,budget:item.budget || item.amount || ""} : item));setError("");}}),
                     ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : isCrypto(r,type) ? "สัญลักษณ์เหรียญ" : "หุ้น / ETF / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น BTC หรือ SCHG"}),
-                    type==="sell" && holdings.length>0 && h("div",{className:"flex flex-wrap gap-2","aria-label":"เลือกสินทรัพย์ที่ถืออยู่"},
-                        ...holdings.map(position=>h("button",{key:position.symbol,type:"button",className:"si-link","aria-pressed":String(r.symbol).trim().toUpperCase()===position.symbol,onClick:()=>change(i,"symbol",position.symbol)},position.symbol))),
+                    type==="sell" && holdings.length>0 && h("details",null,h("summary",null,"เลือกจากหุ้นที่ถืออยู่"),h("div",{className:"flex flex-wrap gap-2","aria-label":"เลือกสินทรัพย์ที่ถืออยู่"},
+                        ...holdings.map(position=>h("button",{key:position.symbol,type:"button",className:"si-link","aria-pressed":String(r.symbol).trim().toUpperCase()===position.symbol,onClick:()=>change(i,"symbol",position.symbol)},position.symbol)))),
                     isCrypto(r,type) && h(React.Fragment,null,
                         type==="buy" && field(i,"budget","งบต่อรอบ ("+currency+")"),
                         field(i,"units",type==="buy" ? "จำนวนเหรียญที่ได้รับจริง" : "จำนวนเหรียญที่ขาย"),
                         field(i,"rate","อัตรา · 1 "+(r.symbol || "เหรียญ")+" เท่ากับกี่ "+currency),
                         preview(r)),
-                    !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
+                    !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหุ้น / หน่วย"),
                     type==="sell" && h("div",{className:"pf-pair"},
                         text(r.symbol ? "ขายได้ "+quantity(sellAvailable(i))+" หน่วย" : "เลือกหุ้นหรือเหรียญก่อน"),
                         h("button",{type:"button",className:"si-link",disabled:!r.symbol || sellAvailable(i)<=0,"aria-label":"ขายทั้งหมด รายการที่ "+(i+1),onClick:()=>change(i,"units",String(sellAvailable(i)))},"ขายทั้งหมด")),
                     isTrade(type) && !isCrypto(r,type) && field(i,"unitPrice",(type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย")+" ("+currency+")"),
-                    !isCrypto(r,type) && field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
+                    !isCrypto(r,type) && !isTrade(type) && field(i,"amount",({fee_refund:"ยอดค่าคอมมิชชันที่ได้รับคืน",fee_charge:"ยอดค่าคอมมิชชันที่หักเพิ่ม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
+                    ["fee_refund","fee_charge"].includes(type) && field(i,"note","หมายเหตุ / อ้างอิงคำสั่งซื้อขาย (ถ้ามี)","text"),
                     isTrade(type) && !isCrypto(r,type) && r.feeUnit!=="asset" && h(React.Fragment,null,
-                        h("nav",{className:"si-nav","aria-label":"วิธีกรอกยอด"+(type==="buy"?"ซื้อ":"ขาย")+" รายการที่ "+(i+1)},
-                            ...[["fee","กรอกค่าธรรมเนียม"],["net",type==="buy"?"กรอกยอดจ่ายรวม":"กรอกยอดรับจริง"]].map(([id,label])=>h("button",{key:id,type:"button","aria-current":(r.saleInput||"fee")===id?"page":undefined,onClick:()=>change(i,"saleInput",id)},label))),
                         h(Input,{label:(type==="buy"?"ยอดจ่ายรวม":"ยอดรับสุทธิ")+" ("+currency+")",type:"number",
                             value:r.saleInput==="net" ? String((type==="buy"?r.totalPaid:r.netReceived)??"") : Number(r.amount)>0 && Number.isFinite(Number(r.fee||0)) && Number(r.fee||0)>=0 && (type==="buy" || Number(r.fee||0)<=Number(r.amount)) ? String(decimalCash(Number(r.amount)+(type==="buy"?1:-1)*Number(r.fee||0))) : "",
                             placeholder:type==="buy"?"ยอดเงินที่ถูกหักจริงรวมค่าธรรมเนียม":"ยอดเงินที่เข้าจริงหลังค่าธรรมเนียม",onChange:v=>change(i,type==="buy"?"totalPaid":"netReceived",v)}),
-                        text(type==="buy" ? "ค่าธรรมเนียม = ยอดจ่ายรวม − ยอดซื้อก่อนค่าธรรมเนียม" : "ยอดรับสุทธิ = ยอดขายก่อนค่าธรรมเนียม − ค่าธรรมเนียม")),
+                        text("ยอด"+(type==="buy"?"ซื้อ":"ขาย")+"ก่อนค่าธรรมเนียม "+(Number(r.amount)>0?money(Number(r.amount)):"—"))),
                     ["interest","dividend"].includes(type) && h(React.Fragment,null,field(i,"tax","ภาษีหัก ณ ที่จ่าย ("+currency+")"),text("รับสุทธิ "+money(Number(r.amount)-Number(r.tax)))),
-                    h("details",null,h("summary",null,currency==="THB"?"เวลาตาม Statement":"เรทเงินบาทและเวลาตาม Statement"),
+                    h("details",null,h("summary",null,"ข้อมูลเพิ่มเติม"),
+                        isTrade(type) && h(FinanceSelect,{label:"วิธีบันทึก",value:r.tradeMode,options:{stock:"หุ้น / ซื้อขายทั่วไป",crypto:"คริปโต · คำนวณจากอัตรา"},onChange:v=>{setRows(list=>list.map((item,j)=>j===i ? {...item,tradeMode:v,budget:item.budget || item.amount || ""} : item));setError("");}}),
+                        isTrade(type) && !isCrypto(r,type) && field(i,"amount",(type==="buy"?"ยอดซื้อ":"ยอดขาย")+"ก่อนค่าธรรมเนียม ("+currency+")"),
                         field(i,"eventTime","เวลาในวันที่ทำรายการ (ถ้าทราบ)","time"),
                         currency!=="THB" && field(i,"thbRate",type==="opening" ? "ต้นทุนเงินบาทต่อ 1 "+currency+" ของยอดตั้งต้น" : "เรทวันรายการ · บาทต่อ 1 "+currency),
                         currency!=="THB" && text("ใช้แยกผลตอบแทนเป็นบาท หากยังไม่ทราบเรทให้เว้นว่าง")),
                     type==="cash" && text("ระบบปรับเฉพาะส่วนต่างจากเงินสดที่บันทึกไว้ถึงวันนั้น เพื่อให้ยอดตรงกับโบรกเกอร์"),
-                    isTrade(type) && !isCrypto(r,type) && h("section",{className:"pf-stack",style:{borderTop:"1px solid "+T.border,paddingTop:12}},
+                    isTrade(type) && !isCrypto(r,type) && h("details",{open:r.feeUnit==="asset" || undefined},h("summary",null,"ค่าธรรมเนียม · "+(r.feeUnit==="asset"?"หักเป็นหน่วย":money(Number(r.fee)||0))),h("div",{className:"pf-stack"},
                         h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,
                             options:{cash:"หักจากเงินสด "+currency,asset:"หักเป็นจำนวนหุ้น / เหรียญ"},
                             onChange:v=>change(i,"feeUnit",v)}),
                         field(i,"fee",r.feeUnit==="asset" ? "จำนวนหุ้น / เหรียญที่ถูกหักเป็นค่าธรรมเนียม" : "ค่าธรรมเนียมรวม ("+currency+")"),
                         text(r.feeUnit==="asset" ? "ใช้เมื่อถูกหักเป็นหน่วยของหุ้นหรือเหรียญ เช่น 0.001 BTC"
-                            : "รวมค่าคอมมิชชัน VAT และค่าธรรมเนียมอื่นที่หักเป็นเงิน หรือกรอก"+(type==="buy"?"ยอดจ่ายรวม":"ยอดรับจริง")+"ด้านบนเพื่อคำนวณให้")))),
+                            : "รวมค่าคอมมิชชัน VAT และค่าธรรมเนียมอื่นที่หักเป็นเงิน หรือกรอก"+(type==="buy"?"ยอดจ่ายรวม":"ยอดรับจริง")+"ด้านบนเพื่อคำนวณให้"))))),
                 isTrade(type) && h("div",{className:"pf-receipt","aria-live":"polite"},
-                    pair(type==="buy" ? "ยอดจ่ายสุทธิ (Net Amount)" : "ยอดรับสุทธิ (Net Amount)", hasNetCash ? money(Math.abs(netCash)) : "—"),
-                    pair("เงินสดในบัญชีหลังบันทึก", hasNetCash ? money(decimalCash(cash - previousCashChange + netCash)) : "—")),
+                    rows.length>1 && pair(type==="buy" ? "ยอดจ่ายรวมทุกรายการ" : "ยอดรับสุทธิทุกรายการ", hasNetCash ? money(Math.abs(netCash)) : "—"),
+                    h("details",null,h("summary",null,"ดูเงินสดหลังบันทึก"),pair("เงินสดในบัญชีหลังบันทึก", hasNetCash ? money(decimalCash(cash - previousCashChange + netCash)) : "—"))),
                 type==="buy" && !editing && -netCash > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
                 isTrade(type) && !editing && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
@@ -2175,7 +2187,7 @@ try {
                             h("td",null,quantity(p.units)),h("td",null,p.cost===null?"—":money(p.cost/p.units)),
                             h("td",null,p.quote?money(p.units*p.quote.amount):"รอราคา"))))))),
                     !totalOnly && !holdings.length && text("เริ่มจากบันทึกซื้อ หรือเลือกสินทรัพย์ตั้งต้นสำหรับหุ้นและเหรียญที่มีอยู่แล้ว"),
-                    !account.archived && h("div",{className:"pf-stack"},h("div",{className:"pf-actions"},...types.filter(k=>["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k),k!=="sell"))),h("details",null,h("summary",null,"รายได้และการจัดการพอร์ต"),h("div",{className:"pf-actions"},...types.filter(k=>!["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k)))))))
+                    !account.archived && h("div",{className:"pf-stack"},h("div",{className:"pf-actions"},...types.filter(k=>["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k),k!=="sell"))),h("details",null,h("summary",null,"รายได้ ค่าคอมมิชชัน และรายการอื่น"),h("div",{className:"pf-actions"},...types.filter(k=>!["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k)))))))
                 : h(React.Fragment,null,h(FinanceSelect,{label:"ปีของ Statement พอร์ต",value:year,onChange:setYear,options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,y])])}),
                     income.length>0 && h("section",{className:"pf-stack"},numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะปีที่เลือก")),
                     !history.length && text("ยังไม่มีรายการภายในพอร์ต"),
@@ -2184,7 +2196,7 @@ try {
                         h("time",{dateTime:day},parseK(day).toLocaleDateString("th-TH",{weekday:"short"}),h("strong",null,parseK(day).getDate()),
                             parseK(day).toLocaleDateString("th-TH",{month:"short"}),h("div",null,parseK(day).getFullYear()+543)),
                         h("div",{className:"pf-day-list"},items.map(r=>{
-                            const delta=portfolioCash(r), cashRow=["buy","sell","interest","dividend"].includes(r.type);
+                            const delta=portfolioCash(r), cashRow=["buy","sell","interest","dividend","fee_refund","fee_charge"].includes(r.type);
                             const amount=cashRow?Math.abs(delta):r.amount;
                             return h("details",{key:r.id},
                                 h("summary",{"aria-label":portfolioTypes[r.type]+" "+(r.symbol||"")+" "+day},
@@ -9118,6 +9130,10 @@ try {
             }
             if(e.delta<0) debit(w.cash,-e.delta);
             else credit(w.cash,e.delta,rate?e.delta*rate:null);
+            if(e.kind==="portfolio" && ["fee_refund","fee_charge"].includes(r.type)){
+                note("commission",e.delta,rate?e.delta*rate:null);
+                results[results.length-1].rate=rate;
+            }
             const kind=e.kind==="portfolio"?r.type:e.kind==="ordinary" && r.kind==="in"?({"ดอกเบี้ย":"interest","เงินปันผล":"dividend"})[r.category]:null;
             if(kind==="interest" || kind==="dividend"){
                 const tax=e.kind==="portfolio"?Number(r.tax)||0:0;
