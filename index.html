@@ -381,6 +381,11 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 .pf-total>b{font-size:clamp(21px,5vw,29px);line-height:1.25;margin-bottom:7px;overflow-wrap:anywhere}
 .pf-pair{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px}
 .pf-pair>span{opacity:.75}.pf-pair>strong{text-align:right;overflow-wrap:anywhere;min-width:0;font-variant-numeric:tabular-nums}
+.pf-help{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;min-height:30px;flex:0 0 30px;border:1px solid #22645c30;border-radius:50%;background:#22645c0c;color:#22645c;font-size:14px;font-weight:800;padding:0}
+.pf-label-help{display:inline-flex;align-items:center;gap:7px}.pf-report-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pf-result{font-size:clamp(23px,6vw,30px);font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums}
+.pf-explanation{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#22645c08}.pf-pending{font-size:13px;color:#805521}
+.pf-order-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:11px;color:#386e79}.pf-order-status button{min-height:32px;padding:4px 8px;border-radius:8px;background:#386e7910}
 .pf-stack details{padding:10px 0;border-block:1px solid #b8aa9333}.pf-stack summary{cursor:pointer;font-size:13px;font-weight:650;padding:4px 0}
 .pf-stack details[open]>summary{margin-bottom:12px}.pf-stack details .pf-pair+.pf-pair{margin-top:8px}
 .pf-entry{gap:9px;border-top:1px solid #b8aa934d;padding:16px 0 4px}
@@ -423,7 +428,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-commissions-simple-form-v37";
+window.__TASKROUTINE_BUILD__="2026-11-05-portfolio-order-v40";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1723,9 +1728,29 @@ try {
             default: return 0;
         }
     }
+    function portfolioEntryCompare(a,b) {
+        const day=a.date.localeCompare(b.date);
+        if(day)return day;
+        const am=Number.isFinite(a.manualOrder),bm=Number.isFinite(b.manualOrder);
+        if(am||bm)return (am?a.manualOrder:Infinity)-(bm?b.manualOrder:Infinity);
+        return (a.eventTime||"12:00").localeCompare(b.eventTime||"12:00");
+    }
+    function reorderPortfolioDay(entries,day,ids=null) {
+        const daily=entries.filter(r=>r.date===day).sort(portfolioEntryCompare);
+        if(ids && (ids.length!==daily.length || new Set(ids).size!==daily.length || ids.some(id=>!daily.some(r=>r.id===id))))
+            throw new Error("รายการวันนี้เปลี่ยนแล้ว กรุณาลองลากใหม่");
+        const ranks=new globalThis.Map((ids||[]).map((id,i)=>[id,i]));
+        const next=entries.map(r=>{
+            if(r.date!==day)return r;
+            const {manualOrder,...rest}=r;
+            return ids?{...rest,manualOrder:ranks.get(r.id)}:rest;
+        });
+        portfolioBook(next); // Never accept a sequence that sells more units than are held.
+        return next;
+    }
     function portfolioBook(entries) {
         const assets = new window.Map(), realized = new window.Map();
-        const ordered = [...entries].sort((a,b) => a.date.localeCompare(b.date) || (a.eventTime||"12:00").localeCompare(b.eventTime||"12:00"));
+        const ordered = [...entries].sort(portfolioEntryCompare);
         let unknownProfit = false, profit = 0, snapshot = null;
         for (const row of ordered) {
             if (row.type === "snapshot") { snapshot = row; continue; }
@@ -1818,19 +1843,18 @@ try {
         const incomeTHB=["trade","interest","dividend"].reduce((s,k)=>s+sourceSum(k,"thb"),0);
         const commissionRows=rows.filter(r=>r.kind==="commission");
         const remaining=remittance?.wallets.get(account.id);
+        const helpButton=(kind,title)=>h("button",{type:"button",className:"pf-help","aria-expanded":help===kind,"aria-label":"คำอธิบาย "+title,onClick:()=>setHelp(help===kind?"":kind)},"!");
         function remittanceCard(kind){
             const [title,explanation]=guidance[kind],list=rows.filter(r=>r.kind===kind);
-            const income=kind==="interest" || kind==="dividend";
-            const native=sum(list,"native"), thb=sourceSum(kind,"thb");
-            return box(title,h("button",{type:"button",className:"si-link","aria-expanded":help===kind,"aria-label":"คำอธิบาย "+title,onClick:()=>setHelp(help===kind?"":kind)},"!"),
-                help===kind && note(explanation),
-                pair("เกิดขึ้นในช่วงนี้ (USD)",kind==="trade"?resultText(native,money):money(native)),
-                income && pair("ก่อนหัก / ภาษีหักไว้ (USD)",money(sum(list,"gross"))+" / "+money(sum(list,"tax"))),
-                pair("ส่วนที่แลกกลับในช่วงนี้ (USD)",money(sourceSum(kind,"value"))),
-                pair("รับจริงเป็นบาทตอนแลกกลับ",baht(thb)));
+            return h("div",{key:kind},
+                pair(h("span",{className:"pf-label-help"},title+"สุทธิ",helpButton(kind,title)),money(sum(list,"native"))),
+                help===kind && h("div",{className:"pf-explanation"},note(explanation),pair("ก่อนหักภาษี",money(sum(list,"gross"))),pair("ภาษีหักไว้",money(sum(list,"tax")))));
         }
         function exportRemittance(){
             const data=[["รายงานแบ่งที่มาของ USD ที่แลกเป็นบาท","ตามสัดส่วนเงินสดก่อนถอน"],["บัญชี",account.name],["ช่วง",range],
+                ["เงินสดคงเหลือ USD",close],["กำไร/ขาดทุนจากการขายในช่วง USD",tradeGain],
+                ["ดอกเบี้ยสุทธิในช่วง USD",sum(rows.filter(r=>r.kind==="interest"),"native")],["ปันผลสุทธิในช่วง USD",sum(rows.filter(r=>r.kind==="dividend"),"native")],
+                ["จำนวนครั้งที่แลกกลับ",returnsInPeriod.length],["บาทรับจริงรวมเงินต้น",returnsTotal],[],
                 ["หมวด","USD ที่แลกกลับ","บาทที่ได้รับ"],...["principal","trade","interest","dividend","unknown"].map(k=>[({principal:"เงินต้น",trade:"กำไรขายสินทรัพย์",interest:"ดอกเบี้ยสุทธิ",dividend:"ปันผลสุทธิ",unknown:"ยังระบุที่มาไม่ได้"})[k],sourceSum(k,"value"),sourceSum(k,"thb")]),
                 [],["วันแลกกลับ","รหัสแลกกลับ","วันเกิดเงินต้น/รายได้","รหัสต้นทาง","หมวด","USD","เรทบาท","THB"]];
             for(const r of returnsInPeriod)for(const l of r.sources)data.push([r.date,r.id,l.date,l.id,l.kind,l.value,r.rate,l.thb]);
@@ -1881,6 +1905,67 @@ try {
         }
         const trades = rows.filter(r=>r.kind==="trade");
         const tradeGain = sum(trades,"native");
+        const unknownOrigins=new globalThis.Map();
+        for(const s of remittedSources.filter(s=>s.kind==="unknown")){
+            const key=s.id||s.date||"opening";
+            const origin=unknownOrigins.get(key)||{date:s.date,id:s.id,value:0};
+            origin.value+=s.value;unknownOrigins.set(key,origin);
+        }
+        const sourceLabels={principal:"เงินต้น",trade:"กำไรจากการขาย",interest:"ดอกเบี้ยสุทธิ",dividend:"ปันผลสุทธิ",unknown:"รอตรวจประวัติ"};
+        const returnsTotal=returnsInPeriod.reduce((s,r)=>s+r.received,0);
+        function compactUSDReport(){
+            return h(React.Fragment,null,
+                box(h("span",{className:"pf-report-heading"},"ผลจากการขายหุ้น",helpButton("trade","กำไรจากการขาย")),
+                    h("div",{className:"pf-result",style:{color:tradeGain==null?T.sub:tradeGain<-.005?T.red:T.green}},trades.length?resultText(tradeGain,money):"ยังไม่มีรายการขาย"),
+                    note("หักค่าซื้อขายในรายการแล้ว · ไม่รวมปันผลและค่าเงิน"),
+                    help==="trade" && note(guidance.trade[1]),
+                    pair("เงินสดเหลือ",money(close)),
+                    saved!=null && note(gap(saved,close)===0?"ตรงกับ Statement ณ วันที่เลือก":"ต่างจาก Statement "+money(gap(saved,close)))),
+                box("รายได้อื่น · USD",...["interest","dividend"].map(remittanceCard),
+                    commissionRows.length>0 && h("details",null,h("summary",null,"คืน/หักค่าคอมมิชชัน"),
+                        pair("ได้รับคืน",money(commissionRows.filter(r=>r.native>0).reduce((s,r)=>s+r.native,0))),
+                        pair("หักเพิ่ม",money(-commissionRows.filter(r=>r.native<0).reduce((s,r)=>s+r.native,0))))),
+                box("แลกกลับเป็นบาทแล้ว",
+                    h("strong",{className:"pf-result"},baht(returnsTotal)),
+                    note("รับจริงรวมเงินต้น · "+returnsInPeriod.length+" ครั้งในช่วงที่เลือก"),
+                    pair("กำไรที่ติดตามมาในเงินแลกกลับ",baht(sourceSum("trade","thb"))),
+                    pair("ดอกเบี้ย + ปันผลในเงินแลกกลับ",baht(sourceSum("interest","thb")+sourceSum("dividend","thb"))),
+                    h("details",null,h("summary",null,"แยกเงินต้นและรายได้"),
+                        pair("เงินต้น",baht(sourceSum("principal","thb"))),
+                        ...["trade","interest","dividend"].map(k=>pair(sourceLabels[k],money(sourceSum(k,"value"))+" → "+baht(sourceSum(k,"thb")))),
+                        unknownUSD>1e-8 && pair("รอตรวจประวัติ",money(unknownUSD)+" → "+baht(sourceSum("unknown","thb"))),
+                        note("แบ่งตามสัดส่วนเงินสดก่อนแลกแต่ละครั้ง ด้วยเรทที่รับจริง กำไรที่แลกกลับอาจเกิดก่อนช่วงที่เลือก และไม่เท่ากับกำไรสุทธิจากการขายทั้งหมด")),
+                    unknownUSD>1e-8 && h("details",{className:"pf-pending"},h("summary",null,"รอตรวจประวัติ USD "+money(unknownUSD)),
+                        note("เงินส่วนนี้ตามย้อนกลับไม่ครบ เช่น เงินตั้งต้น หรือซื้อก่อนบันทึกเงินเข้าในวันเดียวกัน จึงยังแยกเงินต้นกับรายได้ไม่ได้"),
+                        ...[...unknownOrigins.values()].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(o=>{
+                            const event=through.find(e=>e.row.id===o.id), own=event?.accountId===account.id;
+                            return h("div",{className:"pf-entry",key:o.id||o.date||"opening"},note(o.date?shortDate(o.date):"ยอดตั้งต้น"),
+                                pair(event?.title||"ไม่พบประวัติต้นทาง",money(o.value)),
+                                own && event.kind==="portfolio" && !account.archived && button("ตรวจรายการต้นทาง",()=>onEdit(event.row.type,event.row)));
+                        }),note("ตรวจเวลาและยอดเงินจริงก่อนแก้ ไม่เพิ่มเป็นกำไรให้อัตโนมัติ"))),
+                h("details",null,h("summary",null,"ดูการแลกกลับแต่ละครั้ง ("+returnsInPeriod.length+")"),
+                    !returnsInPeriod.length && note("ยังไม่มีการแลก USD เป็นบาทในช่วงนี้"),
+                    ...[...returnsInPeriod].reverse().map(r=>{
+                        const get=k=>r.sources.filter(s=>s.kind===k).reduce((n,s)=>n+s.thb,0);
+                        return h("section",{className:"pf-receipt",key:r.id},h("strong",null,shortDate(r.date)),
+                            pair(money(r.amount)+" →",baht(r.received)),
+                            note("เรท "+r.rate.toLocaleString("th-TH",{maximumFractionDigits:4})+" บาท/USD"),
+                            ...["principal","trade","interest","dividend","unknown"].filter(k=>get(k)>1e-8).map(k=>pair(sourceLabels[k],baht(get(k)))));
+                    })),
+                h("details",null,h("summary",null,"เงินแลกเข้า–ออกและส่วนต่างค่าเงิน"),
+                    flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินในช่วงที่เลือก"},
+                        h("thead",null,h("tr",null,...["สกุล","รับเข้า","จ่ายออก","ผลต่าง"].map(x=>h("th",{key:x,scope:"col"},x)))),h("tbody",null,fxRow("USD"),fxRow("THB")))):note("ไม่มีรายการแลกเงิน"),
+                    note("ผลต่างเงินเข้า–ออกไม่ใช่กำไรจากหุ้น · ไม่รวมโอน USD ข้ามบัญชี"),
+                    pair("ส่วนต่างค่าเงินที่คำนวณได้",resultText(sum(rows.filter(r=>r.kind==="fxCash"),"thb"),baht)),
+                    helpButton("fxCash","ส่วนต่างค่าเงิน"),help==="fxCash" && note(guidance.fxCash[1]),
+                    h("details",null,h("summary",null,"ที่มาของเงินสด USD ที่เหลือ"),
+                        ...Object.keys(sourceLabels).map(k=>pair(sourceLabels[k],money((remaining?.cash||[]).filter(l=>l.kind===k).reduce((s,l)=>s+l.value,0)))))),
+                h("details",null,h("summary",null,"วิธีคิดและข้อมูลประกอบภาษี"),
+                    note("กำไรขายหุ้นคิดต้นทุนเฉลี่ยถ่วงน้ำหนักตามวันและเวลาที่บันทึก รวมค่าซื้อขาย ส่วนเงินบาทใช้เรทรับจริงเมื่อแลกกลับ และตามเงินข้ามบัญชี USD"),
+                    note("ยอดแลกกลับแบ่งที่มาตามสัดส่วนเงินสด ไม่ใช่ยอดภาษีที่ต้องจ่าย การแลกเป็นบาทอาจคนละวันกับการนำเงินเข้าไทย ต้องตรวจหลักฐานก่อนใช้ยื่นแบบ"),
+                    h("a",{href:"https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf",target:"_blank",rel:"noopener noreferrer",style:{fontSize:12,textDecoration:"underline"}},"กรมสรรพากร · เงินต้นและอัตราแลกเปลี่ยน")),
+                button("ส่งออก CSV · สรุปและประวัติแลกกลับ",exportRemittance));
+        }
         const fxRow = code => {
             const {in:incoming,out:outgoing} = flows[code];
             const number = value => value.toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1889,34 +1974,14 @@ try {
         return h("div",{className:"pf-stack"},dateField,
             h("nav",{className:"si-nav","aria-label":"ช่วงสรุปผลตอบแทน"},...[["all","สะสม"],["month","รายเดือน"],["year","รายปี"]].map(([id,label])=>h("button",{key:id,"aria-current":period===id?"page":undefined,onClick:()=>setPeriod(id)},label))),
             note("ช่วงรายงาน "+range+" · ใช้วันที่เกิดรายการ"),
-            box("เงินสดคงเหลือ",h("strong",{style:{fontSize:28}},money(close)),
+            currency!=="USD" && box("เงินสดคงเหลือ",h("strong",{style:{fontSize:28}},money(close)),
                 note(saved == null ? "ยังไม่มี Statement เทียบ ณ วันที่เลือก" : gap(saved,close)===0 ? "ตรงกับ Statement ณ วันที่เลือก" : "ต่างจาก Statement "+money(gap(saved,close)))),
             currency!=="USD" && box("ผลตอบแทนที่เกิดขึ้นแล้ว", trades.length>0 && pair("ขายสินทรัพย์",resultText(tradeGain,money)),
                 pair("รวมหลังภาษีหักไว้และค่าซื้อขาย",rows.length ? resultText(sum(rows,"thb"),baht) : "ไม่มีรายการในช่วงนี้")),
-            box("เงินเข้า–ออกจากการแลกในช่วงนี้",flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินในช่วงที่เลือก"},
+            currency!=="USD" && box("เงินเข้า–ออกจากการแลกในช่วงนี้",flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินในช่วงที่เลือก"},
                 h("thead",null,h("tr",null,...["สกุล","เข้า","ออก","สุทธิ"].map(x=>h("th",{key:x,scope:"col"},x)))),
                 h("tbody",null,fxRow("USD"),fxRow("THB"))),note("สุทธิ = รับ − จ่าย ในสกุลนั้น ยอดออกรวมค่าธรรมเนียมต้นทาง")) : note("ไม่มีรายการแลกในช่วงนี้")),
-            currency==="USD" ? h(React.Fragment,null,
-                box("สรุปเงินบาทที่แลกกลับในช่วงนี้",
-                    pair("รับจริงทั้งหมด",baht(returnsInPeriod.reduce((s,r)=>s+r.received,0))),
-                    pair("ส่วนเงินต้น",baht(sourceSum("principal","thb"))),
-                    pair("กำไร ดอกเบี้ย และปันผลสุทธิที่ระบุได้",baht(incomeTHB)),
-                    unknownUSD>1e-8 && pair("ยังระบุที่มาไม่ได้",money(unknownUSD)+" / "+baht(sourceSum("unknown","thb"))),
-                    note("ใช้สัดส่วนของเงินสด USD ก่อนถอนแต่ละครั้ง รวมประวัติซื้อขายและโอนข้ามบัญชี วันเดียวกันใช้เวลาใน Statement")) ,
-                ...["trade","interest","dividend"].map(remittanceCard),
-                commissionRows.length>0 && box("คืน/หักค่าคอมมิชชันเพิ่มเติม",
-                    pair("ได้รับคืน (USD)",money(commissionRows.filter(r=>r.native>0).reduce((s,r)=>s+r.native,0))),
-                    pair("ถูกหักเพิ่ม (USD)",money(-commissionRows.filter(r=>r.native<0).reduce((s,r)=>s+r.native,0))),
-                    note("เงินคืนคอมมิชชันที่แลกกลับรวมอยู่ในยอดรอตรวจที่มา ให้ตรวจอ้างอิงจากเอกสารโบรกเกอร์")),
-                box("ส่วนต่างค่าเงินตอนแลกกลับ",
-                    pair("เทียบต้นทุนเงินบาทที่ติดตามได้",resultText(sum(rows.filter(r=>r.kind==="fxCash"),"thb"),baht)),
-                    note("แสดงประกอบส่วนเงินต้นและรายได้ที่แบ่งด้านบน")),
-                h("details",null,h("summary",null,"ที่มาของ USD ที่ยังเป็นเงินสด"),
-                    ...["principal","trade","interest","dividend","unknown"].map(k=>pair(({principal:"เงินต้น",trade:"กำไรที่ขายแล้ว",interest:"ดอกเบี้ย",dividend:"ปันผล",unknown:"ยังระบุที่มาไม่ได้"})[k],money((remaining?.cash||[]).filter(l=>l.kind===k).reduce((s,l)=>s+l.value,0))))),
-                note("ยอดเงินบาทของแต่ละหมวดคำนวณเฉพาะส่วนที่แลกกลับด้วยเรทรับจริง ยอดที่ยังอยู่เป็น USD แสดงตามวันเกิดรายได้"),
-                note("การแบ่งตามสัดส่วนเป็นวิธีติดตามในแอป ภาษีต้องประเมินเงินต้นและรายได้ตามหลักฐานจริง และตรวจวันที่นำเงินเข้าไทยประกอบ การแลกสกุลเงินกับการนำเงินเข้าไทยอาจคนละวัน"),
-                button("ส่งออก CSV · เงินต้นและรายได้ที่แลกกลับ",exportRemittance),
-                h("a",{href:"https://www.rd.go.th/fileadmin/download/news/question_p161_162.pdf",target:"_blank",rel:"noopener noreferrer",style:{fontSize:12,textDecoration:"underline"}},"กรมสรรพากร · คำถาม 9–12 เงินต้นและอัตราแลกเปลี่ยน"))
+            currency==="USD" ? compactUSDReport()
                 : h(React.Fragment,null,...Object.keys(guidance).map(metric),button("ส่งออก CSV · สรุปและรายการในช่วงนี้",exportReport)),
             currency!=="USD" && missing.length>0 && h("details",null,h("summary",null,"ตรวจรายการที่ขาดเรทหรือต้นทุน"),...missing.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date+" · "+r.title),note(({trade:"ตรวจต้นทุนหุ้นและเรทวันขาย",fxAsset:"ตรวจเรทวันขายและต้นทุนเงินบาทของหุ้นที่ซื้อ",fxCash:"ตรวจต้นทุน USD ในรายละเอียดการแลกเงิน",interest:"ระบุเรทวันที่รับดอกเบี้ย",dividend:"ระบุเรทวันที่รับปันผล"})[r.kind]),!account.archived && (account.portfolioEntries||[]).some(x=>x.id===r.id) && button("แก้รายการ",()=>{const x=account.portfolioEntries.find(x=>x.id===r.id);onEdit(x.type,x);})))),
             h("details",null,h("summary",null,"มูลค่าที่ยังถืออยู่และเรทประเมิน"),currency!=="THB"&&h(React.Fragment,null,h(Input,{label:"เรทประเมินวันที่เลือก · บาทต่อ 1 "+currency,type:"number",value:rate || account.portfolioMarketRates?.[day] || "",onChange:v=>{setRate(v);setMsg("");}}),!account.archived&&button("บันทึกเรทของวันที่เลือก",()=>record("portfolioMarketRates",rate || account.portfolioMarketRates?.[day],true)),msg&&note(msg)),
@@ -1926,6 +1991,28 @@ try {
                 account.portfolioMode==="summary" && note("บัญชีติดตามยอดรวมแสดงผลแยกได้เฉพาะรายการที่ลงรายละเอียดไว้")));
     }
 
+    function PortfolioHistoryDay({day,items,renderRow,onReorder,onReset,readOnly=false}) {
+        const h=React.createElement;
+        const dnd=useLongPressSort(items,(from,to)=>onReorder(day,reorderListItem(items,from,to).map(r=>r.id)),"portfolio-"+day,320,false,true);
+        const manual=items.some(r=>Number.isFinite(r.manualOrder));
+        return h("section",{className:"pf-day","aria-label":"รายการวันที่ "+day},
+            h("time",{dateTime:day},parseK(day).toLocaleDateString("th-TH",{weekday:"short"}),h("strong",null,parseK(day).getDate()),
+                parseK(day).toLocaleDateString("th-TH",{month:"short"}),h("div",null,parseK(day).getFullYear()+543)),
+            h("div",null,
+                (dnd.dragging || manual) && h("div",{className:"pf-order-status",role:"status"},
+                    h("span",null,dnd.dragging?"กำลังลาก · ปล่อยเพื่อวาง":"ใช้ลำดับที่จัดเอง"),
+                    manual && !readOnly && !dnd.dragging && h("button",{type:"button",onClick:()=>onReset(day),"aria-label":"คืนลำดับเดิม "+day},"คืนลำดับเดิม")),
+                h("div",{className:"pf-day-list"},items.map((r,i)=>renderRow(r,i,{
+                    props:readOnly||items.length<2?{}:{...dnd.itemProps(i),
+                        onContextMenu:e=>{if(!e.target.closest("button,input,a"))e.preventDefault();},
+                        onClickCapture:e=>{if(dnd.suppressClick()){e.preventDefault();e.stopPropagation();}}},
+                    style:readOnly||items.length<2?{}:{...dnd.itemStyle(i),
+                        background:dnd.activeIndex===i||dnd.armedIndex===i?hex(T.blue,.08):undefined,
+                        outline:dnd.activeIndex===i||dnd.armedIndex===i?"1px solid "+T.blue:undefined,outlineOffset:-1},
+                    move:readOnly||items.length<2?null:to=>onReorder(day,reorderListItem(items,i,to).map(row=>row.id)),
+                    count:items.length
+                })))));
+    }
     function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, onClose }) {
         const h = React.createElement, currency = accountCurrency(account);
         const entries = account.portfolioEntries || [];
@@ -1935,6 +2022,7 @@ try {
         const cash = nativeAccountBalance(account, transactions, payments);
         const detailedMoney = new Intl.NumberFormat("th-TH",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:8});
         const money = n => detailedMoney.format(n);
+        const unitCostMoney = new Intl.NumberFormat("th-TH",{style:"currency",currency,minimumFractionDigits:4,maximumFractionDigits:4});
         const quantity = n => Number(n).toLocaleString("en-US",{maximumFractionDigits:16});
         const cryptoDefault = /binance/i.test([account.name,account.platform,accountLabel(account,accounts)].join(" "));
         const isTrade = k => k === "buy" || k === "sell";
@@ -1947,7 +2035,7 @@ try {
             return Number(tradeGrossAmount(row.units,row.rate));
         };
         const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", unitPrice:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
-        const [tab,setTab] = useState("assets"), [type,setType] = useState("");
+        const [tab,setTab] = useState(totalOnly ? "assets" : "profit"), [type,setType] = useState("");
         const [rows,setRows] = useState([]), [date,setDate] = useState(TK), [error,setError] = useState("");
         const [editing,setEditing] = useState(null), [year,setYear] = useState("all");
         const [confirmDelete,setConfirmDelete] = useState(null);
@@ -1987,21 +2075,24 @@ try {
             portfolioBook(next); // Reject oversells, including those caused by changing an earlier entry.
             setAccounts(list => list.map(a => a.id === account.id ? {...a,portfolioEntries:next} : a));
         }
+        function reorderHistory(day,ids){
+            try{commit(reorderPortfolioDay(entries,day,ids));setError("");}
+            catch(e){setError("สลับลำดับไม่ได้: "+e.message);}
+        }
         function sellAvailable(index) {
             const row=rows[index], symbol=String(row.symbol || "").trim().toUpperCase();
-            const cutoff=date+"T"+(row.eventTime || "12:00");
+            const probe={...row,date,id:editing||row.id};
             let held=0, available=0;
-            const timeline=entries.filter(entry=>entry.id!==editing && entry.symbol===symbol)
-                .sort((a,b)=>a.date.localeCompare(b.date) || (a.eventTime||"12:00").localeCompare(b.eventTime||"12:00"));
-            for(const entry of timeline){
+            const timeline=[...entries.filter(entry=>entry.id!==editing && entry.symbol===symbol),probe].sort(portfolioEntryCompare);
+            const cutoff=timeline.indexOf(probe);
+            for(const entry of timeline.slice(0,cutoff)){
                 const assetFee=entry.feeUnit==="asset" ? Number(entry.fee)||0 : 0;
                 const delta=entry.type==="sell" ? -Number(entry.units)-assetFee
                     : ["buy","opening"].includes(entry.type) ? Number(entry.units)-assetFee : 0;
-                if(entry.date+"T"+(entry.eventTime || "12:00")<=cutoff)held+=delta;
+                held+=delta;
             }
             available=held;
-            for(const entry of timeline){
-                if(entry.date+"T"+(entry.eventTime || "12:00")<=cutoff)continue;
+            for(const entry of timeline.slice(cutoff+1)){
                 const assetFee=entry.feeUnit==="asset" ? Number(entry.fee)||0 : 0;
                 if(entry.type==="sell")held-=Number(entry.units)+assetFee;
                 if(["buy","opening"].includes(entry.type))held+=Number(entry.units)-assetFee;
@@ -2022,6 +2113,10 @@ try {
                 };
                 const nextRows = rows.map(row => {
                     const result = { id:row.id, type, date, eventTime:row.eventTime || "" };
+                    const original=entries.find(r=>r.id===editing);
+                    if(original?.date===date && Number.isFinite(original.manualOrder))result.manualOrder=original.manualOrder;
+                    else if(entries.some(r=>r.date===date && Number.isFinite(r.manualOrder)))
+                        result.manualOrder=Math.max(...entries.filter(r=>r.date===date && Number.isFinite(r.manualOrder)).map(r=>r.manualOrder))+1+rows.indexOf(row);
                     if(currency!=="THB" && row.thbRate!=="" && row.thbRate!=null)
                         result.thbRate=numeric(row.thbRate,"เรทเงินบาท ณ วันที่ทำรายการ");
                     if (["buy","sell","opening","quote","dividend"].includes(type)) {
@@ -2087,7 +2182,7 @@ try {
         const income = filtered.filter(r => ["dividend","interest"].includes(r.type));
         const gross = income.reduce((s,r)=>s+r.amount,0), tax = income.reduce((s,r)=>s+r.tax,0);
         const types = totalOnly ? ["snapshot","interest","dividend","fee_refund","fee_charge"] : ["buy","sell","interest","dividend","fee_refund","fee_charge","opening","cash","quote"];
-        const history = [...filtered].reverse().sort((a,b)=>b.date.localeCompare(a.date));
+        const history = [...filtered].sort((a,b)=>b.date.localeCompare(a.date)||portfolioEntryCompare(a,b));
         const historyDays = new globalThis.Map();
         for(const row of history){
             if(!historyDays.has(row.date))historyDays.set(row.date,[]);
@@ -2126,6 +2221,51 @@ try {
         const netCash = isTrade(type) ? rows.reduce((total,row) => total + draftCashChange(row), 0) : 0;
         const hasNetCash = Number.isFinite(netCash);
         const previousCashChange = editing ? portfolioCash(entries.find(row => row.id === editing) || {}) : 0;
+        function tradeProfitView(){
+            const sales=entries.map((row,index)=>({...row,sourceIndex:index}))
+                .filter(row=>row.type==="sell" && (year==="all" || row.date.startsWith(year)))
+                .sort((a,b)=>portfolioEntryCompare(b,a) || b.sourceIndex-a.sourceIndex);
+            const known=sales.filter(row=>book.realized.get(row.id)!=null);
+            const gains=known.reduce((sum,row)=>sum+Math.max(0,book.realized.get(row.id)),0);
+            const losses=known.reduce((sum,row)=>sum+Math.min(0,book.realized.get(row.id)),0);
+            const label=value=>value==null?"รอต้นทุน":Math.abs(value)<.005?"เท่าทุน":(value>0?"กำไร ":"ขาดทุน ")+money(Math.abs(value));
+            const byDay=new globalThis.Map();
+            for(const row of sales){
+                if(!byDay.has(row.date))byDay.set(row.date,[]);
+                byDay.get(row.date).push(row);
+            }
+            return h("div",{className:"pf-stack"},
+                h(FinanceSelect,{label:"ปีของกำไร/ขาดทุน",value:year,onChange:setYear,
+                    options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.filter(r=>r.type==="sell").map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,String(Number(y)+543)])])}),
+                h("section",{className:"pf-receipt"},h("strong",null,"ผลจากการขาย · "+currency),
+                    pair("กำไรรวม",money(gains)),pair("ขาดทุนรวม",money(Math.abs(losses))),
+                    pair(known.length===sales.length?"สุทธิ":"สุทธิเฉพาะรายการที่รู้ต้นทุน",sales.length?label(gains+losses):"ยังไม่มีรายการขาย"),
+                    known.length<sales.length && text("รอต้นทุนอีก "+(sales.length-known.length)+" รายการ")),
+                text("ต้นทุนเฉลี่ยถ่วงน้ำหนัก รวมค่าซื้อขายที่อยู่ในรายการซื้อและขาย · ล่าสุดอยู่บนสุด"),
+                !account.archived && group(button("ซื้อ",()=>begin("buy"),true),button("ขาย",()=>begin("sell"))),
+                !sales.length && text("เมื่อบันทึกขาย ระบบจะแสดงกำไรหรือขาดทุนของแต่ละครั้งที่นี่"),
+                ...Array.from(byDay,([day,list])=>h("section",{key:day,className:"pf-day","aria-label":"กำไรขาดทุนวันที่ "+day},
+                    h("time",{dateTime:day},parseK(day).toLocaleDateString("th-TH",{weekday:"short"}),h("strong",null,parseK(day).getDate()),
+                        parseK(day).toLocaleDateString("th-TH",{month:"short"}),h("div",null,parseK(day).getFullYear()+543)),
+                    h("div",{className:"pf-day-list"},list.map(row=>{
+                        const gain=book.realized.get(row.id), received=portfolioCash(row);
+                        const removedUnits=Number(row.units)+(row.feeUnit==="asset"?Number(row.fee)||0:0);
+                        const basis=gain==null?null:received-gain;
+                        return h("details",{key:row.id},
+                            h("summary",{"aria-label":"ผลการขาย "+row.symbol+" "+day},
+                                h("span",{className:"pf-title"},row.symbol,h("span",{className:"pf-meta"},"ขาย "+quantity(row.units)+" หน่วย"+(row.eventTime?" · "+row.eventTime:""))),
+                                h("span",{className:"pf-value",style:{color:gain==null?T.sub:gain<0?T.red:T.green}},label(gain))),
+                            h("div",{className:"pf-row-detail"},
+                                pair("ต้นทุนเฉลี่ย/หน่วย",basis==null?"รอต้นทุน":money(basis/removedUnits)),
+                                pair("ต้นทุนส่วนที่ขาย",basis==null?"รอต้นทุน":money(basis)),
+                                pair("ยอดขายก่อนค่าธรรมเนียม",money(row.amount)),
+                                pair("ค่าธรรมเนียมขาย",row.feeUnit==="asset"?quantity(row.fee||0)+" หน่วย":money(row.fee||0)),
+                                pair("รับสุทธิ",money(received)),pair("กำไร/ขาดทุน",label(gain)),
+                                basis>0 && pair("ผลตอบแทน",((gain/basis)*100).toFixed(2)+"%"),
+                                !account.archived && button("แก้ไขรายการขาย",()=>begin("sell",row))));
+                    })))),
+                text("เงินคืนคอมมิชชันและค่าคอมมิชชันที่หักเพิ่มแสดงแยกในสรุปผลตอบแทน"));
+        }
         return h(Sheet,{title:type ? portfolioTypes[type]+" · "+account.name : "พอร์ตลงทุน · "+account.name,onClose:type ? finish : onClose},
             type ? h("div",{className:"pf-stack pf-form"},
                 h(Input,{label:"วันที่",type:"date",value:date,onChange:setDate}),
@@ -2173,8 +2313,8 @@ try {
                 isTrade(type) && !editing && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
             : h("div",{className:"pf-stack"},
-                h("div",{className:"pf-tabs"},button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns")),
-                (tab==="audit" || tab==="returns") ? h(BrokerReport,{key:tab,mode:tab,account,accounts,transactions,payments,setAccounts,onEdit:begin}) : tab==="assets" ? h(React.Fragment,null,
+                h("div",{className:"pf-tabs"},!totalOnly && button("กำไร/ขาดทุน",()=>setTab("profit"),tab==="profit"),button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns")),
+                tab==="profit" ? tradeProfitView() : (tab==="audit" || tab==="returns") ? h(BrokerReport,{key:tab,mode:tab,account,accounts,transactions,payments,setAccounts,onEdit:begin}) : tab==="assets" ? h(React.Fragment,null,
                     totalOnly ? h(React.Fragment,null,numbers(stat("มูลค่าล่าสุด",latest ? money(latest.amount) : "—"),stat("วันที่อัปเดต",latest?.date || "—")),
                     first && latest && first.id!==latest.id && text("ผลต่างจากยอดครั้งแรก หลังหักโอนสุทธิ "+money(latest.amount-first.amount-fundingSince))) :
                     h(React.Fragment,null,h("section",{className:"pf-total"},h("small",null,"มูลค่าพอร์ต · "+currency),h("b",null,balances===null ? "รอราคาประเมิน" : money(cash+balances)),pair("เงินสด",money(cash)),pair("มูลค่าสินทรัพย์",balances===null ? "รอราคาประเมิน" : money(balances))),
@@ -2184,21 +2324,20 @@ try {
                         h("thead",null,h("tr",null,...["สินทรัพย์","จำนวน","ทุน/หน่วย","มูลค่า"].map(label=>h("th",{key:label,scope:"col"},label)))),
                         h("tbody",null,holdings.map(p=>h("tr",{key:p.symbol},
                             h("td",null,h("details",null,h("summary",null,p.symbol),h("div",null,p.quote?"ราคาล่าสุด "+money(p.quote.amount)+" · "+shortDate(p.quote.date):"ยังไม่มีราคาประเมิน"))),
-                            h("td",null,quantity(p.units)),h("td",null,p.cost===null?"—":money(p.cost/p.units)),
+                            h("td",null,quantity(p.units)),h("td",null,p.cost===null?"—":unitCostMoney.format(p.cost/p.units)),
                             h("td",null,p.quote?money(p.units*p.quote.amount):"รอราคา"))))))),
                     !totalOnly && !holdings.length && text("เริ่มจากบันทึกซื้อ หรือเลือกสินทรัพย์ตั้งต้นสำหรับหุ้นและเหรียญที่มีอยู่แล้ว"),
                     !account.archived && h("div",{className:"pf-stack"},h("div",{className:"pf-actions"},...types.filter(k=>["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k),k!=="sell"))),h("details",null,h("summary",null,"รายได้ ค่าคอมมิชชัน และรายการอื่น"),h("div",{className:"pf-actions"},...types.filter(k=>!["buy","sell","snapshot"].includes(k)).map(k=>button(portfolioTypes[k],()=>begin(k)))))))
                 : h(React.Fragment,null,h(FinanceSelect,{label:"ปีของ Statement พอร์ต",value:year,onChange:setYear,options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,y])])}),
                     income.length>0 && h("section",{className:"pf-stack"},numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะปีที่เลือก")),
                     !history.length && text("ยังไม่มีรายการภายในพอร์ต"),
-                    text("ยอดรับ–จ่ายสุทธิ · "+currency+" · แตะรายการเพื่อดูรายละเอียด"),
-                    ...Array.from(historyDays,([day,items])=>h("section",{key:day,className:"pf-day","aria-label":"รายการวันที่ "+day},
-                        h("time",{dateTime:day},parseK(day).toLocaleDateString("th-TH",{weekday:"short"}),h("strong",null,parseK(day).getDate()),
-                            parseK(day).toLocaleDateString("th-TH",{month:"short"}),h("div",null,parseK(day).getFullYear()+543)),
-                        h("div",{className:"pf-day-list"},items.map(r=>{
+                    text("วันล่าสุดอยู่บน · ภายในวันทำจากบนลงล่าง"),
+                    !account.archived && text("กดค้างที่รายการเพื่อลากในวันเดียวกัน · ลำดับนี้ใช้คำนวณด้วย"),
+                    ...Array.from(historyDays,([day,items])=>h(PortfolioHistoryDay,{key:day,day,items,readOnly:account.archived,
+                        onReorder:reorderHistory,onReset:day=>reorderHistory(day,null),renderRow:(r,index,drag)=>{
                             const delta=portfolioCash(r), cashRow=["buy","sell","interest","dividend","fee_refund","fee_charge"].includes(r.type);
                             const amount=cashRow?Math.abs(delta):r.amount;
-                            return h("details",{key:r.id},
+                            return h("details",{key:r.id,...drag.props,style:drag.style},
                                 h("summary",{"aria-label":portfolioTypes[r.type]+" "+(r.symbol||"")+" "+day},
                                     h("span",{className:"pf-title"},portfolioTypes[r.type]+(r.symbol?" · "+r.symbol:""),
                                         h("span",{className:"pf-meta"},["buy","sell","opening"].includes(r.type)?quantity(r.units)+" หน่วย"+(r.eventTime?" · "+r.eventTime:""):r.eventTime||"แตะดูรายละเอียด")),
@@ -2207,11 +2346,13 @@ try {
                                 h("div",{className:"pf-row-detail"},text(description(r)),
                                     isCrypto(r,r.type) && pair("ราคา 1 "+r.symbol,money(r.rate)),
                                     r.type==="buy" && isCrypto(r,r.type) && pair("งบต่อรอบ",money(r.budget)),
-                                    !account.archived && group(button("แก้ไข",()=>begin(r.type,r)),r.type==="buy" && button("ซื้อซ้ำ",()=>begin("buy",r,true)),button(confirmDelete===r.id?"ยืนยันลบ":"ลบ",()=>{
+                                    !account.archived && group(button("แก้ไข",()=>begin(r.type,r)),r.type==="buy" && button("ซื้อซ้ำ",()=>begin("buy",r,true)),
+                                        drag.move && index>0 && button("เลื่อนขึ้น",()=>drag.move(index-1)),
+                                        drag.move && index<drag.count-1 && button("เลื่อนลง",()=>drag.move(index+1)),button(confirmDelete===r.id?"ยืนยันลบ":"ลบ",()=>{
                                         if(confirmDelete!==r.id){setConfirmDelete(r.id);return;}
                                         try{commit(entries.filter(x=>x.id!==r.id));setConfirmDelete(null);setError("");}catch(e){setError(e.message);}
                                     }))));
-                        }))))),
+                        }}))),
                     error && h("p",{role:"alert",style:{color:T.red}},error)));
     }
 
@@ -9043,7 +9184,22 @@ try {
             for (const s of paymentAllocationRows(p)) if (s.role==="pass_through" && s.settled)
                 push({...p,date:s.settledDate||p.date},"settled",s.settledAccountId||p.accountId,-Number(s.amount),"ส่งต่อ · "+(s.recipientName||""));
         }
-        return events.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||String(a.row.createdAt||"").localeCompare(String(b.row.createdAt||"")));
+        events.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||String(a.row.createdAt||"").localeCompare(String(b.row.createdAt||"")));
+        // Reorder portfolio slots within each account/day. Transfers retain their
+        // own chronological slots; manual order never invents a transaction time.
+        const days=new globalThis.Map();
+        events.forEach((e,i)=>{
+            if(e.kind!=="portfolio")return;
+            const key=e.accountId+"/"+e.date;
+            if(!days.has(key))days.set(key,[]);
+            days.get(key).push(i);
+        });
+        for(const indices of days.values()){
+            if(!indices.some(i=>Number.isFinite(events[i].row.manualOrder)))continue;
+            const ordered=indices.map(i=>events[i]).sort((a,b)=>portfolioEntryCompare(a.row,b.row));
+            indices.forEach((slot,i)=>{events[slot]=ordered[i];});
+        }
+        return events;
     }
     function brokerCashRows(account,events) {
         let balance=Number(account.startBalance)||0;
@@ -9170,9 +9326,22 @@ try {
     // A withdrawal consumes each cash source proportionally. Dates and amounts remain auditable.
     function usdRemittanceBook(accounts, events) {
         const wallets=new globalThis.Map(), conversions=[];
+        let sourceEvent=null;
         const lot=(kind,value,date="",id="")=>({kind,value,date,id});
         const total=lots=>lots.reduce((sum,l)=>sum+l.value,0);
         const scale=(lots,factor)=>lots.map(l=>({...l,value:l.value*factor}));
+        // Reinvestments split and reunite the same sources. Merge them by origin
+        // rather than letting the number of provenance fragments grow exponentially.
+        function append(lots,added){
+            const merged=new globalThis.Map();
+            for(const l of [...lots,...added]){
+                const key=JSON.stringify([l.kind,l.date,l.id]);
+                if(merged.has(key))merged.get(key).value+=l.value;
+                else merged.set(key,{...l});
+            }
+            lots.length=0;
+            for(const l of merged.values())if(l.value>1e-10)lots.push(l);
+        }
         function take(lots,amount) {
             if(!(amount>0))return [];
             const available=total(lots), used=Math.min(amount,Math.max(0,available));
@@ -9180,7 +9349,7 @@ try {
             const remain=available>0 ? scale(lots,1-used/available) : [];
             lots.splice(0,lots.length,...remain.filter(l=>l.value>1e-10));
             if(amount>used+1e-8){
-                removed.push(lot("unknown",amount-used));
+                removed.push(lot("unknown",amount-used,sourceEvent?.date||"",sourceEvent?.row.id||""));
                 lots.debt=(lots.debt||0)+amount-used;
             }
             return removed;
@@ -9192,7 +9361,7 @@ try {
                 take(added,paid);
                 lots.debt=debt-paid;
             }
-            lots.push(...added);
+            append(lots,added);
         }
         for(const a of accounts)if(accountCurrency(a)==="USD"){
             const n=Number(a.startBalance)||0;
@@ -9201,6 +9370,7 @@ try {
             wallets.set(a.id,{cash,positions:new globalThis.Map()});
         }
         for(const e of events){
+            sourceEvent=e;
             const r=e.row, w=wallets.get(e.accountId);
             if(e.kind==="transfer"){
                 const from=wallets.get(r.fromAccountId), to=wallets.get(r.toAccountId);
@@ -9231,7 +9401,9 @@ try {
                     const units=Number(r.units)+feeUnits;
                     const basis=position.units>0 ? total(position.lots)*Math.min(1,units/position.units) : 0;
                     const sources=take(position.lots,basis);
-                    if(units>position.units+1e-8 || sources.some(l=>l.kind==="unknown") || basis<=0){
+                    // A known purchase cost still establishes the trading gain,
+                    // even when some of the funding's origin is unverified.
+                    if(units>position.units+1e-8 || basis<=0){
                         put(w.cash,[lot("unknown",Math.max(0,e.delta),e.date,r.id)]);
                     }else{
                         if(e.delta<basis)put(w.cash,scale(sources,Math.max(0,e.delta)/basis));
@@ -9243,7 +9415,7 @@ try {
                     position.units=Math.max(0,position.units-units);
                 }else{
                     const cost=r.type==="buy" ? -e.delta : Number(r.amount)||0;
-                    position.lots.push(...(r.type==="buy" ? take(w.cash,cost) : [lot("unknown",cost,e.date,r.id)]));
+                    append(position.lots,r.type==="buy" ? take(w.cash,cost) : [lot("unknown",cost,e.date,r.id)]);
                     position.units+=Number(r.units)-feeUnits;
                 }
                 continue;
