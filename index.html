@@ -401,7 +401,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-sand-and-ink-v29";
+window.__TASKROUTINE_BUILD__="2026-11-04-investment-income-v30";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1734,6 +1734,8 @@ try {
     function BrokerReport({mode,account,accounts,transactions,payments,setAccounts,onEdit}) {
         const h=React.createElement, currency=accountCurrency(account);
         const [day,setDay]=useState(TK),[actual,setActual]=useState(""),[rate,setRate]=useState(""),[msg,setMsg]=useState("");
+        const [period,setPeriod]=useState("all");
+        const [help,setHelp]=useState("");
         const events=useMemo(()=>portfolioTimeline(accounts,transactions,payments),[accounts,transactions,payments]);
         const through=useMemo(()=>events.filter(e=>e.date<=day),[events,day]);
         const ledger=useMemo(()=>brokerCashRows(account,through),[account,through]);
@@ -1772,22 +1774,55 @@ try {
                     pair("ยอดปลายงวด",money(close))));
         }
         const analysis=brokerAnalysis(accounts,through), wallet=analysis.wallets.get(account.id);
-        const rows=analysis.results.filter(r=>r.accountId===account.id);
+        const start = period==="year" ? day.slice(0,4)+"-01-01" : period==="month" ? day.slice(0,7)+"-01" : "";
+        const rows=analysis.results.filter(r=>r.accountId===account.id && r.date>=start);
         const sum=(list,key)=>list.some(r=>r[key]==null)?null:list.reduce((n,r)=>n+r[key],0);
         const format=(n,fn)=>n===null?"ข้อมูลไม่ครบ":fn(n);
-        const section=(kind,title)=>{
-            const list=rows.filter(r=>r.kind===kind), income=["interest","dividend"].includes(kind);
-            return box(title,income && pair("ก่อนหักภาษี",money(sum(list,"gross"))),income && pair("ภาษีที่บันทึก",money(sum(list,"tax"))),
-                pair(income?"รับสุทธิ":"กำไร/ขาดทุน",format(sum(list,"native"),money)),currency!=="THB"&&pair("คิดเป็นบาท ณ วันรายการ",format(sum(list,"thb"),baht)));
+        const guidance={
+            trade:["ผลจากการขายสินทรัพย์","หุ้นและหน่วยลงทุนโดยทั่วไปดู ม.40(4)(ช) ส่วนคริปโทหรือโทเคนดู ม.40(4)(ฌ) ตรวจชนิดสินทรัพย์และสิทธิยกเว้นของปีภาษีตามหลักฐาน รายงานพอร์ตใช้ต้นทุนเฉลี่ยและรวมรายการขาดทุนด้วย"],
+            interest:["ดอกเบี้ย","ดอกเบี้ยเงินฝากและตราสารหนี้โดยทั่วไปดู ม.40(4)(ก) ใช้ยอดก่อนหักภาษีและเก็บหลักฐานภาษีที่ถูกหักไว้ตรวจสอบ"],
+            dividend:["เงินปันผล","เงินปันผลจากบริษัทโดยทั่วไปดู ม.40(4)(ข) สำหรับ ETF ให้ตรวจเอกสารแจกแจงเงินจ่ายของกองทุน โดยเฉพาะเงินคืนทุนและเงินจ่ายประเภทอื่น"],
+            fxCash:["ส่วนต่างจากแลกเงินสดกลับ","คำนวณจากบาทที่ได้รับ หักต้นทุนเงินบาทของ USD ที่แลกออก รวมค่าธรรมเนียมต้นทาง การจัดประเภทภาษีต้องพิจารณาที่มาและลักษณะธุรกรรม"],
+            fxAsset:["ส่วนต่างค่าเงินของต้นทุนสินทรัพย์ที่ขาย","ส่วนของผลตอบแทนที่เกิดจากเรทวันขายเทียบกับต้นทุนเงินบาทเดิม ใช้แยกผลของราคาหุ้นกับค่าเงิน เมื่อตรวจภาษีให้จับคู่กับรายการขายเดียวกันเพื่อป้องกันการนับซ้ำ"]
         };
-        const fx=rows.filter(r=>r.kind.startsWith("fx"));
+        const law="https://www.rd.go.th/5937.html";
+        const range=(start || "เริ่มบันทึก")+" ถึง "+day;
+        const resultText=(v,fmt)=>v==null?"รอเรทหรือต้นทุน":Math.abs(v)<0.005?"เท่าทุน ("+fmt(0)+")":(v>0?"กำไร ":"ขาดทุน ")+fmt(Math.abs(v));
+        const metric=(kind)=>{
+            const [title,explanation]=guidance[kind], list=rows.filter(r=>r.kind===kind);
+            const income=kind==="interest" || kind==="dividend";
+            return h("section",{className:"pf-receipt",key:kind},
+                h("div",{className:"pf-pair"},h("strong",null,title),h("button",{type:"button",className:"si-link","aria-label":"คำอธิบายภาษี "+title,"aria-expanded":help===kind,onClick:()=>setHelp(help===kind?"":kind)},"!")),
+                help===kind && h("div",null,note(explanation)," ",h("a",{href:law,target:"_blank",rel:"noopener noreferrer",style:{textDecoration:"underline"}},"กรมสรรพากร · ม.40–41")),
+                !list.length ? note("ไม่มีรายการในช่วงนี้") : income ? h(React.Fragment,null,
+                    pair("ก่อนหักภาษี",format(sum(list,"grossTHB"),baht)),pair("ภาษีหักไว้",format(sum(list,"taxTHB"),baht)),pair("รับสุทธิ",format(sum(list,"thb"),baht)),
+                    currency!=="THB" && pair("ก่อนหัก / รับสุทธิ ("+currency+")",money(sum(list,"gross"))+" / "+money(sum(list,"native"))))
+                    : h(React.Fragment,null,kind==="trade" && pair("ผลในสกุลบัญชี",resultText(sum(list,"native"),money)),(currency!=="THB" || kind!=="trade") && pair("ผลเป็นบาท",resultText(sum(list,"thb"),baht))));
+        };
         const missing=rows.filter(r=>r.thb===null);
         const book=portfolioBook((account.portfolioEntries||[]).filter(r=>r.date<=day));
         const held=[...book.assets.values()].filter(p=>p.units>0);
         const localRate=currency==="THB"?1:marketRate;
         const reportValue=(value,rate)=>Number.isFinite(rate)&&rate>0&&value!=null?value*rate:null;
         const cashValue=reportValue(close,localRate);
-        const flows = portfolioFxFlows(through, account.id, accounts);
+        const fxLines=[];
+        const flows = portfolioFxFlows(through.filter(e=>e.date>=start), account.id, accounts,fxLines);
+        function exportReport(){
+            const data=[["รายงานผลตอบแทนตามรายการ · เอกสารประกอบตรวจภาษี"],["บัญชี",account.name],["ช่วง",range],["สกุลบัญชี",currency],
+                ["รวมผลตอบแทนสุทธิ (THB)",sum(rows,"thb"),missing.length?"รอเรทหรือต้นทุน":"ข้อมูลครบตามรายการที่บันทึก"],
+                ["สกุลเงินแลก","เข้า","ออก","สุทธิ"],...["USD","THB"].map(c=>[c,flows[c].in,flows[c].out,flows[c].in-flows[c].out]),
+                [],["สรุปประเภท","จำนวนองค์ประกอบ","ผลสุทธิ THB","ก่อนหัก THB","ภาษีหัก THB","สถานะ","ข้อพิจารณาภาษี"]];
+            for(const [kind,[label,info]] of Object.entries(guidance)){
+                const list=rows.filter(r=>r.kind===kind), income=["interest","dividend"].includes(kind);
+                data.push([label,list.length,sum(list,"thb"),income?sum(list,"grossTHB"):null,income?sum(list,"taxTHB"):null,!list.length?"ไม่มีรายการ":sum(list,"thb")==null?"ข้อมูลไม่ครบ":"ครบ",info]);
+            }
+            data.push([],["วันที่","รหัสต้นทาง","รายการ","องค์ประกอบ","สกุลบัญชี","เรทบาทวันรายการ","ก่อนหัก (สกุลบัญชี)","ภาษีหัก (สกุลบัญชี)","ผลสุทธิ (สกุลบัญชี)","ก่อนหัก THB","ภาษีหัก THB","ผลสุทธิ THB","สถานะ"]);
+            for(const r of rows)data.push([r.date,r.id,r.title,guidance[r.kind][0],currency,r.rate,r.gross,r.tax,r.native,r.grossTHB,r.taxTHB,r.thb,r.thb==null?"รอเรทหรือต้นทุน":"ครบ"]);
+            data.push([],["รายละเอียดแลกเงิน","รหัสต้นทาง","สกุลออก","ยอดแลก","ค่าธรรมเนียมต้นทาง","สกุลเข้า","รับจริง"]);
+            data.push(...fxLines);
+            data.push([],["หมายเหตุ","ยอดตามวันเกิดรายการ ตรวจปีที่เกิดเงินได้ ถิ่นที่อยู่ การนำเงินเข้าไทย และหลักฐานก่อนใช้ยื่นแบบ",law]);
+            downloadCSV("TaskRoutine_portfolio_"+account.id+"_"+period+"_"+day+".csv",data);
+        }
         const trades = rows.filter(r=>r.kind==="trade");
         const tradeGain = sum(trades,"native");
         const fxRow = code => {
@@ -1796,16 +1831,18 @@ try {
             return h("tr",{key:code},h("th",{scope:"row"},code),...[incoming,outgoing,incoming-outgoing].map((n,i)=>h("td",{key:i},number(n))));
         };
         return h("div",{className:"pf-stack"},dateField,
+            h("nav",{className:"si-nav","aria-label":"ช่วงสรุปผลตอบแทน"},...[["all","สะสม"],["month","รายเดือน"],["year","รายปี"]].map(([id,label])=>h("button",{key:id,"aria-current":period===id?"page":undefined,onClick:()=>setPeriod(id)},label))),
+            note("ช่วงรายงาน "+range+" · ใช้วันที่เกิดรายการ"),
             box("เงินสดคงเหลือ",h("strong",{style:{fontSize:28}},money(close)),
                 note(saved == null ? "ยังไม่มี Statement เทียบ ณ วันที่เลือก" : gap(saved,close)===0 ? "ตรงกับ Statement ณ วันที่เลือก" : "ต่างจาก Statement "+money(gap(saved,close)))),
-            box("ผลตอบแทนที่เกิดขึ้นแล้ว", trades.length>0 && pair("กำไร/ขาดทุนจากการขาย",format(tradeGain,money)),
-                pair("รวมเป็นบาทหลังภาษีและค่าซื้อขาย",missing.length ? "รอเรทหรือต้นทุน" : baht(sum(rows,"thb")))),
-            box("ยอดแลกเงินสะสม",flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินสะสมถึงวันที่เลือก"},
+            box("ผลตอบแทนที่เกิดขึ้นแล้ว", trades.length>0 && pair("ขายสินทรัพย์",resultText(tradeGain,money)),
+                pair("รวมหลังภาษีหักไว้และค่าซื้อขาย",rows.length ? resultText(sum(rows,"thb"),baht) : "ไม่มีรายการในช่วงนี้")),
+            box("เงินเข้า–ออกจากการแลกในช่วงนี้",flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินในช่วงที่เลือก"},
                 h("thead",null,h("tr",null,...["สกุล","เข้า","ออก","สุทธิ"].map(x=>h("th",{key:x,scope:"col"},x)))),
-                h("tbody",null,fxRow("USD"),fxRow("THB"))),note("ยอดออกรวมค่าธรรมเนียมต้นทาง")) : note("ยังไม่มีรายการแลก THB ↔ USD ถึงวันที่เลือก")),
-            rows.length>0 && h("details",null,h("summary",null,"รายละเอียดผลตอบแทน"),
-                ...[["interest","ดอกเบี้ย"],["dividend","เงินปันผล"],["trade","กำไรจากการขาย"]].map(([k,title])=>rows.some(r=>r.kind===k) && section(k,title)),
-                fx.length>0 && box("ส่วนต่างอัตราแลกเปลี่ยน",pair("เงินต้นของสินทรัพย์ที่ขาย",format(sum(fx.filter(r=>r.kind==="fxAsset"),"thb"),baht)),pair("แลกเงินสดกลับเป็นบาท",format(sum(fx.filter(r=>r.kind==="fxCash"),"thb"),baht)))),
+                h("tbody",null,fxRow("USD"),fxRow("THB"))),note("สุทธิ = รับ − จ่าย ในสกุลนั้น ยอดออกรวมค่าธรรมเนียมต้นทาง")) : note("ไม่มีรายการแลกในช่วงนี้")),
+            ...Object.keys(guidance).map(metric),
+            note("ใช้ประกอบการตรวจภาษีเงินได้ต่างประเทศ ตรวจปีที่เกิดเงินได้ ถิ่นที่อยู่ ปีที่นำเงินเข้าไทย และหลักฐานภาษีต่างประเทศก่อนยื่น"),
+            button("ส่งออก CSV · สรุปและรายการในช่วงนี้",exportReport),
             missing.length>0 && h("details",null,h("summary",null,"ตรวจรายการที่ขาดเรทหรือต้นทุน"),...missing.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date+" · "+r.title),note(({trade:"ตรวจต้นทุนหุ้นและเรทวันขาย",fxAsset:"ตรวจเรทวันขายและต้นทุนเงินบาทของหุ้นที่ซื้อ",fxCash:"ตรวจต้นทุน USD ในรายละเอียดการแลกเงิน",interest:"ระบุเรทวันที่รับดอกเบี้ย",dividend:"ระบุเรทวันที่รับปันผล"})[r.kind]),!account.archived && (account.portfolioEntries||[]).some(x=>x.id===r.id) && button("แก้รายการ",()=>{const x=account.portfolioEntries.find(x=>x.id===r.id);onEdit(x.type,x);})))),
             h("details",null,h("summary",null,"มูลค่าที่ยังถืออยู่และเรทประเมิน"),currency!=="THB"&&h(React.Fragment,null,h(Input,{label:"เรทประเมินวันที่เลือก · บาทต่อ 1 "+currency,type:"number",value:rate || account.portfolioMarketRates?.[day] || "",onChange:v=>{setRate(v);setMsg("");}}),!account.archived&&button("บันทึกเรทของวันที่เลือก",()=>record("portfolioMarketRates",rate || account.portfolioMarketRates?.[day],true)),msg&&note(msg)),
                 currency!=="THB"&&pair("ส่วนต่างค่าเงินสดที่ยังไม่แลก",format(cashValue===null || wallet.cash.cost===null || close<0 ? null : cashValue-wallet.cash.cost,baht)),
@@ -8889,6 +8926,7 @@ try {
                 if(from?.currency!=="THB" && to?.currency==="THB"){
                     const basis=Number(r.fxCostOverride)>0?n*Number(r.fxCostOverride):cost;
                     note("fxCash",null,basis===null || r.receivedAmount==null ? null : received-basis,r.fromAccountId);
+                    results[results.length-1].rate=r.receivedAmount!=null && r.amount>0 ? received/r.amount : null;
                 }
                 credit(to?.cash,received,to?.currency==="THB" ? received : from?.currency==="THB" ? (r.receivedAmount!=null?n:null) : cost);
                 continue;
@@ -8903,7 +8941,11 @@ try {
                     const n=r.units+assetFee, proceeds=e.delta, basis=debit(pos.native,n), historic=debit(pos.thb,n);
                     const gain=basis===null?null:proceeds-basis;
                     note("trade",gain,rate && gain!==null ? gain*rate:null);
-                    if(w.currency!=="THB") note("fxAsset",null,rate && basis!==null && historic!==null ? basis*rate-historic:null);
+                    results[results.length-1].rate=rate;
+                    if(w.currency!=="THB"){
+                        note("fxAsset",null,rate && basis!==null && historic!==null ? basis*rate-historic:null);
+                        results[results.length-1].rate=rate;
+                    }
                     credit(w.cash,proceeds,rate?proceeds*rate:null);
                 }else{
                     const n=r.units-assetFee, native=r.type==="buy"?-e.delta:r.amount;
@@ -8919,7 +8961,8 @@ try {
             if(kind==="interest" || kind==="dividend"){
                 const tax=e.kind==="portfolio"?Number(r.tax)||0:0;
                 note(kind,e.delta,rate?e.delta*rate:null);
-                Object.assign(results[results.length-1],{gross:e.delta+tax,tax});
+                const gross=e.delta+tax;
+                Object.assign(results[results.length-1],{gross,tax,rate,grossTHB:rate?gross*rate:null,taxTHB:tax===0?0:rate?tax*rate:null});
             }
         }
         return {wallets,results};
@@ -8946,7 +8989,7 @@ try {
         const value = convertFromTHB ? q/price : q*price;
         return Number.isFinite(value) ? String(Number(value.toFixed(8))) : "";
     }
-    function portfolioFxFlows(events, accountId, accounts) {
+    function portfolioFxFlows(events, accountId, accounts, detailRows) {
         const totals = {USD:{in:0,out:0}, THB:{in:0,out:0}, count:0};
         for (const {kind,row} of events) {
             if (kind !== "transfer" || (row.fromAccountId !== accountId && row.toAccountId !== accountId)) continue;
@@ -8958,6 +9001,7 @@ try {
             if (!(sent > 0 && received > 0 && fee >= 0)) continue;
             totals[from].out += sent + fee;
             totals[to].in += received;
+            if(detailRows)detailRows.push([row.date,row.id,from,sent,fee,to,received]);
             totals.count++;
         }
         return totals;
