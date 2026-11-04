@@ -11,7 +11,7 @@
 <meta name="application-name" content="TaskRoutine" />
 <meta name="format-detection" content="telephone=no" />
 <meta name="color-scheme" content="light dark" />
-<meta name="theme-color" content="#F3EEE4" />
+<meta name="theme-color" content="#F5F4ED" />
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADDklEQVR42u2XT2hcVRTGf/fPezNv3rwkJlgxC0WJATfNpmTRdTeiAf+CO62IiFpBUAQ3rksFwWIpRawiggutQou4KLhzEbqwboREVNT+k7RpZt6bNzPv3XNdzEwU2jqTpDEIOXB58Bb3fud833fPuap57Q/PDoZmh2MXwP8fgPd+ZwEENtwSCL2VzCthxKlvP2EtXcWaYFNANgXAiaNeS/jmuy84v7zI1MQeSleglNp+AE5KxmrjnF8+x0dnjjKRTBGYAO9l+ykQccTVOj9fXOLEqSNYEzA1vodNJL4ednTOBWsDmlmDD756l2argdaGybE70dogImh9I5JhtIxUAY8HpQhtheNfHuGXi0vUqgkigtEapQ3G2PVl+9/ABkMB2FEVX48STp4+yg/L50hq45SuwNqAuybvptFcJe9kaKVBgfegtaZbdIkqEWFQuaVD1LBu6MRRjxLOLp7h5On3qEcJ8g/BVcMIrTXeAwrwHqMNrXbGvdMzHHrqLYIgRLygUBurgBPHWDzO90uLfPz1+8RRgsf3Nurv1Wpn/X/gAa00pSupViKePvAccS0h77R61dkIBeKFWjXmp99+5NjnhzHKIOL6mQy0AUabHs+DCqBwZYeXnnyTmXsepJGtYbTZmAY8vTJmrSafnf0QL8IdySROHAwO6ys877TW7wCNJs2bHFx4lb0z+4Ye/q8aUErRLTrknZwwCBGRnt89CJ7AhKxcv8w7n75NUbSxJiTNGxyYX+DgwiHSvHnLso9EgfeeMKgQVWqI/5vjAT1xJebCn7+S5g3q1YRGtsrc7DzPPPwyWTsd+Vq2w+xXlMVN9SFeuHLtEhpF3k65b3qWFx97g27ZAe9RSt+eq1gpdeOi5/PV5lU63TZJPMHzj75GEo9RlsXIh2+6GyqlEBEurfyOE8cLj7/O/dOzZO0UPUR0t2keUDhxXL56gWcfeYW5B/bRaK1htN3ebjjQhbUBK9evMDc7z0P7nyBtNYfabcM2HNqavRDYEOfKnZkJtdKUN3HIfzqUqq1MIrsPk10A/fgLjKVMP1zfD/sAAAAASUVORK5CYII=" />
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -385,6 +385,13 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 .pf-stack details[open]>summary{margin-bottom:12px}.pf-stack details .pf-pair+.pf-pair{margin-top:8px}
 .pf-entry{gap:9px;border-top:1px solid #b8aa934d;padding:16px 0 4px}
 .pf-stack .my-3,.pf-stack .mb-3{margin-block:0}
+body,#boot,#err{background:#F5F4ED;color:#202F2E}.app-shell{font-variant-numeric:tabular-nums}
+.si-nav{display:flex;gap:4px;padding:4px;border:1px solid #d5dad0;background:#eceee6;border-radius:15px}.si-nav button{flex:1;min-height:44px;border-radius:11px;font-size:13px;font-weight:700;color:#455753}.si-nav button[aria-current=page]{background:#22645c;color:white}
+.si-tools{display:flex;gap:8px;flex-wrap:wrap}.si-tools button,.si-link{background:#eceee6;color:#225b53;border-radius:10px;padding:8px 12px;min-height:40px;font-size:13px;font-weight:650}
+.si-fold{border-block:1px solid #d5dad0;padding:6px 0}.si-fold>summary{padding:10px 4px;cursor:pointer;font-weight:700}.si-fold[open]>:not(summary){margin-top:8px}
+.si-fx{overflow-x:auto}.si-fx table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}.si-fx td,.si-fx th{padding:7px 3px;text-align:right;white-space:nowrap;border-bottom:1px solid #d5dad0}.si-fx th:first-child{text-align:left}.si-fx thead{color:#536760}
+.si-queue{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid #d5dad0}.si-queue strong{display:block}.si-queue small{color:#536760}
+button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-offset:2px}
 .pf-form>.flex:last-child{display:grid;grid-template-columns:1fr 2fr;padding-top:12px;border-top:1px solid #b8aa934d;gap:10px}
 .pf-form>button{justify-self:start;border:1px dashed #b8aa9388}
 </style>
@@ -394,7 +401,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-sell-unit-price-v25";
+window.__TASKROUTINE_BUILD__="2026-11-04-sand-and-ink-v29";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -518,9 +525,9 @@ try {
     const Utensils = makeIcon("Utensils");
     const Cookie = makeIcon("Cookie");
     const T = {
-        bg: "#F3EEE4", surf: "#FFFDF8", surf2: "#EAE2D3", border: "#D2C5B1",
-        text: "#2E2A22", sub: "#675E50", muted: "#8B806F",
-        purple: "#A65F3F", blue: "#4F766C", green: "#617A3F", orange: "#B96A32",
+        bg: "#F5F4ED", surf: "#FFFEFA", surf2: "#ECEEE6", border: "#D5DAD0",
+        text: "#202F2E", sub: "#455753", muted: "#61716B",
+        purple: "#22645C", blue: "#386E79", green: "#476D37", orange: "#A45827",
         red: "#B74B43", cyan: "#4F7F75", gold: "#9A742F", pink: "#A65F66",
         violet: "#7D5D4D", indigo: "#676A4B", slate: "#746D62", gray: "#777064",
     };
@@ -871,7 +878,7 @@ try {
     const seedBookings = () => [];
     const Glass = ({ children, style, glowColor, className = "", onClick, ...rest }) => (React.createElement("div", { ...rest, onClick: onClick, className: `rounded-2xl ${className}`, style: {
             background: T.surf,
-            border: `1px solid ${glowColor ? hex(glowColor, .38) : T.border}`, boxShadow: glowColor ? `0 6px 18px rgba(0,0,0,.28), inset 3px 0 0 ${hex(glowColor, .72)}` : "0 3px 12px rgba(0,0,0,.24)", minWidth: 0, maxWidth: "100%", overflowX: "hidden", ...style
+            border: `1px solid ${glowColor ? hex(glowColor, .38) : T.border}`, boxShadow: glowColor ? `0 2px 8px rgba(29,51,45,.05), inset 3px 0 0 ${hex(glowColor, .72)}` : "0 2px 8px rgba(29,51,45,.05)", minWidth: 0, maxWidth: "100%", overflowX: "hidden", ...style
         } }, children));
     const Pill = ({ color, children, solid }) => (React.createElement("span", { className: "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", style: { background: solid ? color : hex(color, 0.14), color: solid ? "#0A0A0A" : color, border: `1px solid ${hex(color, 0.4)}` } }, children));
     const STORAGE_KEY = "discipline_os";
@@ -1780,13 +1787,28 @@ try {
         const localRate=currency==="THB"?1:marketRate;
         const reportValue=(value,rate)=>Number.isFinite(rate)&&rate>0&&value!=null?value*rate:null;
         const cashValue=reportValue(close,localRate);
-        return h("div",{className:"pf-stack"},dateField,note("ผลสะสมถึงวันที่เลือก · ต้นทุนเฉลี่ยถ่วงน้ำหนัก · กำไรขายคิดเป็นบาทด้วยเรทวันขาย"),
-            section("interest","ดอกเบี้ย"),section("dividend","เงินปันผล"),section("trade","กำไร/ขาดทุนจากการขายสินทรัพย์"),
-            currency!=="THB" && box("ส่วนต่างอัตราแลกเปลี่ยน",pair("จากเงินต้นของสินทรัพย์ที่ขาย",format(sum(fx.filter(r=>r.kind==="fxAsset"),"thb"),baht)),pair("จากการแลกเงินสดกลับเป็นบาท",format(sum(fx.filter(r=>r.kind==="fxCash"),"thb"),baht))),
-            box("ผลตอบแทนที่เกิดขึ้นแล้ว",pair("รวมหลังภาษีและค่าซื้อขาย",format(sum(rows,"thb"),baht))),
+        const flows = portfolioFxFlows(through, account.id, accounts);
+        const trades = rows.filter(r=>r.kind==="trade");
+        const tradeGain = sum(trades,"native");
+        const fxRow = code => {
+            const {in:incoming,out:outgoing} = flows[code];
+            const number = value => value.toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
+            return h("tr",{key:code},h("th",{scope:"row"},code),...[incoming,outgoing,incoming-outgoing].map((n,i)=>h("td",{key:i},number(n))));
+        };
+        return h("div",{className:"pf-stack"},dateField,
+            box("เงินสดคงเหลือ",h("strong",{style:{fontSize:28}},money(close)),
+                note(saved == null ? "ยังไม่มี Statement เทียบ ณ วันที่เลือก" : gap(saved,close)===0 ? "ตรงกับ Statement ณ วันที่เลือก" : "ต่างจาก Statement "+money(gap(saved,close)))),
+            box("ผลตอบแทนที่เกิดขึ้นแล้ว", trades.length>0 && pair("กำไร/ขาดทุนจากการขาย",format(tradeGain,money)),
+                pair("รวมเป็นบาทหลังภาษีและค่าซื้อขาย",missing.length ? "รอเรทหรือต้นทุน" : baht(sum(rows,"thb")))),
+            box("ยอดแลกเงินสะสม",flows.count ? h("div",{className:"si-fx"},h("table",{"aria-label":"ยอดแลกเงินสะสมถึงวันที่เลือก"},
+                h("thead",null,h("tr",null,...["สกุล","เข้า","ออก","สุทธิ"].map(x=>h("th",{key:x,scope:"col"},x)))),
+                h("tbody",null,fxRow("USD"),fxRow("THB"))),note("ยอดออกรวมค่าธรรมเนียมต้นทาง")) : note("ยังไม่มีรายการแลก THB ↔ USD ถึงวันที่เลือก")),
+            rows.length>0 && h("details",null,h("summary",null,"รายละเอียดผลตอบแทน"),
+                ...[["interest","ดอกเบี้ย"],["dividend","เงินปันผล"],["trade","กำไรจากการขาย"]].map(([k,title])=>rows.some(r=>r.kind===k) && section(k,title)),
+                fx.length>0 && box("ส่วนต่างอัตราแลกเปลี่ยน",pair("เงินต้นของสินทรัพย์ที่ขาย",format(sum(fx.filter(r=>r.kind==="fxAsset"),"thb"),baht)),pair("แลกเงินสดกลับเป็นบาท",format(sum(fx.filter(r=>r.kind==="fxCash"),"thb"),baht)))),
             missing.length>0 && h("details",null,h("summary",null,"ตรวจรายการที่ขาดเรทหรือต้นทุน"),...missing.map((r,i)=>h("div",{key:i,className:"pf-entry"},note(r.date+" · "+r.title),note(({trade:"ตรวจต้นทุนหุ้นและเรทวันขาย",fxAsset:"ตรวจเรทวันขายและต้นทุนเงินบาทของหุ้นที่ซื้อ",fxCash:"ตรวจต้นทุน USD ในรายละเอียดการแลกเงิน",interest:"ระบุเรทวันที่รับดอกเบี้ย",dividend:"ระบุเรทวันที่รับปันผล"})[r.kind]),!account.archived && (account.portfolioEntries||[]).some(x=>x.id===r.id) && button("แก้รายการ",()=>{const x=account.portfolioEntries.find(x=>x.id===r.id);onEdit(x.type,x);})))),
-            box("มูลค่าที่ยังถืออยู่",currency!=="THB"&&h(React.Fragment,null,h(Input,{label:"เรทประเมินวันที่เลือก · บาทต่อ 1 "+currency,type:"number",value:rate || account.portfolioMarketRates?.[day] || "",onChange:v=>{setRate(v);setMsg("");}}),!account.archived&&button("บันทึกเรทของวันที่เลือก",()=>record("portfolioMarketRates",rate || account.portfolioMarketRates?.[day],true)),msg&&note(msg)),
-                pair("เงินสด "+currency,money(close)),currency!=="THB"&&pair("ส่วนต่างค่าเงินสดที่ยังไม่แลก",format(cashValue===null || wallet.cash.cost===null || close<0 ? null : cashValue-wallet.cash.cost,baht)),
+            h("details",null,h("summary",null,"มูลค่าที่ยังถืออยู่และเรทประเมิน"),currency!=="THB"&&h(React.Fragment,null,h(Input,{label:"เรทประเมินวันที่เลือก · บาทต่อ 1 "+currency,type:"number",value:rate || account.portfolioMarketRates?.[day] || "",onChange:v=>{setRate(v);setMsg("");}}),!account.archived&&button("บันทึกเรทของวันที่เลือก",()=>record("portfolioMarketRates",rate || account.portfolioMarketRates?.[day],true)),msg&&note(msg)),
+                currency!=="THB"&&pair("ส่วนต่างค่าเงินสดที่ยังไม่แลก",format(cashValue===null || wallet.cash.cost===null || close<0 ? null : cashValue-wallet.cash.cost,baht)),
                 ...held.map(p=>{const mv=p.quote?p.units*p.quote.amount:null, basis=wallet.positions.get(p.symbol)?.thb.cost;
                     return h("div",{className:"pf-entry",key:p.symbol},h("strong",null,p.symbol),note(p.quote?"ราคาประเมินวันที่ "+p.quote.date:"รอราคาประเมิน"),pair("มูลค่า",format(mv,money)),pair("กำไร/ขาดทุนจากราคา",format(mv===null || p.cost===null ? null : mv-p.cost,money)),currency!=="THB"&&pair("ส่วนต่างค่าเงินของเงินต้น",format(p.cost===null || basis==null || !(localRate>0)?null:p.cost*localRate-basis,baht)));}),
                 account.portfolioMode==="summary" && note("บัญชีติดตามยอดรวมแสดงผลแยกได้เฉพาะรายการที่ลงรายละเอียดไว้")));
@@ -1806,7 +1828,12 @@ try {
         const isTrade = k => k === "buy" || k === "sell";
         const isCrypto = (r,k) => isTrade(k) && r.tradeMode === "crypto";
         const decimalCash = value => Number(value.toFixed(8));
-        const cryptoValue = r => decimalCash(Number(r.units) * Number(r.rate));
+        const cryptoValue = row => {
+            const original = editing && entries.find(entry => entry.id === editing);
+            if (original?.tradeMode === "crypto" && Number(row.units) === original.units && Number(row.rate) === original.rate)
+                return original.amount;
+            return Number(tradeGrossAmount(row.units,row.rate));
+        };
         const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", unitPrice:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
         const [tab,setTab] = useState("assets"), [type,setType] = useState("");
         const [rows,setRows] = useState([]), [date,setDate] = useState(TK), [error,setError] = useState("");
@@ -1826,7 +1853,7 @@ try {
                 if (i !== index) return row;
                 const next = {...row,[key]:value};
                 if (["buy","sell"].includes(type) && !isCrypto(next,type) && ["unitPrice","units"].includes(key) && (next.unitPrice || key==="unitPrice"))
-                    next.amount = purchaseValue(next.units,next.unitPrice);
+                    next.amount = tradeGrossAmount(next.units,next.unitPrice);
                 return next;
             }));
             setError("");
@@ -1909,7 +1936,7 @@ try {
             if (r.type === "quote") return money(r.amount) + " / หน่วย";
             if (r.type === "snapshot" || r.type === "cash") return money(r.amount);
             if (r.type === "opening") return quantity(r.units)+" หน่วย · ต้นทุน "+(r.amount === null ? "ยังไม่ระบุ" : money(r.amount));
-            return quantity(r.units)+" หน่วย"+(["buy","sell"].includes(r.type) && r.units>0 ? " · ราคาต่อหน่วย "+money(r.unitPrice || r.amount/r.units) : "")+" · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
+            return quantity(r.units)+" หน่วย"+(["buy","sell"].includes(r.type) && r.units>0 ? " · ราคาต่อหน่วย "+money(r.unitPrice || r.amount/r.units) : "")+" · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+(r.type==="buy" ? " · จ่ายสุทธิ " : " · รับสุทธิ ")+money(Math.abs(portfolioCash(r)))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
         }
         const preview = r => {
             const value = cryptoValue(r);
@@ -1918,7 +1945,18 @@ try {
                 type==="buy" && pair("เงินเหลือจากงบรอบนี้",ready && Number(r.budget)>0 ? money(decimalCash(Number(r.budget)-value)) : "—"));
         };
         const pair = (label,value) => h("div",{className:"pf-pair"},h("span",null,label),h("strong",null,value));
-        const draftSpend = type === "buy" ? rows.reduce((sum,r)=>sum+(isCrypto(r,type) ? cryptoValue(r) : Number(r.amount || 0)+(r.feeUnit==="asset" ? 0 : Number(r.fee || 0))),0) : 0;
+        function draftCashChange(row) {
+            const crypto = isCrypto(row,type);
+            const amount = crypto ? cryptoValue(row) : Number(row.amount);
+            const fee = crypto ? 0 : Number(row.fee || 0);
+            if (!(Number(row.units) > 0 && amount > 0 && fee >= 0) ||
+                (type === "sell" && row.feeUnit !== "asset" && fee > amount) ||
+                (type === "buy" && row.feeUnit === "asset" && fee >= Number(row.units))) return NaN;
+            return portfolioCash({type, amount, fee, feeUnit:row.feeUnit});
+        }
+        const netCash = isTrade(type) ? rows.reduce((total,row) => total + draftCashChange(row), 0) : 0;
+        const hasNetCash = Number.isFinite(netCash);
+        const previousCashChange = editing ? portfolioCash(entries.find(row => row.id === editing) || {}) : 0;
         return h(Sheet,{title:type ? portfolioTypes[type]+" · "+account.name : "พอร์ตลงทุน · "+account.name,onClose:type ? finish : onClose},
             type ? h("div",{className:"pf-stack pf-form"},
                 h(Input,{label:"วันที่",type:"date",value:date,onChange:setDate}),
@@ -1941,9 +1979,11 @@ try {
                         currency!=="THB" && field(i,"thbRate",type==="opening" ? "ต้นทุนเงินบาทต่อ 1 "+currency+" ของยอดตั้งต้น" : "เรทวันรายการ · บาทต่อ 1 "+currency),
                         currency!=="THB" && text("ใช้แยกผลตอบแทนเป็นบาท หากยังไม่ทราบเรทให้เว้นว่าง")),
                     type==="cash" && text("ระบบปรับเฉพาะส่วนต่างจากเงินสดที่บันทึกไว้ถึงวันนั้น เพื่อให้ยอดตรงกับโบรกเกอร์"))),
-                type==="buy" && h("div",{className:"pf-receipt"},pair("เงินสดที่ใช้รวม",money(draftSpend)),pair("เงินสดในบัญชีหลังบันทึก",money(decimalCash(cash-draftSpend-(editing ? portfolioCash(entries.find(r=>r.id===editing) || {}) : 0)))) ),
-                type==="buy" && !editing && draftSpend > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
-                type==="buy" && !editing && button("+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows([...rows,fresh()])),
+                isTrade(type) && h("div",{className:"pf-receipt","aria-live":"polite"},
+                    pair(type==="buy" ? "ยอดจ่ายสุทธิ (Net Amount)" : "ยอดรับสุทธิ (Net Amount)", hasNetCash ? money(Math.abs(netCash)) : "—"),
+                    pair("เงินสดในบัญชีหลังบันทึก", hasNetCash ? money(decimalCash(cash - previousCashChange + netCash)) : "—")),
+                type==="buy" && !editing && -netCash > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
+                isTrade(type) && !editing && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
             : h("div",{className:"pf-stack"},
                 h("div",{className:"pf-tabs"},button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns")),
@@ -1958,7 +1998,7 @@ try {
                 : h(React.Fragment,null,h(FinanceSelect,{label:"ปีของ Statement พอร์ต",value:year,onChange:setYear,options:Object.fromEntries([["all","ทุกปี"],...Array.from(new Set(entries.map(r=>r.date.slice(0,4)))).sort().reverse().map(y=>[y,y])])}),
                     income.length>0 && h("section",{className:"pf-stack"},numbers(stat("ดอกเบี้ยและปันผลก่อนหัก",money(gross)),stat("ภาษีที่ถูกหัก",money(tax))),text("รับสุทธิ "+money(gross-tax)+" · เฉพาะปีที่เลือก")),
                     !history.length && text("ยังไม่มีรายการภายในพอร์ต"),
-                    history.map(r=>h("div",{key:r.id,className:"pf-entry"},text(r.date),h("strong",null,portfolioTypes[r.type]+(r.symbol ? " · "+r.symbol : "")),isCrypto(r,r.type) ? h("div",{className:"pf-receipt"},pair("จำนวนเหรียญ",quantity(r.units)+" "+r.symbol),pair("ราคา 1 "+r.symbol,money(r.rate)),r.type==="buy" && pair("งบต่อรอบ",money(r.budget)),pair(r.type==="buy" ? "ต้นทุนที่ใช้ซื้อ" : "ยอดขาย",money(r.amount)),r.type==="buy" && pair("เงินเหลือจากงบ",money(decimalCash(r.budget-r.amount))),r.type==="sell" && pair("กำไรขาย",book.realized.get(r.id)==null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id)))) : text(description(r)),
+                    history.map(r=>h("div",{key:r.id,className:"pf-entry"},text(r.date),h("strong",null,portfolioTypes[r.type]+(r.symbol ? " · "+r.symbol : "")),isCrypto(r,r.type) ? h("div",{className:"pf-receipt"},pair("จำนวนเหรียญ",quantity(r.units)+" "+r.symbol),pair("ราคา 1 "+r.symbol,money(r.rate)),r.type==="buy" && pair("งบต่อรอบ",money(r.budget)),pair(r.type==="buy" ? "จ่ายสุทธิ" : "รับสุทธิ",money(Math.abs(portfolioCash(r)))),r.type==="buy" && pair("เงินเหลือจากงบ",money(decimalCash(r.budget-r.amount))),r.type==="sell" && pair("กำไรขาย",book.realized.get(r.id)==null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id)))) : text(description(r)),
                     !account.archived && group(button("แก้ไข",()=>begin(r.type,r)),r.type==="buy" && button("ซื้อซ้ำ",()=>begin("buy",r,true)),button(confirmDelete===r.id ? "ยืนยันลบ" : "ลบ",()=>{
                         if(confirmDelete!==r.id) {setConfirmDelete(r.id);return;}
                         try {commit(entries.filter(x=>x.id!==r.id));setConfirmDelete(null);setError("");} catch(e){setError(e.message);}
@@ -3858,7 +3898,7 @@ try {
                     !waiting && cloudState === "error" && React.createElement("div", { className: "text-[11px] mt-4", style: { color: T.red } }, cloudMsg)));
         }
         return (React.createElement("div", { style: { background: T.bg, color: T.text, fontFamily: "system-ui,-apple-system,sans-serif" }, className: "min-h-screen w-full flex justify-center" },
-            React.createElement("div", { className: "fixed inset-0 pointer-events-none", style: { background: `radial-gradient(600px 300px at 80% -5%, ${hex(T.purple, .12)}, transparent 70%), radial-gradient(500px 300px at 0% 10%, ${hex(T.purple, .08)}, transparent 70%)` } }),
+            React.createElement("div", { className: "fixed inset-0 pointer-events-none", style: { background: `radial-gradient(600px 300px at 80% -5%, ${hex(T.purple, .045)}, transparent 70%), radial-gradient(500px 300px at 0% 10%, ${hex(T.purple, .025)}, transparent 70%)` } }),
             React.createElement("div", { className: "app-shell flex flex-col min-h-screen relative" },
                 ["pending", "error", "conflict"].includes(cloudState) && !chromeless && React.createElement("button", { onClick: () => setTab("settings"), title: cloudMsg, "aria-label": "สถานะซิงก์ Supabase", className: "absolute left-1/2 -translate-x-1/2 z-40 flex items-center rounded-full active:scale-95", style: { top: "calc(12px + env(safe-area-inset-top))", gap: 6, padding: "6px 12px 6px 9px", background: T.surf, border: `1px solid ${cloudState === "error" ? T.red : cloudState === "conflict" ? T.purple : T.orange}`, boxShadow: "0 6px 18px rgba(46,36,22,.18)" } },
                     React.createElement(Cloud, { size: 13, style: { color: cloudState === "error" ? T.red : cloudState === "conflict" ? T.purple : T.orange } }),
@@ -4127,58 +4167,13 @@ try {
                         React.createElement("span", { className: "text-sm font-extrabold truncate", style: { display: "block" } }, item.title),
                         React.createElement("span", { className: "text-[11px] truncate", style: { display: "block", color: T.muted } }, item.detail)),
                     React.createElement(ChevronRight, { size: 15, style: { color: T.muted, flexShrink: 0 } })))))),
-            (() => {
-                const totI = todayEvents.length;
-                const doneI = todayEvents.filter(e => e.status === "done").length;
-                const pct = totI ? Math.round(doneI / totI * 100) : 0;
-                const R = 34, C = 2 * Math.PI * R, dash = C * (1 - pct / 100);
-                const rc = pct >= 100 ? T.green : pct >= 50 ? T.purple : T.blue;
-                return (React.createElement(Glass, { className: "p-0 overflow-hidden relative" },
-                    React.createElement("div", { className: "absolute left-0 top-0 bottom-0 w-1.5", style: { background: `linear-gradient(${T.purple}, ${T.blue})` } }),
-                    React.createElement("div", { className: "flex items-center", style: { background: `linear-gradient(120deg, ${hex(T.purple, .28)}, ${hex(T.blue, .1)} 60%, transparent)` } },
-                        React.createElement("button", { onClick: () => setSel(dkey(addDays(d, -1))), "aria-label": "\u0E27\u0E31\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E2B\u0E19\u0E49\u0E32", className: "self-stretch px-3 shrink-0 flex items-center active:scale-90 ml-1.5" },
-                            React.createElement(ChevronLeft, { size: 18, style: { color: T.muted } })),
-                        React.createElement("div", { className: "flex-1 flex items-center justify-center min-w-0", style: { gap: 20, paddingTop: 24, paddingBottom: 24 } },
-                            React.createElement("div", { className: "min-w-0", style: { width: 168 } },
-                                React.createElement("div", { className: "flex items-center gap-1.5" },
-                                    React.createElement("div", { className: "text-xs font-extrabold", style: { letterSpacing: "0.28em", color: T.purple } }, EN_D[d.getDay()]),
-                                    sel !== TK && React.createElement("button", { onClick: () => setSel(TK), className: "text-[10px] font-bold px-2 py-1 rounded-full", style: { background: hex(T.gold, .16), color: T.gold } }, "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49")),
-                                React.createElement("div", { className: "flex items-end gap-2 mt-1" },
-                                    React.createElement("span", { className: "text-5xl font-extrabold leading-none tabular-nums", style: { color: T.text } }, String(d.getDate()).padStart(2, "0")),
-                                    React.createElement("div", { className: "pb-1" }, React.createElement("div", { className: "text-lg font-extrabold", style: { lineHeight: 1.25, color: T.sub } }, EN_M[d.getMonth()]), React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, d.getFullYear()))),
-                                React.createElement("div", { className: "inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold mt-2", style: { color: T.sub, background: hex(T.surf2, .8), border: `1px solid ${T.border}` } },
-                                    todayEvents.length,
-                                    " \u0E07\u0E32\u0E19")),
-                            React.createElement("div", { className: "relative shrink-0", style: { width: 88, height: 88 } },
-                                React.createElement("svg", { width: "88", height: "88", viewBox: "0 0 88 88", style: { transform: "rotate(-90deg)" } },
-                                    React.createElement("circle", { cx: "44", cy: "44", r: R, fill: "none", stroke: T.surf2, strokeWidth: "7" }),
-                                    React.createElement("circle", { cx: "44", cy: "44", r: R, fill: "none", stroke: rc, strokeWidth: "7", strokeLinecap: "round", strokeDasharray: C, strokeDashoffset: dash, style: { transition: "stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)", filter: `drop-shadow(0 0 5px ${hex(rc, .7)})` } })),
-                                React.createElement("div", { className: "absolute inset-0 flex flex-col items-center justify-center" },
-                                    React.createElement("span", { className: "text-xl font-extrabold leading-none", style: { color: rc } },
-                                        pct,
-                                        React.createElement("span", { className: "text-[11px]" }, "%")),
-                                    React.createElement("span", { className: "font-bold tracking-wide mt-0.5", style: { fontSize: 8, color: T.muted } }, "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E40\u0E2A\u0E23\u0E47\u0E08")))),
-                        React.createElement("button", { onClick: () => setSel(dkey(addDays(d, 1))), "aria-label": "\u0E27\u0E31\u0E19\u0E16\u0E31\u0E14\u0E44\u0E1B", className: "self-stretch px-3 shrink-0 flex items-center active:scale-90" },
-                            React.createElement(ChevronRight, { size: 18, style: { color: T.muted } })))));
-            })(),
-            overdueEvents.length > 0 && React.createElement(Glass, { className: "p-0 overflow-hidden", glowColor: T.orange },
-                React.createElement("button", { onClick: () => setShowOverdue(value => !value), className: "w-full flex items-center gap-2.5 p-3.5 active:scale-[.99]", style: { borderBottom: showOverdue ? `1px solid ${T.border}` : "none" } },
-                    React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.orange, .16), color: T.orange } }, React.createElement(History, { size: 16 })),
-                    React.createElement("div", { className: "flex-1 text-left" }, React.createElement("div", { className: "text-sm font-bold" }, "งานตกค้าง"), React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "เลยวันแล้วแต่ยังไม่ทำเสร็จ")),
-                    React.createElement("span", { className: "text-[11px] font-bold px-2 py-0.5 rounded-full", style: { background: hex(T.orange, .16), color: T.orange } }, overdueEvents.length),
-                    React.createElement(ChevronDown, { size: 16, style: { color: T.muted, transform: showOverdue ? "rotate(180deg)" : "none", transition: "transform .2s" } })),
-                showOverdue && React.createElement("div", { className: "p-3 space-y-2" }, overdueEvents.map(event => {
-                    const type = EVENT_TYPES[event.type] || EVENT_TYPES.other;
-                    return React.createElement("div", { key: event.id, className: "p-3 rounded-xl", style: { background: T.surf2, border: `1px solid ${hex(type.color, .35)}` } },
-                        React.createElement("div", { className: "flex items-center gap-2" },
-                            React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "text-sm font-bold truncate" }, event.title), React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: T.muted } }, `${shortDate(event.date)}${event.startTime ? ` · ${event.startTime}–${event.endTime || addHour(event.startTime)}` : ""}${event.seriesId ? " · รายการทำซ้ำ" : ""}`)),
-                            React.createElement("button", { onClick: () => props.toggleEvent(event.id), className: "px-2.5 py-2 rounded-lg text-[10px] font-bold shrink-0 flex items-center gap-1", style: { background: hex(T.green, .15), color: T.green, border: `1px solid ${hex(T.green, .4)}` } }, React.createElement(Check, { size: 12 }), "เสร็จแล้ว")),
-                        React.createElement("div", { className: "mt-2", style: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "6px" } },
-                            React.createElement("button", { onClick: () => quickMove(event, TK), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.blue } }, "วันนี้"),
-                            React.createElement("button", { onClick: () => quickMove(event, dkey(addDays(parseK(TK), 1))), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.purple } }, "พรุ่งนี้"),
-                            React.createElement("button", { onClick: () => quickMove(event, dkey(addDays(parseK(TK), 7))), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.cyan } }, "+7 วัน"),
-                            React.createElement("button", { onClick: () => event.bookingId ? props.openStudioBooking(event.bookingId) : setRescheduleEv({ event, targetDate: event.date }), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.sub } }, event.bookingId ? "แก้ที่ Studio" : "เลือกวัน")));
-                }))),
+            React.createElement(Glass,{className:"p-3 flex items-center gap-2"},
+                React.createElement("button",{className:"si-link","aria-label":"วันก่อนหน้า",onClick:()=>setSel(dkey(addDays(d,-1)))},React.createElement(ChevronLeft,{size:16})),
+                React.createElement("div",{className:"flex-1 min-w-0"},
+                    React.createElement("h1",{className:"text-lg font-bold"},d.toLocaleDateString("th-TH",{weekday:"short",day:"numeric",month:"short",year:"numeric"})),
+                    React.createElement("small",{style:{color:T.sub}},todayEvents.length?"เสร็จแล้ว "+todayEvents.filter(e=>e.status==="done").length+" จาก "+todayEvents.length+" งาน":"ยังไม่มีงานในตาราง")),
+                sel!==TK && React.createElement("button",{className:"si-link",onClick:()=>setSel(TK)},"วันนี้"),
+                React.createElement("button",{className:"si-link","aria-label":"วันถัดไป",onClick:()=>setSel(dkey(addDays(d,1)))},React.createElement(ChevronRight,{size:16}))),
             (ongoing || nextUp) && (() => {
                 const cur = ongoing || nextUp;
                 const ET = EVENT_TYPES[cur.e.type];
@@ -4204,6 +4199,24 @@ try {
                         React.createElement("span", { className: "text-[11px]", style: { color: T.muted } }, isNow ? "จะจบในอีก" : "เริ่มในอีก"),
                         React.createElement("span", { className: "text-2xl font-extrabold tabular-nums", style: { color: ET.color } }, fmtDur(Math.max(0, mins))))));
             })(),
+            overdueEvents.length > 0 && React.createElement(Glass, { className: "p-0 overflow-hidden", glowColor: T.orange },
+                React.createElement("button", { onClick: () => setShowOverdue(value => !value), className: "w-full flex items-center gap-2.5 p-3.5 active:scale-[.99]", style: { borderBottom: showOverdue ? `1px solid ${T.border}` : "none" } },
+                    React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.orange, .16), color: T.orange } }, React.createElement(History, { size: 16 })),
+                    React.createElement("div", { className: "flex-1 text-left" }, React.createElement("div", { className: "text-sm font-bold" }, "งานตกค้าง"), React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "เลยวันแล้วแต่ยังไม่ทำเสร็จ")),
+                    React.createElement("span", { className: "text-[11px] font-bold px-2 py-0.5 rounded-full", style: { background: hex(T.orange, .16), color: T.orange } }, overdueEvents.length),
+                    React.createElement(ChevronDown, { size: 16, style: { color: T.muted, transform: showOverdue ? "rotate(180deg)" : "none", transition: "transform .2s" } })),
+                showOverdue && React.createElement("div", { className: "p-3 space-y-2" }, overdueEvents.map(event => {
+                    const type = EVENT_TYPES[event.type] || EVENT_TYPES.other;
+                    return React.createElement("div", { key: event.id, className: "p-3 rounded-xl", style: { background: T.surf2, border: `1px solid ${hex(type.color, .35)}` } },
+                        React.createElement("div", { className: "flex items-center gap-2" },
+                            React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "text-sm font-bold truncate" }, event.title), React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: T.muted } }, `${shortDate(event.date)}${event.startTime ? ` · ${event.startTime}–${event.endTime || addHour(event.startTime)}` : ""}${event.seriesId ? " · รายการทำซ้ำ" : ""}`)),
+                            React.createElement("button", { onClick: () => props.toggleEvent(event.id), className: "px-2.5 py-2 rounded-lg text-[10px] font-bold shrink-0 flex items-center gap-1", style: { background: hex(T.green, .15), color: T.green, border: `1px solid ${hex(T.green, .4)}` } }, React.createElement(Check, { size: 12 }), "เสร็จแล้ว")),
+                        React.createElement("div", { className: "mt-2", style: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "6px" } },
+                            React.createElement("button", { onClick: () => quickMove(event, TK), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.blue } }, "วันนี้"),
+                            React.createElement("button", { onClick: () => quickMove(event, dkey(addDays(parseK(TK), 1))), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.purple } }, "พรุ่งนี้"),
+                            React.createElement("button", { onClick: () => quickMove(event, dkey(addDays(parseK(TK), 7))), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.cyan } }, "+7 วัน"),
+                            React.createElement("button", { onClick: () => event.bookingId ? props.openStudioBooking(event.bookingId) : setRescheduleEv({ event, targetDate: event.date }), className: "py-2 rounded-lg text-[10px] font-bold", style: { background: T.surf, color: T.sub } }, event.bookingId ? "แก้ที่ Studio" : "เลือกวัน")));
+                }))),
             goalEvents.length > 0 && React.createElement(Section, { title: "เป้าหมายวันนี้", icon: Target, action: React.createElement("span", { className: "text-[10px] font-bold", style: { color: T.muted } }, `${goalEvents.filter(e => e.status === "done").length}/${goalEvents.length}`) },
                 React.createElement(Glass, { className: "p-0 overflow-hidden" }, goalEvents.map((e, gi) => {
                     const done = e.status === "done";
@@ -4214,7 +4227,7 @@ try {
                             e.note && React.createElement("div", { className: "text-[10px] truncate", style: { color: T.muted } }, e.note)),
                         React.createElement("span", { className: "shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full", style: { background: hex(EVENT_TYPES[e.type]?.color || T.sub, .14), color: EVENT_TYPES[e.type]?.color || T.sub } }, (EVENT_TYPES[e.type] || {}).label || "Goal"));
                 }))),
-            React.createElement(Section, { title: "Timeline", icon: Clock }, timedEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
+            React.createElement(Section, { title: "ตารางวันนี้", icon: Clock }, timedEvents.length === 0 ? React.createElement(Glass, { className: "text-center", style: { border: `1px dashed ${hex(T.purple, .42)}`, background: `linear-gradient(145deg, ${T.surf}, ${hex(T.purple, .06)})`, padding: "28px 20px" } },
                 React.createElement("div", { className: "mx-auto flex items-center justify-center", style: { width: 48, height: 48, borderRadius: 16, background: hex(T.purple, .13), color: T.purple, border: `1px solid ${hex(T.purple, .3)}` } }, React.createElement(CalendarDays, { size: 23 })),
                 React.createElement("div", { className: "font-extrabold", style: { fontSize: 17, marginTop: 14 } }, "วันนี้ยังไม่มีงาน"),
                 React.createElement("div", { style: { fontSize: 12, marginTop: 6, lineHeight: 1.6, color: T.muted } }, "กดปุ่ม + มุมขวาล่างเพื่อเพิ่ม Event แรก")) :
@@ -4337,7 +4350,7 @@ try {
                 React.createElement("div", { className: "flex items-center gap-2" },
                     React.createElement("button", { onClick: () => toggleEvent(e.id), className: "w-6 h-6 rounded-md flex items-center justify-center shrink-0", style: { background: done ? ET.color : "transparent", border: `2px solid ${done ? ET.color : T.border}` } }, done && React.createElement(Check, { size: 14, color: "#000" })),
                     React.createElement("div", { className: "flex-1 min-w-0" },
-                        React.createElement("div", { className: "font-semibold text-sm truncate" }, e.title),
+                        React.createElement("button", { onClick:()=>e.bookingId ? props.openStudioBooking(e.bookingId) : setEditEv(e), className: "font-semibold text-sm truncate" }, e.title),
                         React.createElement("div", { className: "flex items-center gap-1.5 mt-0.5 flex-wrap" },
                             React.createElement(ET.Icon, { size: 11, style: { color: ET.color } }),
                             React.createElement("span", { className: "text-[10px]", style: { color: T.muted } },
@@ -4347,23 +4360,23 @@ try {
                             e.location && React.createElement("button", { onClick: () => openMaps(e.location), className: "inline-flex items-center gap-0.5 text-[10px] font-semibold", style: { color: T.blue } },
                                 React.createElement(MapPin, { size: 11 }),
                                 e.location))),
-                    React.createElement("div", { className: "flex items-center gap-1 shrink-0" },
+                    React.createElement("details",{className:"shrink-0"},React.createElement("summary",{className:"si-link","aria-label":"ตัวเลือกของ "+e.title},"ตัวเลือก"),React.createElement("div",{className:"si-tools"},
                         e.startTime && React.createElement("button", { onClick: () => exportEventICS(e), "aria-label": e.icsAdded ? "ส่งออกปฏิทินแล้ว" : "ส่งออกไปยังปฏิทิน", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.green, background: e.icsAdded ? hex(T.green, .22) : T.surf2, border: `1px solid ${e.icsAdded ? T.green : T.border}` } }, e.icsAdded ? React.createElement(Check, { size: 13 }) : React.createElement(CalendarPlus, { size: 15 })),
-                        React.createElement("button", { onClick: () => e.bookingId ? props.openStudioBooking(e.bookingId) : setEditEv(e), "aria-label": e.bookingId ? "แก้ไขที่ Studio" : "แก้ไข event", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: e.bookingId ? T.purple : T.blue } },
+                        !e.bookingId && React.createElement("button", { onClick: () => setEditEv(e), "aria-label": e.bookingId ? "แก้ไขที่ Studio" : "แก้ไข event", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: e.bookingId ? T.purple : T.blue } },
                             React.createElement(Pencil, { size: 14 })),
                         e.bookingId ? React.createElement("button", { onClick: () => props.openStudioBooking(e.bookingId), "aria-label": "จัดการการจองที่ Studio", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.purple } }, React.createElement(Music, { size: 14 })) : confirmDel === e.id ? (React.createElement("button", { onClick: () => { delEvent(e.id); setConfirmDel(null); }, className: "text-[10px] font-bold px-2 py-1 rounded-lg", style: { background: T.red, color: "#fff" } }, "ลบ?")) : (React.createElement("button", { onClick: () => setConfirmDel(e.id), "aria-label": "ลบ event", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.muted } },
-                            React.createElement(Trash2, { size: 14 })))))));
+                            React.createElement(Trash2, { size: 14 }))))))));
         };
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
-                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "Calendar")),
-            React.createElement("div", { className: "flex gap-1.5 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
+                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "ปฏิทิน")),
+            React.createElement("details",{className:"si-fold",style:{order:2}},React.createElement("summary",null,"ส่งออกปฏิทิน"), React.createElement("div", { className: "flex gap-1.5 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } },
                     React.createElement("button", { onClick: () => exportDayICS(sel), className: "flex-1 text-[11px] font-bold px-2.5 py-2.5 rounded-xl flex items-center justify-center gap-1 active:scale-95", style: { minHeight: 40, background: "#FFFFFF", color: T.green, border: `1px solid ${hex(T.green, .3)}`, boxShadow: "0 3px 10px rgba(83,67,43,.05)" } },
                         React.createElement(CalendarPlus, { size: 12 }),
                         " ส่งออกวันที่เลือก"),
                     React.createElement("button", { onClick: () => exportWeekICS(week), className: "flex-1 text-[11px] font-bold px-2.5 py-2.5 rounded-xl flex items-center justify-center gap-1 active:scale-95", style: { minHeight: 40, background: "#FFFFFF", color: T.green, border: `1px solid ${hex(T.green, .3)}`, boxShadow: "0 3px 10px rgba(83,67,43,.05)" } },
                         React.createElement(CalendarPlus, { size: 12 }),
-                        " ส่งออกสัปดาห์")),
+                        " ส่งออกสัปดาห์"))),
             React.createElement("div", { className: "flex gap-1 p-1.5 rounded-2xl", style: { background: T.surf2, border: `1px solid ${T.border}` } }, CAL_VIEWS.map(([k, label]) => {
                 const on = view === k;
                 return React.createElement("button", { key: k, onClick: () => setView(k), className: "flex-1 py-2.5 rounded-xl text-xs font-bold transition active:scale-[.98]", style: { minHeight: 42, background: on ? T.purple : "transparent", color: on ? "#fff" : T.sub, boxShadow: on ? "0 5px 14px rgba(173,95,68,.22)" : "none" } }, label);
@@ -4391,13 +4404,13 @@ try {
                     const k = dkey(cell);
                     const on = k === sel;
                     const isToday = k === dkey(new Date());
-                    const n = countOn(k);
-                    return (React.createElement("button", { key: i, onClick: () => { setSel(k); setView("day"); }, className: "aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 transition active:scale-95", style: { background: on ? T.purple : T.surf, border: `1px solid ${on ? T.purple : isToday ? hex(T.gold, .6) : T.border}` } },
-                        React.createElement("span", { className: "text-xs font-bold", style: { color: isToday ? T.gold : T.text } }, cell.getDate()),
-                        n > 0 && React.createElement("span", { className: "font-bold px-1 rounded-full", style: { fontSize: 8, background: hex(T.purple, .18), color: T.text } }, n)));
+                    const types = [...new Set(events.filter(e=>e.date===k).map(e=>e.type))];
+                    return (React.createElement("button", { key: i, "aria-label":shortDate(k)+", "+countOn(k)+" งาน","aria-pressed":on,onClick: () => setSel(k), className: "aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 transition active:scale-95", style: { background: on ? T.purple : T.surf, border: `1px solid ${on ? T.purple : isToday ? hex(T.gold, .6) : T.border}` } },
+                        React.createElement("span", { className: "text-xs font-bold", style: { color: on ? "#fff" : isToday ? T.gold : T.text } }, cell.getDate()),
+                        React.createElement("span",{className:"flex gap-1","aria-hidden":true},types.slice(0,3).map(type=>React.createElement("i",{key:type,style:{width:5,height:5,borderRadius:5,background:(EVENT_TYPES[type] || EVENT_TYPES.other).color}})))));
                 })),
-                React.createElement("div", { className: "text-[10px] text-center mt-3", style: { color: T.muted } }, "\u0E41\u0E15\u0E30\u0E27\u0E31\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E14\u0E39\u0E23\u0E32\u0E22\u0E25\u0E30\u0E40\u0E2D\u0E35\u0E22\u0E14 \u00B7 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02 = \u0E08\u0E33\u0E19\u0E27\u0E19 event \u0E27\u0E31\u0E19\u0E19\u0E31\u0E49\u0E19"))),
-            view === "day" && (React.createElement("div", { className: "space-y-2" }, dayEvents.length === 0 ? React.createElement(Empty, { text: "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E27\u0E48\u0E32\u0E07 \u2014 \u0E40\u0E1E\u0E34\u0E48\u0E21 Event \u0E2B\u0E23\u0E37\u0E2D\u0E1E\u0E31\u0E01\u0E01\u0E47\u0E44\u0E14\u0E49" }) : dayEvents.map(EventRow))),
+                React.createElement("div", { className: "text-[10px] text-center mt-3", style: { color: T.muted } }, "จุดสีแสดงประเภทงาน · แตะวันที่เพื่อดูคิวด้านล่าง"))),
+            (view === "day" || view === "month") && (React.createElement("div", { className: "space-y-2" }, view === "month" && React.createElement("strong",null,shortDate(sel)), dayEvents.length === 0 ? React.createElement(Empty, { text: "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E27\u0E48\u0E32\u0E07 \u2014 \u0E40\u0E1E\u0E34\u0E48\u0E21 Event \u0E2B\u0E23\u0E37\u0E2D\u0E1E\u0E31\u0E01\u0E01\u0E47\u0E44\u0E14\u0E49" }) : dayEvents.map(EventRow))),
             view === "week" && (React.createElement("div", { className: "space-y-3" }, week.map(wd => {
                 const k = dkey(wd);
                 const evs = events.filter(e => e.date === k).sort((a, b) => toMin(a.startTime) - toMin(b.startTime));
@@ -5150,6 +5163,7 @@ try {
                     React.createElement("div", null,
                         React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.red } }, "บันทึกในเครื่องมีปัญหา"),
                         React.createElement("div", { className: "text-xs mt-1", style: { color: T.sub, lineHeight: 1.5 } }, localSaveError)))),
+            React.createElement("details",{className:"si-fold",style:{order:2}},React.createElement("summary",null,"อุปกรณ์ การติดตั้ง และการแจ้งเตือน"),
             React.createElement("button", { onClick: async () => { if (pwaCanPrompt) await requestPwaInstall?.(); else setShowInstallHelp(value => !value); }, className: "w-full p-4 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { background: T.surf, border: `1px solid ${pwaInstalled ? hex(T.green, .45) : T.border}`, minHeight: 68, boxShadow: "0 6px 18px rgba(83,67,43,.06)" } },
                 React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(pwaInstalled ? T.green : T.purple, .15), color: pwaInstalled ? T.green : T.purple } }, pwaInstalled ? React.createElement(Check, { size: 18 }) : React.createElement(Download, { size: 18 })),
                 React.createElement("div", { className: "flex-1 min-w-0" }, React.createElement("div", { className: "font-extrabold text-sm" }, pwaInstalled ? "เปิดแบบเว็บแอปแล้ว" : "ติดตั้ง TaskRoutine"), React.createElement("div", { className: "text-[11px] mt-0.5", style: { color: T.muted } }, pwaInstalled ? "เปิดจากไอคอนบนหน้าจอโฮมได้" : pwaCanPrompt ? "แตะเพื่อติดตั้งเป็นแอป" : "ดูวิธีเพิ่มไปยังหน้าจอโฮม")),
@@ -5225,7 +5239,7 @@ try {
                             localStorage.setItem("tr_count_style", value);
                         }
                         catch (error) { } setCountStyleSel(value); if (value === "voice") countSpeak(3); else countBeep(3); }, className: "px-2.5 py-1 rounded-lg text-[10px] font-bold", style: { background: countStyleSel === value ? hex(T.green, .16) : T.surf2, color: countStyleSel === value ? T.green : T.muted, border: `1px solid ${countStyleSel === value ? hex(T.green, .45) : T.border}` } }, label)))),
-                React.createElement("div", { className: "text-[10px] leading-relaxed", style: { color: T.muted } }, "iPhone \u0e15\u0e49\u0e2d\u0e07\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e41\u0e2d\u0e1b\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e08\u0e2d\u0e42\u0e2e\u0e21\u0e01\u0e48\u0e2d\u0e19 \u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e17\u0e33\u0e07\u0e32\u0e19 (\u0e02\u0e49\u0e2d\u0e08\u0e33\u0e01\u0e31\u0e14\u0e02\u0e2d\u0e07 iOS)")),
+                React.createElement("div", { className: "text-[10px] leading-relaxed", style: { color: T.muted } }, "iPhone \u0e15\u0e49\u0e2d\u0e07\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e41\u0e2d\u0e1b\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e08\u0e2d\u0e42\u0e2e\u0e21\u0e01\u0e48\u0e2d\u0e19 \u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19\u0e08\u0e36\u0e07\u0e08\u0e30\u0e17\u0e33\u0e07\u0e32\u0e19 (\u0e02\u0e49\u0e2d\u0e08\u0e33\u0e01\u0e31\u0e14\u0e02\u0e2d\u0e07 iOS)"))),
             React.createElement("button", { onClick: () => setShowTaxSettings(value => !value), className: "w-full p-4 rounded-2xl flex items-center gap-3 text-left active:scale-[.99]", style: { background: T.surf, border: `1px solid ${T.border}`, minHeight: 68, boxShadow: "0 6px 18px rgba(83,67,43,.06)" } },
                 React.createElement("span", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.blue, .15), color: T.blue } }, React.createElement(FileText, { size: 17 })),
                 React.createElement("div", { className: "flex-1 min-w-0" },
@@ -5500,16 +5514,29 @@ try {
         const sortedTxns = useMemo(() => [...studioTxns].sort((a, b) => b.date.localeCompare(a.date)), [studioTxns]);
         const txnSlice = sortedTxns.slice(txnPage * PER_PAGE, (txnPage + 1) * PER_PAGE);
         const netColor = net >= 0 ? T.green : T.red;
+        const queue = bookings.filter(b=>b.date===TK && !b.cancelled && !b.archived).sort((a,b)=>String(a.startTime).localeCompare(String(b.startTime)));
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             React.createElement("div", { className: "flex items-center justify-between" },
-                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "Studio")),
-            React.createElement("div", { className: "flex gap-1 p-1.5 rounded-2xl", style: { background: T.surf, border: `1px solid ${hex(T.border, .86)}`, boxShadow: "0 8px 24px rgba(86,68,43,.08)" } }, [["overview", BarChart3, "ภาพรวม"], ["booking", History, "การจอง"], ["bands", Gift, "วง/ลูกค้า"], ["finance", Wallet, "รายรับ-จ่าย"]].map(([k, Ic, l]) => {
+                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "สตูดิโอ")),
+            React.createElement("div", { className: "flex gap-1 p-1.5 rounded-2xl", style: { background: T.surf, border: `1px solid ${hex(T.border, .86)}`, boxShadow: "0 8px 24px rgba(86,68,43,.08)" } }, [["overview", BarChart3, "คิววันนี้"], ["booking", History, "การจอง"], ["bands", Gift, "วง/ลูกค้า"], ["finance", Wallet, "การเงิน"]].map(([k, Ic, l]) => {
                 const on = sub === k;
                 return React.createElement("button", { key: k, onClick: () => setSub(k), className: "flex-1 min-w-0 py-2.5 px-1 rounded-xl text-[10px] font-bold whitespace-nowrap active:scale-95 flex items-center justify-center gap-1", style: { minHeight: 42, background: on ? T.purple : "transparent", color: on ? "#fff" : T.sub, border: "1px solid transparent", boxShadow: on ? "0 5px 14px rgba(173,95,68,.22)" : "none", transition: "all .18s ease" } },
                     React.createElement(Ic, { size: 13 }),
                     l);
             })),
-            (sub === "overview" || sub === "finance") && (React.createElement(React.Fragment, null,
+            sub==="overview" && React.createElement(Glass,{className:"p-4"},
+                React.createElement("h2",{className:"font-bold mb-2"},"คิวห้องซ้อม · "+shortDate(TK)),
+                !queue.length && React.createElement("p",{style:{color:T.muted}},"วันนี้ยังไม่มีการจอง"),
+                queue.map(b=>{
+                    const source=sourceForBooking(b), due=sourceRemaining(source);
+                    return React.createElement("div",{key:b.id,className:"si-queue"},
+                        React.createElement("button",{className:"text-left",onClick:()=>setEditBk(b)},
+                            React.createElement("small",null,b.startTime+"–"+b.endTime),React.createElement("strong",null,b.bandName)),
+                        source && due>0 && !b.loyaltyFree
+                            ? React.createElement("button",{className:"si-link",onClick:()=>openIncomeSourceBudget?.(source.id)},"รับยอดคงเหลือ "+fmtBaht(due))
+                            : React.createElement("small",null,b.loyaltyFree?"ใช้สิทธิ์ฟรี":source?"ชำระครบ":"รอตรวจยอด"));
+                })),
+            sub === "finance" && (React.createElement(React.Fragment, null,
                 React.createElement(Glass, { className: "p-4" },
                     React.createElement("div", { className: "flex items-center gap-1.5 p-1.5 rounded-2xl mb-4", style: { background: T.surf2, border: `1px solid ${T.border}` } }, [["total", "รวมทั้งหมด"], ["month", "รายเดือน"]].map(([k, l]) => {
                         const on = finMode === k;
@@ -5557,9 +5584,9 @@ try {
                             React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "เงินต้น + ผลสุทธิสะสม"),
                             React.createElement("div", { className: "text-lg font-extrabold", style: { color: balance >= 0 ? T.gold : T.red } }, fmtBaht(balance)))),
                     !accounts.some(a=>a.pocketEnabled) && finMode === "month" && React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "* \u0E22\u0E2D\u0E14\u0E04\u0E07\u0E40\u0E2B\u0E25\u0E37\u0E2D\u0E23\u0E27\u0E21\u0E17\u0E38\u0E01\u0E40\u0E14\u0E37\u0E2D\u0E19 (\u0E40\u0E07\u0E34\u0E19\u0E15\u0E49\u0E19 + \u0E2A\u0E38\u0E17\u0E18\u0E34\u0E2A\u0E30\u0E2A\u0E21) \u2014 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E23\u0E32\u0E22\u0E23\u0E31\u0E1A/\u0E08\u0E48\u0E32\u0E22/\u0E2A\u0E38\u0E17\u0E18\u0E34\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19\u0E04\u0E37\u0E2D\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E37\u0E2D\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
-            (sub === "overview" || sub === "finance") && React.createElement(PocketSummary,{accounts,transactions,payments,sources:incomeSources,studioOnly:true}),
-            React.createElement("div", { className: "flex gap-2" },
-                (sub === "overview" || sub === "finance") && React.createElement("button", { onClick: () => setTxnOpen(true), className: "flex-1 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { minHeight: 50, padding: "12px 16px", background: "#FFFFFF", color: T.red, border: `1px solid ${hex(T.red, .38)}`, boxShadow: "0 8px 20px rgba(182,73,73,.10)" } },
+            sub === "finance" && React.createElement(PocketSummary,{accounts,transactions,payments,sources:incomeSources,studioOnly:true}),
+            sub === "finance" && React.createElement("div", { className: "flex gap-2" },
+                sub === "finance" && React.createElement("button", { onClick: () => setTxnOpen(true), className: "flex-1 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { minHeight: 50, padding: "12px 16px", background: "#FFFFFF", color: T.red, border: `1px solid ${hex(T.red, .38)}`, boxShadow: "0 8px 20px rgba(182,73,73,.10)" } },
                     React.createElement(TrendingDown, { size: 17 }),
                     " \u0E23\u0E32\u0E22\u0E08\u0E48\u0E32\u0E22\u0E2B\u0E49\u0E2D\u0E07\u0E0B\u0E49\u0E2D\u0E21")),
             sub === "bands" && (React.createElement(Collapse, { title: "\u0E27\u0E07 & \u0E0A\u0E31\u0E48\u0E27\u0E42\u0E21\u0E07\u0E2A\u0E30\u0E2A\u0E21", icon: Gift, count: groups.length, color: T.gold, defaultOpen: true },
@@ -6173,7 +6200,7 @@ try {
               receivedAmount: duplicateMode ? "" : initial.receivedAmount ?? initial.amount ?? "",
               transferFee: duplicateMode ? "" : initial.transferFee || "",
               eventTime: duplicateMode ? "" : initial.eventTime || "",
-              fxBuyPrice: duplicateMode ? "" : initial.fxBuyPrice ?? "",
+              fxBuyPrice: duplicateMode ? "" : initial.fxExchangeRate ?? initial.fxBuyPrice ?? "",
               fxCostOverride: duplicateMode ? "" : initial.fxCostOverride ?? "",
               sourceRateTHB: duplicateMode ? "" : initial.sourceRateTHB || "",
               sharedExpense: Number(initial.reimbursableAmount) > 0,
@@ -6572,7 +6599,7 @@ try {
           Number.isFinite(receivedAmount) && receivedAmount > 0 &&
           Number.isFinite(transferFee) && transferFee >= 0 &&
           (!needsTHBRate || (Number.isFinite(rates.sourceRate) && rates.sourceRate > 0)) &&
-          (!buyingFX || !f.fxBuyPrice || (Number.isFinite(Number(f.fxBuyPrice)) && Number(f.fxBuyPrice)>0)) &&
+          (!(buyingFX || sellingFX) || !f.fxBuyPrice || (Number.isFinite(Number(f.fxBuyPrice)) && Number(f.fxBuyPrice)>0)) &&
           (!sellingFX || !f.fxCostOverride || (Number.isFinite(Number(f.fxCostOverride)) && Number(f.fxCostOverride)>0)) &&
           !!fromAcc && !!toAcc && purposeValid &&
           (!fromAcc.archived || editMode) && (!toAcc.archived || editMode) &&
@@ -6663,7 +6690,7 @@ try {
               value: f.amount,
               onChange: (event) => {
                 const value = event.target.value;
-                setF(current => ({ ...current, amount: value, ...(buyingFX && current.fxBuyPrice ? {receivedAmount:purchaseValue(value,current.fxBuyPrice,true)} : {}) }));
+                setF(current => ({ ...current, amount: value, ...((buyingFX || sellingFX) && current.fxBuyPrice ? {receivedAmount:purchaseValue(value,current.fxBuyPrice,buyingFX)} : {}) }));
                 if (linkedIncomeSource)
                   setLinkedAllocations((list) => list.length === 1 && list[0].role !== "pass_through" ? [{ ...list[0], amount: value }] : list);
               },
@@ -7129,7 +7156,7 @@ try {
                     React.createElement("p", { style: { fontSize: 11, color: T.muted, lineHeight: 1.7, marginTop: 9 } }, "เลือกได้ครั้งละหนึ่งอย่าง ใช้ร่วมกับโอนย้ายบัญชีหรือแลกสกุลเงินได้ทุกประเภทบัญชี"),
                     investmentFlow !== "none" && React.createElement("p", { style: { fontSize: 11, color: T.blue, lineHeight: 1.7, marginTop: 6 } }, investmentFlow === "add" ? `นับเงินเติมให้บัญชีปลายทาง: ${toAcc?.name || "ยังไม่เลือก"}` : `นับเงินถอนจากบัญชีต้นทาง: ${fromAcc?.name || "ยังไม่เลือก"}`),
                     React.createElement("p", { style: { fontSize: 10, color: T.muted, lineHeight: 1.7, marginTop: 6 } }, "โอนหรือแลกเงินที่ลงทุนแล้วระหว่างบัญชีของตัวเอง เว้นทั้งสองช่องเพื่อไม่ให้นับยอดลงทุนซ้ำ")),
-                buyingFX && React.createElement(Input,{label:`ราคาที่ซื้อ · 1 ${toCurrency} กี่บาท (ถ้ามี)`,type:"number",value:f.fxBuyPrice ?? "",placeholder:"กรอกเรทเพื่อคำนวณยอดรับ หรือกรอกยอดรับจริงด้านล่าง",onChange:v=>setF(current=>({...current,fxBuyPrice:v,receivedAmount:purchaseValue(current.amount,v,true)}))}),
+                (buyingFX || sellingFX) && React.createElement(Input,{label:`เรทที่แลก · บาทต่อ 1 ${buyingFX ? toCurrency : fromCurrency} (ถ้ามี)`,type:"number",value:f.fxBuyPrice ?? "",placeholder:"กรอกเรทเพื่อคำนวณยอดรับ หรือกรอกยอดรับจริงด้านล่าง",onChange:v=>setF(current=>({...current,fxBuyPrice:v,receivedAmount:purchaseValue(current.amount,v,buyingFX)}))}),
                 crossCurrency && React.createElement(Input, { label: `ยอดรับจริงปลายทาง (${toCurrency})`, type: "number", value: f.receivedAmount || "", onChange: v => setF({ ...f, receivedAmount: v }), placeholder: "จำนวนที่เข้าบัญชีจริง" }),
                 fromCurrency !== "THB" && toCurrency !== "THB" && React.createElement(React.Fragment, null,
                     React.createElement(Input, { label: `เรทวันโอน · 1 ${fromCurrency} = กี่บาท${needsTHBRate ? " (จำเป็น)" : " (ไม่บังคับ)"}`, type: "number", value: f.sourceRateTHB || "", onChange: v => setF({ ...f, sourceRateTHB: v }), placeholder: needsTHBRate ? "กรอกเรทมากกว่า 0" : "เว้นว่างได้" }),
@@ -8255,7 +8282,7 @@ try {
                       amount: Number(f.amount) || 0,
                       date: f.date,
                       title: TRANSFER_PURPOSES[transferPurpose],
-                      transferPurpose, investmentFlow, receivedAmount, eventTime:f.eventTime || "", fxBuyPrice:buyingFX && Number(f.fxBuyPrice)>0 ? Number(f.fxBuyPrice) : null, fxCostOverride:sellingFX && Number(f.fxCostOverride)>0 ? Number(f.fxCostOverride) : null,
+                      transferPurpose, investmentFlow, receivedAmount, eventTime:f.eventTime || "", fxExchangeRate:(buyingFX || sellingFX) && Number(f.fxBuyPrice)>0 ? Number(f.fxBuyPrice) : null, fxBuyPrice:buyingFX && Number(f.fxBuyPrice)>0 ? Number(f.fxBuyPrice) : null, fxCostOverride:sellingFX && Number(f.fxCostOverride)>0 ? Number(f.fxCostOverride) : null,
                       fromCurrency, toCurrency, transferFee, pocketOwner: transferPocket,
                       sourceRateTHB: rates.sourceRate > 0 ? rates.sourceRate : null, amountTHB: rates.sourceRate > 0 ? rates.amountTHB : null,
                       fromInvestment: isInvestmentAccount(fromAcc), toInvestment: isInvestmentAccount(toAcc),
@@ -8897,11 +8924,43 @@ try {
         }
         return {wallets,results};
     }
+    function tradeGrossAmount(units, unitPrice) {
+        if (![units, unitPrice].every(value => Number.isFinite(Number(value)) && Number(value) > 0)) return "";
+        // Multiply decimal digits before rounding to avoid half-cent errors such as 1.005.
+        function decimalParts(value) {
+            const [mantissa, exponent = "0"] = String(value).trim().toLowerCase().split("e");
+            const [whole, fraction = ""] = mantissa.split(".");
+            return {digits: BigInt(whole + fraction), scale: fraction.length - Number(exponent)};
+        }
+        const quantity = decimalParts(units), price = decimalParts(unitPrice);
+        const product = quantity.digits * price.digits;
+        const shift = quantity.scale + price.scale - 2;
+        const factor = 10n ** BigInt(Math.abs(shift));
+        let cents = shift > 0 ? (product + factor / 2n) / factor : product * factor;
+        if (cents % 100n === 99n) cents += 1n;
+        return String(cents / 100n) + "." + String(cents % 100n).padStart(2,"0");
+    }
     function purchaseValue(quantity,unitPrice,convertFromTHB=false) {
         const q = Number(quantity), price = Number(unitPrice);
         if (!(q > 0 && price > 0)) return "";
         const value = convertFromTHB ? q/price : q*price;
         return Number.isFinite(value) ? String(Number(value.toFixed(8))) : "";
+    }
+    function portfolioFxFlows(events, accountId, accounts) {
+        const totals = {USD:{in:0,out:0}, THB:{in:0,out:0}, count:0};
+        for (const {kind,row} of events) {
+            if (kind !== "transfer" || (row.fromAccountId !== accountId && row.toAccountId !== accountId)) continue;
+            const from = row.fromCurrency || accountCurrency(accounts.find(a=>a.id===row.fromAccountId));
+            const to = row.toCurrency || accountCurrency(accounts.find(a=>a.id===row.toAccountId));
+            if (!(from === "USD" && to === "THB" || from === "THB" && to === "USD")) continue;
+            const sent = Number(row.amount), received = Number(row.receivedAmount);
+            const fee = Number(row.transferFee || 0);
+            if (!(sent > 0 && received > 0 && fee >= 0)) continue;
+            totals[from].out += sent + fee;
+            totals[to].in += received;
+            totals.count++;
+        }
+        return totals;
     }
     function exchangeFigures(t, from, to, reference) {
         const sent=Number(t.amount), received=Number(t.receivedAmount), fee=Number(t.transferFee)||0;
@@ -8960,6 +9019,7 @@ try {
         catch { } };
         const [mode, setMode] = useState("total");
         const [budgetView, setBudgetView] = useState("overview");
+        const [openFamilies,setOpenFamilies]=useState({});
         const [portfolioId, setPortfolioId] = useState(null);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId && a.portfolioEnabled);
         const [budgetNow, setBudgetNow] = useState(Date.now());
@@ -9355,15 +9415,21 @@ try {
         };
         const srcTag = (k, category) => k === "reimbursement" ? { t: "เงินสำรองจ่าย", c: T.orange } : k === "incomeSource" ? { t: normalizeIncomeCategory(category || "Work"), c: T.green } : { t: k === "booking" ? "Studio" : normalizeIncomeCategory(category || (k === "event" ? "Work" : "Work")), c: k === "booking" ? T.blue : k === "event" ? T.purple : T.cyan };
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
-            React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em", order: -4 } }, "Budget"),
-            React.createElement("div", { className: "flex gap-1 p-1.5 rounded-2xl", style: { order: -3, background: T.surf, border: `1px solid ${hex(T.border, .86)}`, boxShadow: "0 8px 24px rgba(86,68,43,.08)" } }, [["summary", BarChart3, "ภาพรวม"], ["transactions", History, "ธุรกรรม"], ["due", AlertCircle, "ค้างรับ"], ["monthclose", Check, "ปิดเดือน"]].map(([k, Ic, l]) => {
-                const on = sub === k;
-                return React.createElement("button", { key: k, onClick: () => setSub(k), className: "flex-1 min-w-0 py-2.5 px-1 rounded-xl text-[10px] font-bold whitespace-nowrap active:scale-95 flex items-center justify-center gap-1", style: { minHeight: 42, background: on ? T.green : "transparent", color: on ? "#18200f" : T.sub, border: "1px solid transparent", boxShadow: on ? "0 5px 13px rgba(92,126,61,.23)" : "none", transition: "background .2s ease, box-shadow .2s ease, transform .15s ease" } },
-                    React.createElement(Ic, { size: 13 }),
-                    l,
-                    k === "due" && due.length > 0 && React.createElement("span", { className: "px-1 rounded-full inline-flex items-center justify-center text-[9px] font-extrabold", style: { minWidth: 18, height: 18, background: "#e2703a", color: "#fff" }, "aria-label": `${due.length} รายการค้างรับ` }, due.length > 99 ? "99+" : due.length));
-            })),
-            sub === "summary" && React.createElement("nav", { "aria-label": "ส่วนของภาพรวมบัญชี", className: "flex gap-1", style: { order: -2, borderBottom: `1px solid ${T.border}` } }, [["overview","สรุปเดือน"],["accounts","บัญชี"],["investment","ลงทุน"],["reports","รายงาน"]].map(([id,label]) => React.createElement("button", { key: id, "aria-current": budgetView === id ? "page" : undefined, onClick: () => { setBudgetView(id); if (id === "accounts") setShowAccounts(true); }, className: "flex-1 text-xs font-bold py-3", style: { color: budgetView === id ? T.purple : T.muted, borderBottom: `2px solid ${budgetView === id ? T.purple : "transparent"}` } }, label))),
+            React.createElement("h1",{className:"text-2xl font-extrabold",style:{order:-4}},"บัญชี"),
+            React.createElement("nav",{className:"si-nav","aria-label":"เมนูบัญชี",style:{order:-3}},
+                ...[["overview","ภาพรวม"],["transactions","รายการ"],["accounts","บัญชีและพอร์ต"]].map(([id,label])=>{
+                    const active=sub==="transactions" ? "transactions" : sub==="summary" && ["accounts","investment"].includes(budgetView) ? "accounts" : "overview";
+                    return React.createElement("button",{key:id,"aria-current":active===id?"page":undefined,onClick:()=>{
+                        setSub(id==="transactions"?"transactions":"summary");
+                        if(id!=="transactions")setBudgetView(id);
+                        if(id==="accounts")setShowAccounts(true);
+                    }},label);
+                })),
+            sub==="summary" && budgetView==="overview" && React.createElement("div",{className:"si-tools",style:{order:8}},
+                React.createElement("button",{onClick:()=>setBudgetView("reports")},"รายงาน"),
+                React.createElement("button",{onClick:()=>setSub("monthclose")},"ตรวจ Statement และปิดเดือน")),
+            sub==="summary" && budgetView==="accounts" && React.createElement("button",{className:"si-link",style:{order:2},onClick:()=>setBudgetView("investment")},"แผนลงทุนและพอร์ตทั้งหมด"),
+            (sub==="due" || sub==="monthclose" || sub==="summary" && ["reports","investment"].includes(budgetView)) && React.createElement("h2",{className:"text-base font-bold"},sub==="due"?"ค้างรับ":sub==="monthclose"?"ตรวจ Statement และปิดเดือน":budgetView==="reports"?"รายงาน":"แผนลงทุนและพอร์ต"),
             sub === "summary" && budgetView === "overview" && React.createElement("div", { className: "flex items-center justify-between gap-2", style: { order: -1 } }, React.createElement("button", { "aria-label": "เดือนก่อนหน้า", onClick: () => setMk(value => addMonthKey(value,-1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronLeft,{size:18})), React.createElement("input", { type: "month", "aria-label": "เดือนภาพรวมบัญชี", value: mk, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setMk(e.target.value); } }, style: { padding: "8px 10px", maxWidth: 170, borderRadius: 10, background: T.surf, color: T.text, border: `1px solid ${T.border}`, fontSize: 13 } }), React.createElement("button", { "aria-label": "เดือนถัดไป", onClick: () => setMk(value => addMonthKey(value,1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronRight,{size:18}))),
             sub === "summary" && budgetView === "investment" && React.createElement(Glass,{className:"p-4"},React.createElement("div",{className:"font-bold text-sm"},"พอร์ตลงทุน"),accounts.some(a=>a.portfolioEnabled) ? React.createElement("div",{className:"flex flex-wrap gap-2 mt-2"},accounts.filter(a=>a.portfolioEnabled).map(a=>React.createElement("button",{key:a.id,onClick:()=>setPortfolioId(a.id),className:"px-3 py-2 rounded-xl font-bold text-xs",style:{background:T.surf2,color:T.purple}},accountLabel(a,accounts)))) : React.createElement("button",{onClick:()=>{setBudgetView("accounts");setShowAccounts(true);},className:"text-xs py-2",style:{color:T.purple}},"ไปที่บัญชี แล้วติ๊กเปิดพอร์ตลงทุนในการแก้ไขบัญชี")),
             sub === "summary" && budgetView === "investment" && React.createElement(InvestmentOverview, { accounts, transactions, payments, month: mk, setMonth: setMk, investmentPlans, setInvestmentPlans, onAddAccount: () => setEditAcc({ id: null, name: "", startBalance: 0, accountType: "investment", currency: "THB", spendable: false }), onTransfer: () => { setTxnKind("transfer"); setTxnOpen(true); } }),
@@ -9605,17 +9671,17 @@ try {
                                 accounts.length > 1 && React.createElement("div", { className: "text-[11px] pt-2.5", style: { color: accountDnd.dragging ? T.blue : T.muted } }, accounts.some(a => a.parentAccountId) ? "บัญชีย่อยแสดงใต้บัญชีหลัก · ยอดแต่ละบัญชีคิดแยกกัน" : accountDnd.dragging ? "กำลังลาก — ปล่อยเพื่อบันทึกลำดับ" : "กดค้างที่บัญชีแล้วลากเพื่อจัดลำดับ"),
                                 accounts.length === 0 ? React.createElement(Empty, { text: "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E1A\u0E31\u0E0D\u0E0A\u0E35 \u2014 \u0E40\u0E1E\u0E34\u0E48\u0E21\u0E1A\u0E31\u0E0D\u0E0A\u0E35\u0E41\u0E23\u0E01\u0E02\u0E2D\u0E07\u0E04\u0E38\u0E13" }) : (React.createElement("div", { className: "mt-1" }, orderedAccounts(accounts).map(a => {
                                     const i = accounts.findIndex(item => item.id === a.id);
+                                    if (accountParent(a,accounts) && !openFamilies[a.parentAccountId]) return null;
                                     const bal = balanceOf(a.id);
                                     return (React.createElement("div", { key: a.id, ...(accounts.some(item => item.parentAccountId) ? {} : accountDnd.itemProps(i)), className: "flex items-center gap-2.5 py-3", style: { ...accountDnd.itemStyle(i), marginLeft: accountParent(a, accounts) ? 18 : 0, paddingLeft: accountParent(a, accounts) ? 10 : 0, borderLeft: accountParent(a, accounts) ? `2px solid ${T.border}` : "none", background: T.surf, borderTop: i > 0 ? `1px solid ${T.border}` : "none" } },
                                         !accounts.some(item => item.parentAccountId) && React.createElement(GripVertical, { size: 18, style: { color: accountDnd.activeIndex === i || accountDnd.armedIndex === i ? T.blue : T.muted, flexShrink: 0 } }),
                                         React.createElement("div", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.purple, .16) } },
                                             React.createElement(Wallet, { size: 15, style: { color: T.purple } })),
                                         React.createElement("div", { className: "flex-1 min-w-0" },
-                                            React.createElement("div", { className: "font-bold text-sm truncate" }, `${a.name}${a.archived ? " · เก็บถาวร" : ""}`),
-                                            React.createElement("div", { className: "text-[10px] mt-1", style: { color: T.blue } }, `${a.platform || ACCOUNT_TYPES[a.accountType || "bank"]} · ${accountCurrency(a)} · ${isSpendableAccount(a) ? "เงินใช้ได้" : "แยกจากเงินใช้ได้"}`),
-                                            React.createElement("div", { className: "text-[10px]", style: { color: T.muted } },
-                                                "ยอดเริ่มต้น ",
-                                                moneyIn(a.startBalance, accountCurrency(a))),
+                                            accounts.some(child=>child.parentAccountId===a.id)
+                                                ? React.createElement("button",{className:"font-bold text-sm py-2 text-left","aria-expanded":!!openFamilies[a.id],onClick:()=>setOpenFamilies(current=>({...current,[a.id]:!current[a.id]}))},a.name+(a.archived?" · เก็บถาวร":"")+(openFamilies[a.id]?" ▴":" ▾"))
+                                                : React.createElement("strong",{className:"text-sm"},a.name+(a.archived?" · เก็บถาวร":"")),
+                                            React.createElement("small",{style:{display:"block",color:T.muted}},accountCurrency(a)),
                                             a.portfolioEnabled && React.createElement("button",{onClick:()=>setPortfolioId(a.id),className:"mt-1 text-xs px-2 py-1 rounded-lg font-bold",style:{background:T.surf2,color:T.purple}},"เปิดพอร์ตลงทุน")),
                                         React.createElement("span", { className: "text-base font-extrabold shrink-0", style: { color: bal >= 0 ? T.text : T.red } }, moneyIn(bal, accountCurrency(a)),bal<0 && a.portfolioEnabled && React.createElement("small",{style:{display:"block",textAlign:"right",fontSize:10,color:T.sub}},"รอตรวจสอบ")),
                                         !accountParent(a, accounts) && !a.archived && React.createElement("button", { onClick: () => setEditAcc({ id: null, name: "", startBalance: 0, parentAccountId: a.id, platform: a.platform || a.name, accountType: "investment", currency: "USD", spendable: false }), "aria-label": `เพิ่มบัญชีย่อยของ ${a.name}`, className: "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", style: { color: T.purple, background: hex(T.purple, .1) } }, React.createElement(Plus, { size: 15 })),
@@ -12131,7 +12197,7 @@ try {
         const togPart = (d, p) => setDraft(s => { const cur = s[d] || { kind: "weight", parts: [] }; const parts = cur.parts || []; return { ...s, [d]: { ...cur, parts: parts.includes(p) ? parts.filter(x => x !== p) : [...parts, p] } }; });
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             !focusMode && React.createElement("div", { className: "flex items-end justify-between" },
-                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "Fitness"),
+                React.createElement("h1", { className: "text-2xl font-extrabold", style: { lineHeight: 1.15, letterSpacing: "-0.02em" } }, "ฟิตเนส"),
                 React.createElement("div", { className: "text-sm font-extrabold", style: { color: T.purple } },
                     EN_D[today.getDay()],
                     " ",
@@ -12145,7 +12211,7 @@ try {
                     l);
             })),
             (sub === "today" || sub === "history") && (React.createElement(WorkoutLog, { view: sub, workouts: workouts, updateWorkouts: updateWorkouts, events: events, exPresets: exPresets, setExPresets: setExPresets, workoutPresets: workoutPresets, setWorkoutPresets: setWorkoutPresets, offerUndo: offerUndo, addSheet: props.addSheet, clearAdd: props.clearAdd, onActiveChange: setFocusMode, onManagePresets: () => setPresetManagerOpen(true) })),
-            sub === "today" && !focusMode && (() => { const row7 = Array.from({ length: 7 }, (_, i) => { const dt = addDays(today, -6 + i); const k = dkey(dt); return { dn: TH_D[dt.getDay()], trained: workouts.some(w => w.date === k), vol: workouts.filter(w => w.date === k).reduce((sum, w) => sum + (w.exercises || []).reduce((s2, e) => s2 + (e.sets || []).reduce((s3, st) => s3 + workoutSetVolume(st) + dropsOf(st).reduce((v, d) => v + workoutSetVolume(d), 0), 0), 0), 0) }; }); const trainCount = row7.filter(x => x.trained).length; const volArr = row7.map(x => x.vol); const volSum = volArr.reduce((a, b) => a + b, 0); const maxVol = Math.max(1, ...volArr); return React.createElement(React.Fragment, null,
+            sub === "today" && !focusMode && (() => { const row7 = Array.from({ length: 7 }, (_, i) => { const dt = addDays(today, -6 + i); const k = dkey(dt); return { dn: TH_D[dt.getDay()], trained: workouts.some(w => w.date === k), vol: workouts.filter(w => w.date === k).reduce((sum, w) => sum + (w.exercises || []).reduce((s2, e) => s2 + (e.sets || []).reduce((s3, st) => s3 + workoutSetVolume(st) + dropsOf(st).reduce((v, d) => v + workoutSetVolume(d), 0), 0), 0), 0) }; }); const trainCount = row7.filter(x => x.trained).length; const volArr = row7.map(x => x.vol); const volSum = volArr.reduce((a, b) => a + b, 0); const maxVol = Math.max(1, ...volArr); return React.createElement("details",{className:"si-fold"},React.createElement("summary",null,"ความก้าวหน้า · สถิติ 7 วัน"),
                 React.createElement("div", { className: "grid grid-cols-2 gap-2.5" }, [["Session 7 วัน", `${trainCount}`, "วัน", T.green, Dumbbell], ["Volume 7 วัน", volSum >= 1000 ? (volSum / 1000).toFixed(1) + "k" : `${volSum}`, "kg", T.cyan, TrendingUp]].map(([lab, val, unit, c, Ic], i) => React.createElement(Glass, { key: i, className: "p-3 text-center" },
                     React.createElement("div", { className: "w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1.5", style: { background: hex(c, .16) } }, React.createElement(Ic, { size: 15, style: { color: c } })),
                     React.createElement("div", { className: "text-lg font-extrabold leading-none" }, val, React.createElement("span", { className: "text-[10px] font-bold ml-0.5", style: { color: T.muted } }, unit)),
