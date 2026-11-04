@@ -401,7 +401,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-sell-all-v32";
+window.__TASKROUTINE_BUILD__="2026-11-04-sale-net-input-v33";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1936,6 +1936,18 @@ try {
                 const next = {...row,[key]:value};
                 if (["buy","sell"].includes(type) && !isCrypto(next,type) && ["unitPrice","units"].includes(key) && (next.unitPrice || key==="unitPrice"))
                     next.amount = tradeGrossAmount(next.units,next.unitPrice);
+                if(type==="sell" && !isCrypto(next,type)){
+                    if(key==="saleInput" && value==="net"){
+                        const received=Number(next.amount)-Number(next.fee||0);
+                        next.netReceived=Number(next.amount)>0 && received>=0 ? String(decimalCash(received)) : "";
+                    }
+                    if(key==="fee" || key==="feeUnit")next.saleInput="fee";
+                    if(key==="netReceived")next.saleInput="net";
+                    if(next.saleInput==="net" && next.feeUnit!=="asset"){
+                        next.fee=next.netReceived!=="" && next.netReceived!=null && Number(next.amount)>0
+                            ? String(decimalCash(Number(next.amount)-Number(next.netReceived))) : "";
+                    }
+                }
                 return next;
             }));
             setError("");
@@ -2002,6 +2014,10 @@ try {
                     if (["buy","sell","opening"].includes(type)) result.units = numeric(row.units,"จำนวนหน่วย");
                     if (["buy","sell"].includes(type)) {
                         result.tradeMode = "stock";
+                        if(type==="sell" && row.saleInput==="net" && row.feeUnit!=="asset"){
+                            const received=numeric(row.netReceived,"ยอดรับสุทธิ",true);
+                            if(received>result.amount)throw new Error("ยอดรับสุทธิต้องไม่เกินยอดขายก่อนค่าธรรมเนียม");
+                        }
                         if (row.unitPrice!=="" && row.unitPrice!=null)
                             result.unitPrice = numeric(row.unitPrice,type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย");
                         result.fee = numeric(row.fee || 0,"ค่าธรรมเนียม",true); result.feeUnit = row.feeUnit;
@@ -2056,6 +2072,7 @@ try {
             const crypto = isCrypto(row,type);
             const amount = crypto ? cryptoValue(row) : Number(row.amount);
             const fee = crypto ? 0 : Number(row.fee || 0);
+            if(type==="sell" && !crypto && row.saleInput==="net" && (row.netReceived==="" || row.netReceived==null))return NaN;
             if (!(Number(row.units) > 0 && amount > 0 && fee >= 0) ||
                 (type === "sell" && row.feeUnit !== "asset" && fee > amount) ||
                 (type === "buy" && row.feeUnit === "asset" && fee >= Number(row.units))) return NaN;
@@ -2085,6 +2102,13 @@ try {
                     isTrade(type) && !isCrypto(r,type) && field(i,"unitPrice",(type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย")+" ("+currency+")"),
                     !isCrypto(r,type) && field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
                     isTrade(type) && !isCrypto(r,type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
+                    type==="sell" && !isCrypto(r,type) && r.feeUnit!=="asset" && h(React.Fragment,null,
+                        h("nav",{className:"si-nav","aria-label":"วิธีกรอกยอดขาย รายการที่ "+(i+1)},
+                            ...[["fee","กรอกค่าธรรมเนียม"],["net","กรอกยอดรับจริง"]].map(([id,label])=>h("button",{key:id,type:"button","aria-current":(r.saleInput||"fee")===id?"page":undefined,onClick:()=>change(i,"saleInput",id)},label))),
+                        h(Input,{label:"ยอดรับสุทธิ ("+currency+")",type:"number",
+                            value:r.saleInput==="net" ? String(r.netReceived??"") : Number(r.amount)>0 && Number.isFinite(Number(r.fee||0)) && Number(r.fee||0)>=0 && Number(r.fee||0)<=Number(r.amount) ? String(decimalCash(Number(r.amount)-Number(r.fee||0))) : "",
+                            placeholder:"ยอดเงินที่เข้าจริงหลังค่าธรรมเนียม",onChange:v=>change(i,"netReceived",v)}),
+                        text(r.saleInput==="net" ? "ค่าธรรมเนียม = ยอดขายก่อนค่าธรรมเนียม − ยอดรับสุทธิ" : "ยอดรับสุทธิ = ยอดขายก่อนค่าธรรมเนียม − ค่าธรรมเนียม")),
                     ["interest","dividend"].includes(type) && h(React.Fragment,null,field(i,"tax","ภาษีหัก ณ ที่จ่าย ("+currency+")"),text("รับสุทธิ "+money(Number(r.amount)-Number(r.tax)))),
                     h("details",null,h("summary",null,currency==="THB"?"เวลาตาม Statement":"เรทเงินบาทและเวลาตาม Statement"),
                         field(i,"eventTime","เวลาในวันที่ทำรายการ (ถ้าทราบ)","time"),
