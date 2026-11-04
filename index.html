@@ -394,7 +394,7 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-04-grouped-statement-suggestions-v24";
+window.__TASKROUTINE_BUILD__="2026-11-04-sell-unit-price-v25";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1807,7 +1807,7 @@ try {
         const isCrypto = (r,k) => isTrade(k) && r.tradeMode === "crypto";
         const decimalCash = value => Number(value.toFixed(8));
         const cryptoValue = r => decimalCash(Number(r.units) * Number(r.rate));
-        const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
+        const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", unitPrice:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
         const [tab,setTab] = useState("assets"), [type,setType] = useState("");
         const [rows,setRows] = useState([]), [date,setDate] = useState(TK), [error,setError] = useState("");
         const [editing,setEditing] = useState(null), [year,setYear] = useState("all");
@@ -1816,7 +1816,8 @@ try {
         const cost = holdings.every(p => p.cost !== null) ? holdings.reduce((sum,p) => sum + p.cost,0) : null;
         function begin(kind, old, reuse = false) {
             setType(kind); setEditing(old && !reuse ? old.id : null); setDate(old && !reuse ? old.date : TK);
-            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), ...(reuse ? {thbRate:"",eventTime:""} : {}), amount: old?.amount ?? "" }]);
+            const unitPrice = old?.unitPrice ?? (old && ["buy","sell"].includes(kind) && old.tradeMode !== "crypto" && Number(old.units)>0 && Number(old.amount)>0 ? purchaseValue(old.amount,old.units,true) : "");
+            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), ...(reuse ? {thbRate:"",eventTime:""} : {}), unitPrice, amount: old?.amount ?? "" }]);
             setError(""); setConfirmDelete(null);
         }
         function finish() { setType(""); setEditing(null); setError(""); }
@@ -1824,7 +1825,7 @@ try {
             setRows(list => list.map((row,i) => {
                 if (i !== index) return row;
                 const next = {...row,[key]:value};
-                if (type === "buy" && !isCrypto(next,type) && ["unitPrice","units"].includes(key) && (next.unitPrice || key==="unitPrice"))
+                if (["buy","sell"].includes(type) && !isCrypto(next,type) && ["unitPrice","units"].includes(key) && (next.unitPrice || key==="unitPrice"))
                     next.amount = purchaseValue(next.units,next.unitPrice);
                 return next;
             }));
@@ -1867,8 +1868,8 @@ try {
                     if (["buy","sell","opening"].includes(type)) result.units = numeric(row.units,"จำนวนหน่วย");
                     if (["buy","sell"].includes(type)) {
                         result.tradeMode = "stock";
-                        if (type==="buy" && row.unitPrice!=="" && row.unitPrice!=null)
-                            result.unitPrice = numeric(row.unitPrice,"ราคาที่ซื้อต่อหน่วย");
+                        if (row.unitPrice!=="" && row.unitPrice!=null)
+                            result.unitPrice = numeric(row.unitPrice,type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย");
                         result.fee = numeric(row.fee || 0,"ค่าธรรมเนียม",true); result.feeUnit = row.feeUnit;
                         if (result.feeUnit === "asset" && type === "buy" && result.fee >= result.units) throw new Error("ค่าธรรมเนียมต้องน้อยกว่าจำนวนหน่วยที่ซื้อ");
                         if (result.feeUnit === "cash" && type === "sell" && result.fee > result.amount) throw new Error("ค่าธรรมเนียมเกินยอดขาย");
@@ -1908,7 +1909,7 @@ try {
             if (r.type === "quote") return money(r.amount) + " / หน่วย";
             if (r.type === "snapshot" || r.type === "cash") return money(r.amount);
             if (r.type === "opening") return quantity(r.units)+" หน่วย · ต้นทุน "+(r.amount === null ? "ยังไม่ระบุ" : money(r.amount));
-            return quantity(r.units)+" หน่วย"+(r.type==="buy" && r.units>0 ? " · "+(r.unitPrice ? "ราคาที่กรอก " : "ราคาต่อหน่วยจากยอดซื้อ ")+money(r.unitPrice || r.amount/r.units) : "")+" · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
+            return quantity(r.units)+" หน่วย"+(["buy","sell"].includes(r.type) && r.units>0 ? " · ราคาต่อหน่วย "+money(r.unitPrice || r.amount/r.units) : "")+" · ยอด "+money(r.amount)+" · ค่าธรรมเนียม "+(r.feeUnit==="asset" ? quantity(r.fee)+" "+r.symbol : money(r.fee))+" · เงินสด "+money(portfolioCash(r))+(r.type==="sell" ? " · กำไรขาย "+(book.realized.get(r.id) == null ? "ยังไม่ทราบต้นทุน" : money(book.realized.get(r.id))) : "");
         }
         const preview = r => {
             const value = cryptoValue(r);
@@ -1931,7 +1932,7 @@ try {
                         field(i,"rate","อัตรา · 1 "+(r.symbol || "เหรียญ")+" เท่ากับกี่ "+currency),
                         preview(r)),
                     !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหน่วยที่ซื้อหรือขาย ก่อนค่าธรรมเนียม"),
-                    type==="buy" && !isCrypto(r,type) && field(i,"unitPrice","ราคาที่ซื้อต่อหน่วย ("+currency+" · ถ้ามี)"),
+                    isTrade(type) && !isCrypto(r,type) && field(i,"unitPrice",(type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย")+" ("+currency+")"),
                     !isCrypto(r,type) && field(i,"amount",({buy:"ยอดซื้อก่อนค่าธรรมเนียม",sell:"ยอดขายก่อนค่าธรรมเนียม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
                     isTrade(type) && !isCrypto(r,type) && h(React.Fragment,null,h(FinanceSelect,{label:"ค่าธรรมเนียมหักจาก",value:r.feeUnit,options:{cash:"เงินสด "+currency,asset:"หน่วยของสินทรัพย์นี้"},onChange:v=>change(i,"feeUnit",v)}),field(i,"fee","ค่าธรรมเนียม ("+(r.feeUnit==="asset" ? r.symbol || "หน่วย" : currency)+")")),
                     ["interest","dividend"].includes(type) && h(React.Fragment,null,field(i,"tax","ภาษีหัก ณ ที่จ่าย ("+currency+")"),text("รับสุทธิ "+money(Number(r.amount)-Number(r.tax)))),
@@ -12573,6 +12574,7 @@ try {
         check("Broker: migration รักษาประเภทบัญชี", brokerSnapshot.accounts[0].accountType, "broker");
         check("Broker: ไม่นับเป็นเงินใช้ได้โดยอัตโนมัติ", isSpendableAccount(brokerSnapshot.accounts[0]), false);
         check("Broker: อยู่ในกลุ่มบัญชีลงทุน", isInvestmentAccount(brokerSnapshot.accounts[0]), true);
+        check("พอร์ต: จำนวน 2 คูณราคาขาย 15.55 เป็นยอดรวม 31.10", purchaseValue(2,15.55), "31.1");
         const statementRows = [
             { id: "new", date: "2026-11-04" },
             { id: "middle", date: "2026-11-04" },
