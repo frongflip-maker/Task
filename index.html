@@ -386,6 +386,18 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 .pf-result{font-size:clamp(23px,6vw,30px);font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums}
 .pf-explanation{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#22645c08}.pf-pending{font-size:13px;color:#805521}
 .pf-order-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:11px;color:#386e79}.pf-order-status button{min-height:32px;padding:4px 8px;border-radius:8px;background:#386e7910}
+.st-day{display:grid;grid-template-columns:39px minmax(0,1fr);gap:8px;margin:16px 0;align-items:start}
+.st-date{padding-top:11px;text-align:center;color:#61716b;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}.st-date strong{display:block;font-size:22px;line-height:1.2;color:#202f2e;margin:3px 0}
+.st-frame{min-width:0;border:1px solid #d5dad0;border-radius:15px;overflow:hidden;background:#fffefa}
+.st-row{box-sizing:border-box;height:76px;padding:10px;display:flex;flex-direction:column;justify-content:center;gap:8px;width:100%;text-align:left;min-width:0;border-radius:0;overflow:hidden}
+.st-line{display:flex;align-items:center;justify-content:space-between;gap:7px;min-width:0;min-height:20px;flex:0 0 20px}
+.st-heading{display:flex;align-items:center;gap:5px;min-width:0;flex:1}.st-heading>svg{flex:0 0 16px}
+.st-label{font-size:14px;font-weight:750;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.st-flow{font-size:11px;font-weight:600;white-space:nowrap;flex:0 0 auto;color:#386e79}
+.st-badge{display:flex;max-width:54%;min-width:0;flex:0 1 auto;overflow:hidden}.st-route{display:flex;align-items:center;gap:3px;max-width:46%;min-width:0;flex:0 1 auto}.st-route .st-badge{flex:0 1 auto;max-width:calc(50% - 7px)}
+.st-category{font-size:11px;line-height:1.5;color:#61716b;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;min-width:0;flex:0 1 auto}
+.st-status{font-size:11px;color:#386e79;margin-bottom:5px}
+@media(max-width:360px){.st-day{grid-template-columns:32px minmax(0,1fr);gap:6px}.st-row{padding-inline:8px}.st-line,.st-heading{gap:4px}}
 .pf-stack details{padding:10px 0;border-block:1px solid #b8aa9333}.pf-stack summary{cursor:pointer;font-size:13px;font-weight:650;padding:4px 0}
 .pf-stack details[open]>summary{margin-bottom:12px}.pf-stack details .pf-pair+.pf-pair{margin-top:8px}
 .pf-entry{gap:9px;border-top:1px solid #b8aa934d;padding:16px 0 4px}
@@ -428,7 +440,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-portfolio-newest-v41";
+window.__TASKROUTINE_BUILD__="2026-11-05-statement-layout-v42";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -5124,12 +5136,16 @@ try {
             }
             const head = heads.get(key);
             if (!head) {
-                const seed = { ...row, bankLineParts: [titleOf(row)], bankLineDetails: [labelOf ? labelOf(row) : titleOf(row)] };
+                const seed = { ...row, ...(row.allocationTotals?{allocationTotals:{...row.allocationTotals}}:{}), bankLineParts: [titleOf(row)], bankLineDetails: [labelOf ? labelOf(row) : titleOf(row)] };
                 heads.set(key, seed);
                 out.push(seed);
                 return;
             }
             amountFields.forEach(field => { head[field] = (Number(head[field]) || 0) + (Number(row[field]) || 0); });
+            if(row.allocationTotals){
+                head.allocationTotals=head.allocationTotals||{};
+                Object.entries(row.allocationTotals).forEach(([key,value])=>{head.allocationTotals[key]=(Number(head.allocationTotals[key])||0)+(Number(value)||0);});
+            }
             head.bankLineParts.push(titleOf(row));
             head.bankLineDetails.push(labelOf ? labelOf(row) : titleOf(row));
         });
@@ -9095,51 +9111,59 @@ try {
         return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "1 1 0" : undefined, maxWidth: "100%", minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
             React.createElement("span", { ref: content, style: { display: "inline-flex", width: "max-content", alignItems: "baseline", gap: 5, fontSize, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.4 } }, children));
     }
+    function statementCategoryText(row,currency) {
+        const parts=Object.entries(row.allocationTotals||{}).filter(([,amount])=>Number(amount)>0);
+        const compact=n=>(currency==="THB"?"฿":currency==="USD"?"$":currency+" ")+Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
+        if(parts.length>1)return parts.map(([label,amount])=>label+" "+compact(amount)).join(" · ");
+        return row.tag!==row.title ? row.tag||"อื่นๆ" : "";
+    }
     function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
+        const h=React.createElement;
         const dnd = useLongPressSort(rows, (from, to) => onReorder(date, reorderListItem(rows, from, to).map(row => String(row.id))), `statement-${String(date).replace(/[^a-zA-Z0-9_-]/g, "-")}`, 320, false, true);
-        return React.createElement("section", { "data-statement-day": date },
-            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "12px 0 7px", fontSize: 12, fontWeight: 700, color: dnd.dragging ? T.blue : T.sub } },
-                parseK(date).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
-                dnd.dragging && React.createElement("span", { style: { fontSize: 10, color: T.blue } }, "กำลังลาก · ปล่อยเพื่อวาง")),
-            React.createElement("div", { role: "group", "aria-label": `รายการวันที่ ${shortDate(date)}`, "data-statement-day-frame": true, style: { background: T.surf, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" } }, rows.map((row, index) => {
-                const t = row.raw || {}, transfer = t.kind === "transfer";
-                const account = accounts.find(a => a.id === row.accountId);
-                const currency = accountCurrency(account);
-                const from = accounts.find(a => a.id === t.fromAccountId), to = accounts.find(a => a.id === t.toAccountId);
-                const fc = t.fromCurrency || accountCurrency(from), tc = t.toCurrency || accountCurrency(to);
-                const color = transfer ? TRANSFER_COLOR : row.dir === "in" ? T.green : T.orange;
-                const active = dnd.activeIndex === index, armed = dnd.armedIndex === index;
-                const flow = transfer ? investmentDirection(t, accounts) : "none";
-                const contentInset = 23; // 16px direction icon plus the 7px gap beside it.
-                const heading = transfer ? (["invest","withdraw"].includes(t.transferPurpose) ? "โอนย้ายบัญชี" : TRANSFER_PURPOSES[t.transferPurpose] || "โอนย้ายบัญชี") : row.title;
-                return React.createElement("button", { key: row.id, type: "button", ...dnd.itemProps(index),
-                    "aria-label": `ดูรายการ ${row.title}`, title: "แตะเพื่อดูรายละเอียด · กดค้างเพื่อลาก",
-                    onContextMenu: e => e.preventDefault(),
-                    onClick: e => { if (dnd.suppressClick()) { e.preventDefault(); return; } onOpen(row); },
-                    style: { ...dnd.itemStyle(index), touchAction: rows.length > 1 ? "none" : "pan-y", display: "block", width: "100%", textAlign: "left", margin: 0, padding: "11px 11px", borderRadius: 0, background: active || armed ? hex(T.blue,.06) : T.surf, color: T.text, overflow: "hidden", border: "none", borderTop: index ? `1px solid ${T.border}` : "none", outline: active || armed ? `1px solid ${T.blue}` : "none", outlineOffset: -1 } },
-                    React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 } },
-                        React.createElement(transfer ? RefreshCw : row.dir === "in" ? TrendingUp : TrendingDown, { size: 16, style: { color, flexShrink: 0, marginTop: 2 } }),
-                        React.createElement("div", { style: { display: "flex", alignItems: "center", flexWrap: "nowrap", gap: 6, flex: 1, minWidth: 0 } },
-                            React.createElement("span", { title: heading, style: { fontSize: transfer ? 14 : 15, fontWeight: 750, lineHeight: 1.45, flex: transfer ? "0 0 auto" : "0 1 auto", maxWidth: transfer ? "44%" : undefined, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, heading),
-                            transfer ? React.createElement("span", { "data-transfer-route": true, style: { display: "flex", alignItems: "center", gap: 3, flex: "1 1 0%", minWidth: 0 } },
-                                React.createElement("span", { style: { display: "flex", minWidth: 0, flex: "0 1 auto", overflow: "hidden" } }, React.createElement(AccountBadge, { account: from, accounts })),
-                                React.createElement("span", { style: { color: T.muted, fontSize: 10, flexShrink: 0 } }, "→"),
-                                React.createElement("span", { style: { display: "flex", minWidth: 0, flex: "0 1 auto", overflow: "hidden" } }, React.createElement(AccountBadge, { account: to, accounts }))) :
-                                React.createElement("span", { style: { display: "flex", flex: "0 0 auto", minWidth: 0, maxWidth: "58%" } }, React.createElement(AccountBadge, { account, accounts }))),
-                        flow !== "none" && React.createElement("span", { "data-investment-flow": flow, style: { marginLeft: "auto", flexShrink: 0, color: T.blue, fontSize: "clamp(9px, 2.35vw, 10.5px)", fontWeight: 650, lineHeight: "20px", whiteSpace: "nowrap", textAlign: "right" } }, INVESTMENT_FLOWS[flow])),
-                    transfer ? React.createElement(React.Fragment, null,
-                        React.createElement(StatementMoney, { fontSize: 15 },
-                            React.createElement("span", { style: { color: T.text } }, `−${ledgerMoney(t.amount, fc)}`),
-                            React.createElement("span", { style: { color: T.muted } }, "→"),
-                            React.createElement("span", { style: { color } }, `+${ledgerMoney(transferReceived(t), tc)}`))) :
-                        React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 4, paddingLeft: contentInset, minWidth: 0 } },
-                            React.createElement("span", { style: { color: T.sub, fontSize: 13, lineHeight: 1.5, flex: "0 1 auto", maxWidth: "42%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.tag !== row.title ? row.tag || "อื่นๆ" : ""),
-                            React.createElement(StatementMoney, { inline: true }, React.createElement("span", { style: { color } }, `${row.dir === "in" ? "+" : "−"}${moneyIn(row.amount, currency)}`))),
-                    transfer && Number(t.transferFee) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.muted, paddingLeft: contentInset, marginTop: 3, lineHeight: 1.5 } }, `ค่าธรรมเนียม ${ledgerMoney(t.transferFee, fc)}`),
-                    !transfer && t.kind === "out" && Number(t.pocketSplit?.studio) > 0 && Number(t.pocketSplit?.personal) > 0 && React.createElement("div", { style: { fontSize: 10, color: T.purple, paddingLeft: contentInset, marginTop: 3 } }, `ห้องซ้อม ${moneyIn(t.pocketSplit.studio)} · ส่วนตัว ${moneyIn(t.pocketSplit.personal)}`),
-                    !transfer && pendingIncomeValuation(t) && React.createElement("div", { style: { fontSize: 10, color: T.muted, paddingLeft: contentInset, marginTop: 3 } }, "ยังไม่ระบุมูลค่าเงินบาท"),
-                    !transfer && row.detailSummary && React.createElement("div", { style: { fontSize: 10, color: T.muted, paddingLeft: contentInset, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.detailSummary));
-            })));
+        const day=parseK(date);
+        const badge=account=>h("span",{className:"st-badge"},h(AccountBadge,{account,accounts}));
+        return h("section",{className:"st-day","data-statement-day":date},
+            h("time",{className:"st-date",dateTime:date,"aria-label":day.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})},
+                day.toLocaleDateString("en-GB",{weekday:"short"}),h("strong",null,String(day.getDate()).padStart(2,"0")),
+                day.toLocaleDateString("en-GB",{month:"short"}),h("div",null,day.getFullYear())),
+            h("div",{style:{minWidth:0}},
+                dnd.dragging && h("div",{className:"st-status",role:"status"},"กำลังลาก · ปล่อยเพื่อวาง"),
+                h("div",{className:"st-frame",role:"group","aria-label":`รายการวันที่ ${day.toLocaleDateString("en-GB")}`,"data-statement-day-frame":true},
+                    rows.map((row,index)=>{
+                        const t=row.raw||{},transfer=t.kind==="transfer";
+                        const account=accounts.find(a=>a.id===row.accountId),currency=accountCurrency(account);
+                        const from=accounts.find(a=>a.id===t.fromAccountId),to=accounts.find(a=>a.id===t.toAccountId);
+                        const fc=t.fromCurrency||accountCurrency(from),tc=t.toCurrency||accountCurrency(to);
+                        const color=transfer?T.blue:row.dir==="in"?T.green:T.orange;
+                        const flow=transfer?investmentDirection(t,accounts):"none";
+                        const fullHeading=transfer?(["invest","withdraw"].includes(t.transferPurpose)?"โอนย้ายบัญชี":TRANSFER_PURPOSES[t.transferPurpose]||"โอนย้ายบัญชี"):row.title;
+                        const heading=transfer && t.transferPurpose==="exchange" ? "แลกเงิน" : fullHeading;
+                        const category=statementCategoryText(row,currency);
+                        const active=dnd.activeIndex===index,armed=dnd.armedIndex===index;
+                        const twoAmounts=transfer && (fc!==tc || Math.abs(Number(t.amount)-transferReceived(t))>.005);
+                        return h("button",{key:row.id,type:"button",className:"st-row",...dnd.itemProps(index),
+                            "aria-label":`ดูรายการ ${row.title}${category?" · "+category:""}`,title:fullHeading,
+                            onContextMenu:e=>e.preventDefault(),
+                            onClick:e=>{if(dnd.suppressClick()){e.preventDefault();return;}onOpen(row);},
+                            style:{...dnd.itemStyle(index),touchAction:rows.length>1?"none":"pan-y",margin:0,
+                                background:active||armed?hex(T.blue,.06):T.surf,color:T.text,border:"none",borderTop:index?`1px solid ${T.border}`:"none",
+                                outline:active||armed?`1px solid ${T.blue}`:"none",outlineOffset:-1}},
+                            h("div",{className:"st-line"},
+                                h("span",{className:"st-heading"},
+                                    h(transfer?(fc===tc?Repeat:RefreshCw):row.dir==="in"?TrendingUp:TrendingDown,{size:16,style:{color},strokeWidth:1.8,"aria-hidden":true}),
+                                    h("span",{className:"st-label"},heading),
+                                    flow!=="none" && h("span",{className:"st-flow","data-investment-flow":flow},INVESTMENT_FLOWS[flow])),
+                                transfer?h("span",{className:"st-route","data-transfer-route":true},badge(from),h("span",{"aria-hidden":true,style:{flexShrink:0,color:T.muted,fontSize:12}},"→"),badge(to)):badge(account)),
+                            h("div",{className:"st-line"},
+                                !twoAmounts && h("span",{className:"st-category",title:category},transfer?"โอนย้าย":category),
+                                h("div",{style:{flex:twoAmounts?"1 1 0":"0 1 auto",minWidth:0,maxWidth:twoAmounts?"100%":"65%",marginLeft:"auto"}},
+                                    h(StatementMoney,{inline:true,fontSize:14},
+                                        twoAmounts?h(React.Fragment,null,
+                                            h("span",{style:{color:T.text}},`−${ledgerMoney(t.amount,fc)}`),
+                                            h("span",{style:{color:T.muted}},"→"),
+                                            h("span",{style:{color}},`+${ledgerMoney(transferReceived(t),tc)}`)):
+                                            h("span",{style:{color}},transfer?moneyIn(t.amount,fc):`${row.dir==="in"?"+":"−"}${moneyIn(row.amount,currency)}`)))));
+                    }))));
     }
     function TransactionRows({ rows, accounts, onOpen, onReorder }) {
         const groups = [];
