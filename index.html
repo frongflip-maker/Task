@@ -477,6 +477,8 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 .pa-field{display:grid;gap:4px;min-width:0;color:var(--pa-sub);font-weight:700}
 .pa-field :is(input,select){display:block;min-height:44px;min-width:0;width:100%;max-width:100%;padding:7px 9px;border:1px solid var(--pa-border);border-radius:10px;color:var(--pa-fg);background:var(--pa-bg);font-size:16px}
 .pa-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pa-ticker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.pa-ticker input{width:100%;min-width:0;padding:7px 9px;border:1px solid var(--pa-border);border-radius:10px;background:var(--pa-bg);color:var(--pa-fg);font-size:16px}
 .pa-etf{display:grid;grid-template-columns:1fr auto;align-items:end;gap:6px}
 @media (max-width:360px){.pa-card,.pa-head{padding:10px}.pa-root{font-size:13px}.pa-donut{width:76px;height:76px}.pa-nav button{padding:5px 3px}}
 @media (prefers-color-scheme:dark){.pa-root{color-scheme:dark;--pa-bg:#192423;--pa-fg:#e9f2ef;--pa-sub:#bbcdc7;--pa-soft:#263d3a;--pa-border:#3d5752;--pa-brand:#81c9bd;--pa-action:#122e29;--pa-green:#89d4a8;--pa-red:#f2a399;--pa-alert:#3c3320;--pa-alert-text:#f8db91}.pa-root .pa-field :is(input,select){color-scheme:dark!important}}
@@ -488,7 +490,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-portfolio-allocation-v51";
+window.__TASKROUTINE_BUILD__="2026-11-05-smart-dca-budget-currency-v53";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1073,6 +1075,7 @@ function allocationDateAfter(day, months) {
     const allocationSymbol = value => String(value ?? "").trim().toUpperCase();
     const allocationSymbolOK = value => /^[A-Z0-9][A-Z0-9._: /-]{0,23}$/.test(value);
     const allocationDay = value => /^\d{4}-\d{2}-\d{2}$/.test(value || "") && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
+    const dcaTickerOK = symbol => /^[A-Z][A-Z0-9.-]{0,23}$/.test(symbol);
     const allocationIsGold = symbol => allocationSymbol(symbol)==="XAU";
     const allocationIsBtc = symbol => /^(BTC|XBT|BTC\/THB)$/.test(allocationSymbol(symbol));
     function allocationQuote(raw,fx=false) {
@@ -1104,7 +1107,12 @@ function allocationDateAfter(day, months) {
         const plans=(Array.isArray(raw.plans)?raw.plans:[]).filter(p=>p && typeof p.id==="string" && typeof p.accountId==="string" &&
             ALLOCATION_KEYS.includes(p.bucket) && (!p.symbol || allocationSymbolOK(p.symbol)) && allocationCents(p.amount)>0 && allocationDay(p.date));
         return {rules,quotes,classes,fx:allocationQuote(raw.fx,true),etfs,etfMode:raw.etfMode==="portfolio"?"portfolio":"stock",
-            budget:range(raw.budget,0,1e12),reviewMonths:Math.max(1,Math.floor(range(raw.reviewMonths,6,60))),
+            dcaScope:raw.dcaScope==="stocks"?"stocks":"portfolio",
+            dcaStocks:[...new Set((Array.isArray(raw.dcaStocks)?raw.dcaStocks:[]).map(allocationSymbol).filter(dcaTickerOK))],
+            budget:range(raw.budget,0,1e12),
+            budgetCurrency:raw.budgetCurrency==="USD"?"USD":"THB",
+            budgetDisplayCurrency:["USD","THB"].includes(raw.budgetDisplayCurrency)?raw.budgetDisplayCurrency:(raw.budgetCurrency==="USD"?"USD":"THB"),
+            reviewMonths:Math.max(1,Math.floor(range(raw.reviewMonths,6,60))),
             reviewed:allocationDay(raw.reviewed)?raw.reviewed:"",plans};
     }
     function allocationBucket(symbol,account,entries,classes={}) {
@@ -1213,21 +1221,35 @@ function allocationDateAfter(day, months) {
             cashFx:allocationSum(cashFx),commissions:allocationSum(commissions),
             allocationTotal:allocationSum(Object.values(buckets))};
     }
+    function dcaStockChoice(symbol,portfolio,settings) {
+        if (!dcaTickerOK(symbol) || portfolio.holdings.some(row=>row.symbol===symbol && row.bucket!=="stock")) return false;
+        return allocationBucket(symbol,null,[],settings.classes)==="stock";
+    }
     function allocationPlan(portfolio,settings,budget) {
         const {buckets,stockSymbols,allocationTotal:current}=portfolio;
         const gross=allocationBudgetCents(budget)/100;
-        const etfs=Object.entries(settings.etfs);
-        const stockTarget=settings.rules.stock.target;
-        const required=settings.etfMode==="stock"?100:stockTarget;
-        const validEtfs=!etfs.length || Math.abs(etfs.reduce((sum,[,v])=>sum+v,0)-required)<1e-6;
-        const canCalculate=portfolio.issues.length===0 && ALLOCATION_KEYS.every(key=>buckets[key]!=null) && validEtfs;
-        if(!canCalculate)return {canCalculate,validEtfs};
+        const stocksOnly=settings.dcaScope==="stocks";
+        const chosen=(settings.dcaStocks||[]).filter(symbol=>dcaStockChoice(symbol,portfolio,settings));
+        const custom=chosen.length>0;
+        const useSavedWeights=custom && chosen.every(key=>settings.etfs[key]>0);
+        const etfs=custom?chosen.map(key=>[key,useSavedWeights?settings.etfs[key]:1]):Object.entries(settings.etfs);
+        const required=custom?etfs.reduce((sum,[,weight])=>sum+weight,0):settings.etfMode==="stock"?100:settings.rules.stock.target;
+        const validEtfs=custom || !etfs.length || Math.abs(etfs.reduce((sum,[,v])=>sum+v,0)-required)<1e-6;
+        const known=portfolio.issues.length===0 && ALLOCATION_KEYS.every(key=>buckets[key]!=null);
+        const canCalculate=stocksOnly?custom:known && validEtfs;
+        if(!canCalculate)return {canCalculate,validEtfs,stocksOnly};
         const inputs=ALLOCATION_KEYS.map(key=>({...settings.rules[key],key,value:buckets[key]}));
-        const orders=allocationDca(inputs,gross,current,etfs.length>0);
+        const orders=stocksOnly?ALLOCATION_KEYS.map(key=>({key,buy:0,fee:0,reserved:key==="stock"?gross:0})):
+            allocationDca(inputs,gross,current,etfs.length>0);
         const stockOrder=orders[0];
-        const etfInputs=etfs.map(([key,weight])=>({...settings.rules.stock,key,
-            target:required>0?weight/required*100:0,value:(stockSymbols.get(key)||[]).reduce((sum,p)=>sum+(p.value||0),0)}));
-        const etfOrders=allocationDca(etfInputs,stockOrder.reserved,buckets.stock);
+        const stockValues=etfs.map(([key])=>allocationSum((stockSymbols.get(key)||[]).map(row=>row.value)));
+        const selectedKnown=stockValues.every(value=>value!=null) && portfolio.issues.length===0;
+        const selectedTotal=selectedKnown?stockValues.reduce((sum,value)=>sum+value,0):0;
+        const useEstimates=custom && !selectedKnown;
+        const etfInputs=etfs.map(([key,weight],i)=>({...settings.rules.stock,key,
+            target:required>0?weight/required*100:0,value:useEstimates?0:stockValues[i]}));
+        const etfBase=custom?selectedTotal:buckets.stock;
+        const etfOrders=allocationDca(etfInputs,stockOrder.reserved,etfBase);
         const sumMoney=(list,key)=>list.reduce((sum,r)=>sum+allocationCents(r[key]),0)/100;
         if(etfs.length){
             stockOrder.buy=sumMoney(etfOrders,"buy");
@@ -1235,27 +1257,39 @@ function allocationDateAfter(day, months) {
         }
         const buys=sumMoney(orders,"buy"), fees=sumMoney(orders,"fee");
         const unallocated=Math.max(0,allocationCents(gross)-allocationCents(buys)-allocationCents(fees))/100;
-        const planned=(rows,list,before,added)=>rows.map((item,i)=>{
+        const planned=(rows,list,before,added,hasValues)=>rows.map((item,i)=>{
             const order=list[i];
-            const actual=allocationPct(item.value,before), post=allocationPct(item.value+order.buy,before+added);
-            return {...item,...order,actual,post,drift:post-item.target,budgetPct:allocationPct(order.buy,gross),
-                full:(before+gross)*item.target/100-item.value};
+            const actual=hasValues?allocationPct(item.value,before):null;
+            const post=hasValues?allocationPct(item.value+order.buy,before+added):null;
+            return {...item,...order,actual,post,drift:post==null?null:post-item.target,budgetPct:allocationPct(order.buy,gross),
+                full:hasValues?(before+gross)*item.target/100-item.value:null};
         });
-        return {canCalculate,validEtfs,gross,fees,unallocated,buys,orders:planned(inputs,orders,current,buys),
-            etfOrders:planned(etfInputs,etfOrders,buckets.stock,stockOrder.buy)};
+        return {canCalculate,validEtfs,gross,fees,unallocated,buys,stocksOnly,custom,useSavedWeights,useEstimates,
+            orders:planned(inputs,orders,current,buys,known),
+            etfOrders:planned(etfInputs,etfOrders,etfBase,stockOrder.buy,!useEstimates)};
     }
 
     function PortfolioAllocation({accounts,transactions,payments,settings,setSettings,onBack,onTrade}) {
         const h=React.createElement;
         const today=dkey(new Date());
         const [panel,setPanel]=useState("overview"), [draft,setDraft]=useState(null);
-        const [budget,setBudget]=useState(String(settings.budget||""));
+        const [budgetDraft,setBudgetDraft]=useState(null);
         const [quote,setQuote]=useState({symbol:"",currency:"THB",unit:"unit",value:"",date:today});
         const [planDraft,setPlanDraft]=useState(null), [message,setMessage]=useState("");
         const [scenario,setScenario]=useState("contribution");
+        const [tickerInput,setTickerInput]=useState("");
         const p=useMemo(()=>allocationPortfolio(accounts,transactions,payments,settings,today),[accounts,transactions,payments,settings,today]);
-        const budgetValid=budget==="" || Number.isFinite(Number(budget)) && Number(budget)>=0 && Number(budget)<=1e12;
-        const d=allocationPlan(p,settings,budgetValid?budget:0);
+        const budgetCurrency=settings.budgetCurrency||"THB";
+        const budgetDisplay=settings.budgetDisplayCurrency||budgetCurrency;
+        const fxRate=p.fx?.value;
+        const needsRate=budgetDisplay==="USD" || budgetCurrency==="USD" && settings.budget>0;
+        const budgetTHB=settings.budget*(budgetCurrency==="USD" && settings.budget>0 ? fxRate : 1);
+        const displayAmount=budgetDisplay===budgetCurrency ? settings.budget :
+            budgetDisplay==="USD" ? budgetTHB/fxRate : budgetTHB;
+        const budget=budgetDraft ?? (Number.isFinite(displayAmount) && displayAmount>0 ? String(Number(displayAmount.toFixed(2))) : "");
+        const budgetValid=Number.isFinite(Number(budget)) && Number(budget)>=0 && Number(budget)<=1e12;
+        const budgetReady=budgetValid && (!needsRate||fxRate>0) && Number.isFinite(budgetTHB) && budgetTHB<=1e12;
+        const d=allocationPlan(p,settings,budgetReady?budgetTHB:0);
         const actualKnown=p.issues.length===0 && p.allocationTotal!=null && p.allocationTotal>0;
         const actual=Object.fromEntries(ALLOCATION_KEYS.map(key=>[key,actualKnown?allocationPct(p.buckets[key],p.allocationTotal):null]));
         const colors={stock:"#438981",gold:"#c28d26",btc:"#ce7446"};
@@ -1268,6 +1302,8 @@ function allocationDateAfter(day, months) {
         const pp=n=>n==null?"—":(n>=.005?"+":"")+(Math.abs(n)<.005?0:n).toLocaleString("en-US",{maximumFractionDigits:2})+" จุด";
         const tone=n=>n==null||Math.abs(n)<.005?"":n>0?"pa-good":"pa-bad";
         const cash=(n,c)=>c==="THB"?money(n):c==="USD"?usd.format(n):num.format(n)+" "+c;
+        const budgetMoney=n=>budgetDisplay==="USD"&&fxRate>0?usd.format(n/fxRate):money(n);
+        const orderMoney=(n,bucket)=>bucket==="stock"&&fxRate>0?usd.format(n/fxRate):money(n);
         const day=v=>v?new Date(v+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—";
         const card=(title,...children)=>h("section",{className:"pa-card"},h("h3",null,title),...children);
         const line=(label,value,className="")=>h("div",{className:"pa-line"},h("span",null,label),h("strong",{className},value));
@@ -1279,10 +1315,38 @@ function allocationDateAfter(day, months) {
         const select=(label,value,onChange,options)=>h("label",{className:"pa-field"},h("span",null,label),
             h("select",{value,onChange:e=>onChange(e.target.value)},options.map(([id,name])=>h("option",{key:id,value:id},name))));
         const title=key=>ALLOCATION_LABELS[key]||key;
-        const weightStatus=row=>row.actual>row.target+.005?"เกินเป้า":row.actual<row.target-.005?"ต่ำกว่าเป้า":"ตามเป้า";
+        const weightStatus=row=>row.actual==null?"รอมูลค่าปัจจุบัน":row.actual>row.target+.005?"เกินเป้า":row.actual<row.target-.005?"ต่ำกว่าเป้า":"ตามเป้า";
         const patch=fn=>setSettings(value=>normalizeAllocation(fn(normalizeAllocation(value))));
         const eligible=accounts.filter(a=>a.portfolioEnabled && a.portfolioMode!=="summary" && !a.archived);
         const stockOptions=[...new Set([...p.stockSymbols.keys(),"SCHG","SPMO","AVUV","VXUS","VHT",...Object.keys(settings.etfs)])].sort();
+        const selectedStocks=settings.dcaStocks||[];
+        const dcaOptions=[...new Set([...stockOptions,...selectedStocks])].sort();
+        function addDcaStock(){
+            const ticker=allocationSymbol(tickerInput);
+            if(!dcaStockChoice(ticker,p,settings)){setMessage("กรอกสัญลักษณ์หุ้นหรือ ETF เช่น SCHG");return;}
+            if(!selectedStocks.includes(ticker))patch(s=>({...s,dcaStocks:[...s.dcaStocks,ticker]}));
+            setTickerInput("");setMessage("");
+        }
+        function toggleDcaStock(symbol){
+            setPlanDraft(null);setMessage("");
+            patch(s=>({...s,dcaStocks:s.dcaStocks.includes(symbol)?s.dcaStocks.filter(key=>key!==symbol):[...s.dcaStocks,symbol]}));
+        }
+        function stockSelection(){
+            const setScope=dcaScope=>{patch(s=>({...s,dcaScope}));setScenario("contribution");setPlanDraft(null);setMessage("");};
+            const options=dcaOptions.filter(symbol=>selectedStocks.includes(symbol)||dcaStockChoice(symbol,p,settings));
+            return card("เลือกหุ้นที่จะ DCA",
+                h("div",{className:"pa-actions"},
+                    action("ตามสัดส่วนพอร์ต",()=>setScope("portfolio"),!d.stocksOnly),
+                    action("เฉพาะหุ้นที่เลือก",()=>setScope("stocks"),d.stocksOnly)),
+                note(d.stocksOnly?"ใช้งบเดือนนี้กับหุ้นหรือ ETF ที่เลือกเท่านั้น":"แบ่งงบตามเป้าพอร์ต แล้วใช้เงินส่วนหุ้นกับตัวที่เลือก"),
+                h("div",{className:"pa-actions",role:"group","aria-label":"หุ้นและ ETF ที่จะ DCA"},...options.map(symbol=>
+                    h("button",{key:symbol,type:"button","aria-pressed":selectedStocks.includes(symbol),onClick:()=>toggleDcaStock(symbol)},symbol))),
+                h("form",{className:"pa-ticker",onSubmit:e=>{e.preventDefault();addDcaStock();}},
+                    h("input",{type:"text",placeholder:"เช่น VOO",value:tickerInput,maxLength:24,autoCapitalize:"characters",
+                        "aria-label":"สัญลักษณ์หุ้นหรือ ETF เพิ่มเติม",onChange:e=>setTickerInput(e.target.value)}),
+                    h("button",{type:"submit",disabled:!tickerInput.trim()},"เพิ่มตัวเลือก")),
+                !d.stocksOnly&&!selectedStocks.length&&note("ถ้ายังไม่ได้เลือก ระบบจะใช้การตั้งค่า ETF เดิม"));
+        }
         const openPanel=next=>{setPanel(next);setMessage("");setPlanDraft(null);if(next==="settings")setDraft(normalizeAllocation(settings));};
         const quoteName=q=>q?.source==="manual"?"กรอกเอง":"ราคาจากพอร์ตเดิม";
         function editQuote(symbol){
@@ -1335,7 +1399,7 @@ function allocationDateAfter(day, months) {
             const status=allocationRebalanceStatus(actual[key],settings.rules[key]);
             return status==="normal"?[]:[{key,status}];
         }):[];
-        const assetKeys=[...new Set([...p.holdings.map(row=>row.symbol),...Object.keys(settings.quotes),...Object.keys(settings.etfs),"XAU","BTC"])].sort();
+        const assetKeys=[...new Set([...p.holdings.map(row=>row.symbol),...Object.keys(settings.quotes),...Object.keys(settings.etfs),...selectedStocks,"XAU","BTC"])].sort();
         const selectedSymbol=allocationSymbol(quote.symbol);
         const selectedQuote=selectedSymbol==="FX"?p.fx:p.quotes.get("ASSET:"+selectedSymbol);
         const savedManual=selectedSymbol==="FX"?settings.fx:settings.quotes[selectedSymbol];
@@ -1389,44 +1453,66 @@ function allocationDateAfter(day, months) {
         }
         function suggested(row,bucket,symbol=""){
             return h("div",{key:row.key,className:"pa-order"},
-                line(title(row.key),money(row.buy)),
+                line(title(row.key),orderMoney(row.buy,bucket)),
                 note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
-                line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift)),
-                symbol && line("เทียบเป็น USD",p.fx?usd.format(row.buy/p.fx.value):"รอเรท"),
+                row.actual!=null&&line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift)),
+                bucket==="stock" && fxRate>0 && line("ประมาณ (THB)",money(row.buy)),
                 row.buy>0 && action("เก็บเป็นแผนซื้อ",()=>planBuy(bucket,symbol,row.buy)));
         }
         function smart(){
             return h(React.Fragment,null,
                 card("งบลงทุนเดือนนี้",
-                    field("งบพร้อมลงทุน (THB)",budget,value=>{
-                        setBudget(value);setMessage("");if(value===""||Number(value)>=0&&Number(value)<=1e12)patch(s=>({...s,budget:allocationBudgetCents(value)/100}));
-                    },{step:0.01}),
+                    h("div",{className:"pa-actions",role:"group","aria-label":"สกุลเงินงบ DCA"},
+                        ...["THB","USD"].map(currency=>h("button",{key:currency,type:"button","aria-pressed":budgetDisplay===currency,
+                            onClick:()=>{
+                                if(currency===budgetDisplay)return;
+                                setBudgetDraft(null);setPlanDraft(null);setMessage("");
+                                patch(s=>({...s,budgetDisplayCurrency:currency}));
+                            }},currency))),
+                    field("งบพร้อมลงทุน ("+budgetDisplay+")",budget,value=>{
+                        setBudgetDraft(value);setPlanDraft(null);setMessage("");
+                        if(Number.isFinite(Number(value)) && Number(value)>=0 && Number(value)<=1e12)
+                            patch(s=>({...s,budget:allocationBudgetCents(value)/100,budgetCurrency:budgetDisplay,budgetDisplayCurrency:budgetDisplay}));
+                    },{step:0.01,inputMode:"decimal"}),
+                    fxRate>0&&budgetReady&&line(budgetDisplay==="USD"?"เทียบเป็นบาท":"เทียบเป็นดอลลาร์",budgetDisplay==="USD"?money(budgetTHB):usd.format(budgetTHB/fxRate)),
+                    fxRate>0&&note("1 USD = "+num.format(fxRate)+" THB · "+day(p.fx.date)+(p.isStale(p.fx)?" · เรทค้าง":"")),
+                    needsRate&&!(fxRate>0)&&h("div",{className:"pa-actions"},
+                        note("ต้องมีเรท USD/THB เพื่อคำนวณงบ USD"),
+                        action("กรอกเรท USD/THB",()=>{openPanel("prices");editQuote("FX");})),
                     line("มูลค่าที่ใช้จัดสรร",p.issues.length?"—":money(p.allocationTotal)),
                     info("เงินที่โอนเข้าโบรกเกอร์แล้ว","กรอกเฉพาะเงินที่พร้อมซื้อรอบนี้ได้เลย เงินสดไม่อยู่ในมูลค่าสินทรัพย์ที่ใช้จัดสรร งบนี้จึงถูกนับครั้งเดียว"),
-                    !budgetValid&&note("ตรวจจำนวนเงิน DCA อีกครั้ง")),
+                    (!budgetValid||budgetTHB>1e12)&&note("ตรวจจำนวนเงิน DCA อีกครั้ง")),
+                stockSelection(),
+                d.stocksOnly&&!d.canCalculate?card("ยังไม่มีหุ้นสำหรับ DCA",note("เลือกหุ้นหรือ ETF อย่างน้อย 1 ตัว")):
                 !d.canCalculate?card("รอข้อมูล",note(!d.validEtfs?"ตรวจผลรวมสัดส่วน ETF ในตั้งค่า":[...p.issues,...p.missing].join(" · ")),action(!d.validEtfs?"ตั้งค่า":"ไปที่ราคาและเรท",()=>openPanel(!d.validEtfs?"settings":"prices"))):
-                    budgetValid&&h(React.Fragment,null,
-                        card("เปรียบเทียบวิธีปรับพอร์ต",
-                            h("div",{className:"pa-actions"},action("ใช้เงินใหม่",()=>setScenario("contribution"),scenario==="contribution"),action("ซื้อและขาย",()=>setScenario("full"),scenario==="full")),
+                    budgetReady&&h(React.Fragment,null,
+                        card(d.stocksOnly?"ยอดแนะนำซื้อหุ้น":"เปรียบเทียบวิธีปรับพอร์ต",
+                            !d.stocksOnly&&h("div",{className:"pa-actions"},action("ใช้เงินใหม่",()=>setScenario("contribution"),scenario==="contribution"),action("ซื้อและขาย",()=>setScenario("full"),scenario==="full")),
                             p.stale.length>0&&note("ใช้ราคาค้างสำหรับประมาณการ · "+p.stale.join(" · ")),
-                            scenario==="contribution"?h(React.Fragment,null,
-                                line("แนะนำซื้อรวม",money(d.buys)),line("ค่าธรรมเนียมประมาณการ",money(d.fees)),
-                                line("เงินยังไม่จัดสรร",money(d.unallocated)),
+                            (d.stocksOnly||scenario==="contribution")?h(React.Fragment,null,
+                                line("แนะนำซื้อรวม",budgetMoney(d.buys)),line("ค่าธรรมเนียมประมาณการ",budgetMoney(d.fees)),
+                                line("เงินยังไม่จัดสรร",budgetMoney(d.unallocated)),
                                 info("วิธีคำนวณ","กระจายงบตามส่วนที่ขาดจากเป้าหลังเติมเงิน พักซื้อกลุ่มที่เกินเป้าปัจจุบัน ยอดที่ต่ำกว่าขั้นต่ำหรือปัดลงจะแสดงเป็นเงินเหลือ"),
-                                ...d.orders.map(row=>row.key==="stock"&&d.etfOrders.length?h("div",{key:row.key,className:"pa-order"},
-                                    line(title(row.key),money(row.buy)),note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
+                                d.custom&&note(d.useSavedWeights?"ใช้น้ำหนักเป้าหมายเดิมเฉพาะตัวที่เลือก":"ใช้เป้าหมายเท่ากันสำหรับตัวที่เลือก"),
+                                d.useEstimates&&note("มูลค่าปัจจุบันยังไม่ครบ รอบนี้แบ่งงบตามน้ำหนักเป้าหมาย"),
+                                d.stocksOnly?h(React.Fragment,null,
+                                    ...d.etfOrders.map(row=>suggested(row,"stock",row.key)),
+                                    h("details",null,h("summary",null,"สัดส่วนพอร์ตรวมหลังซื้อ"),
+                                        ...d.orders.map(row=>h("div",{key:row.key},line(title(row.key),pct(row.actual)+" → "+pct(row.post)))))):
+                                h(React.Fragment,null,...d.orders.map(row=>row.key==="stock"&&d.etfOrders.length?h("div",{key:row.key,className:"pa-order"},
+                                    line(title(row.key),orderMoney(row.buy,row.key)),note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
                                     line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift))):
                                     suggested(row,row.key,row.key==="btc"?"BTC":row.key==="gold"?"XAU":"")),
-                                d.etfOrders.length>0&&h("details",null,h("summary",null,"แผนซื้อ ETF รายตัว"),
-                                    note("ใช้เฉพาะงบที่จัดให้กลุ่มหุ้น · สัดส่วนเทียบภายในกลุ่ม"),
-                                    ...d.etfOrders.map(row=>suggested(row,"stock",row.key)))):h(React.Fragment,null,
+                                d.etfOrders.length>0&&h("details",{open:d.custom||undefined},h("summary",null,"แผนซื้อหุ้น / ETF รายตัว"),
+                                    note(d.custom?"สัดส่วนเทียบเฉพาะตัวที่เลือก":"ใช้เฉพาะงบที่จัดให้กลุ่มหุ้น · สัดส่วนเทียบภายในกลุ่ม"),
+                                    ...d.etfOrders.map(row=>suggested(row,"stock",row.key))))):h(React.Fragment,null,
                                 note("จำลองก่อนค่าธรรมเนียม Spread และภาษี"),
                                 ...d.orders.map(row=>h("div",{key:row.key,className:"pa-order"},
                                     line(title(row.key),Math.abs(row.full)<.005?"—":(row.full>0?"ซื้อ ":"ขาย ")+money(Math.abs(row.full))),
                                     line("จริง "+pct(row.actual)+" → เป้า "+pct(row.target),"เหลือ 0 จุด"))),
                                 info("การขาย","หน้านี้คำนวณเฉพาะยอดจำลอง การขายจริงบันทึกจากบัญชีลงทุนเดิม")))),
                 planDraft&&card("Suggested Order",
-                    line((planDraft.symbol||title(planDraft.bucket)),money(planDraft.amount)),
+                    line((planDraft.symbol||title(planDraft.bucket)),orderMoney(planDraft.amount,planDraft.bucket)),
                     select("บัญชีที่จะซื้อ",planDraft.accountId,accountId=>setPlanDraft({...planDraft,accountId}),[["","เลือกบัญชี"],...eligible.map(a=>[a.id,accountLabel(a,accounts)])]),
                     !eligible.length&&note("เปิดพอร์ตแบบรายสินทรัพย์ในบัญชีที่จะใช้ซื้อ"),
                     h("div",{className:"pa-actions"},action("บันทึกแผน",savePlan,true,!planDraft.accountId),action("ยกเลิก",()=>setPlanDraft(null)))),
