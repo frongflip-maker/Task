@@ -406,6 +406,9 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 body,#boot,#err{background:#F5F4ED;color:#202F2E}.app-shell{font-variant-numeric:tabular-nums}
 .si-nav{display:flex;gap:4px;padding:4px;border:1px solid #d5dad0;background:#eceee6;border-radius:15px}.si-nav button{flex:1;min-height:44px;border-radius:11px;font-size:13px;font-weight:700;color:#455753}.si-nav button[aria-current=page]{background:#22645c;color:white}
 .si-tools{display:flex;gap:8px;flex-wrap:wrap}.si-tools button,.si-link{background:#eceee6;color:#225b53;border-radius:10px;padding:8px 12px;min-height:40px;font-size:13px;font-weight:650}
+.calendar-event-actions{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px}
+.calendar-event-actions button{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;min-height:44px;padding:0;border-radius:12px}
+.calendar-event-actions button svg{width:22px;height:22px;flex:0 0 22px;stroke-width:2.25}
 .si-fold{border-block:1px solid #d5dad0;padding:6px 0}.si-fold>summary{padding:10px 4px;cursor:pointer;font-weight:700}.si-fold[open]>:not(summary){margin-top:8px}
 .si-fx{overflow-x:auto}.si-fx table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}.si-fx td,.si-fx th{padding:7px 3px;text-align:right;white-space:nowrap;border-bottom:1px solid #d5dad0}.si-fx th:first-child{text-align:left}.si-fx thead{color:#536760}
 .si-queue{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid #d5dad0}.si-queue strong{display:block}.si-queue small{color:#536760}
@@ -441,7 +444,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-visible-transaction-date-v47";
+window.__TASKROUTINE_BUILD__="2026-11-05-account-list-scroll-v49";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -5157,12 +5160,12 @@ try {
                             e.location && React.createElement("button", { onClick: () => openMaps(e.location), className: "inline-flex items-center gap-0.5 text-[10px] font-semibold", style: { color: T.blue } },
                                 React.createElement(MapPin, { size: 11 }),
                                 e.location))),
-                    React.createElement("details",{className:"shrink-0"},React.createElement("summary",{className:"si-link","aria-label":"ตัวเลือกของ "+e.title},"ตัวเลือก"),React.createElement("div",{className:"si-tools"},
-                        e.startTime && React.createElement("button", { onClick: () => exportEventICS(e), "aria-label": e.icsAdded ? "ส่งออกปฏิทินแล้ว" : "ส่งออกไปยังปฏิทิน", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.green, background: e.icsAdded ? hex(T.green, .22) : T.surf2, border: `1px solid ${e.icsAdded ? T.green : T.border}` } }, e.icsAdded ? React.createElement(Check, { size: 13 }) : React.createElement(CalendarPlus, { size: 15 })),
-                        !e.bookingId && React.createElement("button", { onClick: () => setEditEv(e), "aria-label": e.bookingId ? "แก้ไขที่ Studio" : "แก้ไข event", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: e.bookingId ? T.purple : T.blue } },
-                            React.createElement(Pencil, { size: 14 })),
-                        e.bookingId ? React.createElement("button", { onClick: () => props.openStudioBooking(e.bookingId), "aria-label": "จัดการการจองที่ Studio", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.purple } }, React.createElement(Music, { size: 14 })) : confirmDel === e.id ? (React.createElement("button", { onClick: () => { delEvent(e.id); setConfirmDel(null); }, className: "text-[10px] font-bold px-2 py-1 rounded-lg", style: { background: T.red, color: "#fff" } }, "ลบ?")) : (React.createElement("button", { onClick: () => setConfirmDel(e.id), "aria-label": "ลบ event", className: "w-7 h-7 rounded-lg flex items-center justify-center", style: { color: T.muted } },
-                            React.createElement(Trash2, { size: 14 }))))))));
+                    React.createElement("details",{className:"shrink-0"},React.createElement("summary",{className:"si-link","aria-label":"ตัวเลือกของ "+e.title},"ตัวเลือก"),React.createElement("div",{className:"si-tools calendar-event-actions"},
+                        e.startTime && React.createElement("button", { onClick: () => exportEventICS(e), "aria-label": e.icsAdded ? "ส่งออกปฏิทินแล้ว" : "ส่งออกไปยังปฏิทิน", title:"ส่งออกปฏิทิน", style: { color: T.green, background: e.icsAdded ? hex(T.green, .22) : T.surf2, border: `1px solid ${e.icsAdded ? T.green : T.border}` } }, e.icsAdded ? React.createElement(Check, { size: 22 }) : React.createElement(CalendarPlus, { size: 22 })),
+                        !e.bookingId && React.createElement("button", { onClick: () => setEditEv(e), "aria-label": "แก้ไข event", title:"แก้ไข", style: { color: T.blue } },
+                            React.createElement(Pencil, { size: 22 })),
+                        e.bookingId ? React.createElement("button", { onClick: () => props.openStudioBooking(e.bookingId), "aria-label": "จัดการการจองที่ Studio", title:"จัดการการจอง", style: { color: T.purple } }, React.createElement(Music, { size: 22 })) : confirmDel === e.id ? (React.createElement("button", { onClick: () => { delEvent(e.id); setConfirmDel(null); }, className: "text-xs font-bold", style: { background: T.red, color: "#fff" } }, "ลบ?")) : (React.createElement("button", { onClick: () => setConfirmDel(e.id), "aria-label": "ลบ event", title:"ลบ", style: { color: T.red, background:hex(T.red,.08) } },
+                            React.createElement(Trash2, { size: 22 }))))))));
         };
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
@@ -9616,7 +9619,6 @@ try {
         });
         const draggable = groups.some(group => group.rows.length > 1);
         return React.createElement("div", null,
-            draggable && React.createElement("div", { style: { fontSize: 10, color: T.muted, padding: "2px 0 5px" } }, "แตะดูรายละเอียด · กดค้างที่รายการเพื่อลากเรียงในวันเดียวกัน"),
             groups.map(group => React.createElement(StatementDayRows, { key: group.date, date: group.date, rows: group.rows, accounts, onOpen, onReorder })));
     }
     function portfolioTimeline(accounts,transactions,payments) {
@@ -10606,6 +10608,7 @@ try {
             })(),
             (sub === "summary" || (sub === "transactions" && transactionSection === "all")) && (React.createElement(React.Fragment, null,
                 sub === "summary" && budgetView === "accounts" && (() => {
+                    const hasAccountFamilies = accounts.some(a => a.parentAccountId);
                     const balanceOf = accId => nativeAccountBalance(accounts.find(a => a.id === accId), transactions, payments);
                     const totals = accounts.reduce((groups, a) => { const key = accountCurrency(a); groups[key] = (groups[key] || 0) + balanceOf(a.id); return groups; }, {});
                     const totalAll = totals.THB || 0;
@@ -10624,13 +10627,13 @@ try {
                                         `${accounts.filter(a => !accountParent(a, accounts)).length} หลัก · ${accounts.filter(a => accountParent(a, accounts)).length} ย่อย`),
                                     React.createElement(ChevronDown, { size: 18, style: { transform: showAccounts ? "rotate(180deg)" : "none", transition: "transform .2s" } }))),
                             showAccounts && (React.createElement("div", { className: "px-4 pb-4", style: { borderTop: `1px solid ${T.border}` } },
-                                accounts.length > 1 && React.createElement("div", { className: "text-[11px] pt-2.5", style: { color: accountDnd.dragging ? T.blue : T.muted } }, accounts.some(a => a.parentAccountId) ? "บัญชีย่อยแสดงใต้บัญชีหลัก · ยอดแต่ละบัญชีคิดแยกกัน" : accountDnd.dragging ? "กำลังลาก — ปล่อยเพื่อบันทึกลำดับ" : "กดค้างที่บัญชีแล้วลากเพื่อจัดลำดับ"),
+                                accounts.length > 1 && React.createElement("div", { className: "text-[11px] pt-2.5", style: { color: accountDnd.dragging ? T.blue : T.muted } }, hasAccountFamilies ? "บัญชีย่อยแสดงใต้บัญชีหลัก · ยอดแต่ละบัญชีคิดแยกกัน" : accountDnd.dragging ? "กำลังลาก — ปล่อยเพื่อบันทึกลำดับ" : "กดค้างที่จุดลากเพื่อจัดลำดับ"),
                                 accounts.length === 0 ? React.createElement(Empty, { text: "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E1A\u0E31\u0E0D\u0E0A\u0E35 \u2014 \u0E40\u0E1E\u0E34\u0E48\u0E21\u0E1A\u0E31\u0E0D\u0E0A\u0E35\u0E41\u0E23\u0E01\u0E02\u0E2D\u0E07\u0E04\u0E38\u0E13" }) : (React.createElement("div", { className: "mt-1" }, orderedAccounts(accounts).map(a => {
                                     const i = accounts.findIndex(item => item.id === a.id);
                                     if (accountParent(a,accounts) && !openFamilies[a.parentAccountId]) return null;
                                     const bal = balanceOf(a.id);
-                                    return (React.createElement("div", { key: a.id, ...(accounts.some(item => item.parentAccountId) ? {} : accountDnd.itemProps(i)), className: "flex items-center gap-2.5 py-3", style: { ...accountDnd.itemStyle(i), marginLeft: accountParent(a, accounts) ? 18 : 0, paddingLeft: accountParent(a, accounts) ? 10 : 0, borderLeft: accountParent(a, accounts) ? `2px solid ${T.border}` : "none", background: T.surf, borderTop: i > 0 ? `1px solid ${T.border}` : "none" } },
-                                        !accounts.some(item => item.parentAccountId) && React.createElement(GripVertical, { size: 18, style: { color: accountDnd.activeIndex === i || accountDnd.armedIndex === i ? T.blue : T.muted, flexShrink: 0 } }),
+                                    return (React.createElement("div", { key: a.id, "data-account-row":a.id, ...(hasAccountFamilies ? {} : accountDnd.rowProps(i)), className: "flex items-center gap-2.5 py-3", style: { ...accountDnd.itemStyle(i), touchAction:"pan-y",cursor:"default", marginLeft: accountParent(a, accounts) ? 18 : 0, paddingLeft: accountParent(a, accounts) ? 10 : 0, borderLeft: accountParent(a, accounts) ? `2px solid ${T.border}` : "none", background: T.surf, borderTop: i > 0 ? `1px solid ${T.border}` : "none" } },
+                                        !hasAccountFamilies && accounts.length>1 && React.createElement("span",{...accountDnd.handleProps(i),"aria-label":"ลากเรียงบัญชี "+a.name,title:"กดค้างเพื่อจัดลำดับ",className:"shrink-0 flex items-center justify-center",style:{touchAction:"none",cursor:accountDnd.activeIndex===i?"grabbing":"grab",width:28,minHeight:40,color:accountDnd.activeIndex===i||accountDnd.armedIndex===i?T.blue:T.muted}},React.createElement(GripVertical, { size: 18 })),
                                         React.createElement("div", { className: "w-9 h-9 rounded-xl flex items-center justify-center shrink-0", style: { background: hex(T.purple, .16) } },
                                             React.createElement(Wallet, { size: 15, style: { color: T.purple } })),
                                         React.createElement("div", { className: "flex-1 min-w-0" },
