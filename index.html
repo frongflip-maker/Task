@@ -479,6 +479,33 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 .pa-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .pa-ticker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
 .pa-ticker input{width:100%;min-width:0;padding:7px 9px;border:1px solid var(--pa-border);border-radius:10px;background:var(--pa-bg);color:var(--pa-fg);font-size:16px}
+.pa-calculator{gap:16px;padding:16px}
+.pa-calculator>header h3{font-size:clamp(17px,4.9vw,23px);line-height:1.2;margin-bottom:5px}
+.pa-calc-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.95fr);gap:8px;align-items:center}
+.pa-calc-label{display:flex;align-items:center;gap:9px;min-width:0}
+.pa-calc-label>div{min-width:0}
+.pa-calc-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.pa-calc-side{display:grid;gap:3px;min-width:0;text-align:right;font-variant-numeric:tabular-nums}
+.pa-calc-input{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;min-width:0;border:1px solid var(--pa-border);border-radius:12px}
+.pa-calc-input :is(input,select){min-width:0;min-height:42px;border:0;background:transparent;color:var(--pa-fg);font-size:16px}
+.pa-calc-input input{width:100%;padding:7px 8px;text-align:right;box-shadow:none}
+.pa-calc-input select{padding-inline:5px;max-width:64px}
+.pa-calc-input .pa-field{display:block}
+.pa-calc-input .pa-field>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pa-calc-side .pa-calc-reset{font-size:11px;padding:4px 2px;min-height:28px;background:none;color:var(--pa-sub)}
+.pa-calc-equivalent{display:block;font-size:12px;color:var(--pa-sub);text-align:right;overflow-wrap:anywhere}
+.pa-calc-total{display:grid;gap:3px;padding:12px;border-radius:14px;background:var(--pa-soft)}
+.pa-calc-total strong{font-size:clamp(24px,6vw,35px);line-height:1.15;overflow-wrap:anywhere}
+.pa-calc-total .pa-calc-equivalent{text-align:left}
+.pa-calc-section{display:grid;gap:12px}
+.pa-calc-section+.pa-calc-section,.pa-calc-budget,.pa-calc-footer{border-top:1px solid var(--pa-border);padding-top:12px}
+.pa-calc-chart{display:grid;gap:4px}
+.pa-calc-order{display:grid;gap:2px}
+.pa-calc-order .pa-note{font-size:12px}
+.pa-calc-order .pa-calc-side>strong{font-size:clamp(15px,4.5vw,20px);overflow-wrap:anywhere}
+.pa-calc-save{display:grid;gap:4px;padding:4px 0}.pa-calc-save button{justify-self:start}
+.pa-calc-footer{display:grid;gap:4px}
+@media(max-width:360px){.pa-calculator{padding:12px}.pa-calc-row{grid-template-columns:minmax(0,1fr) minmax(128px,.95fr);gap:6px}.pa-calc-label{gap:6px}}
 .pa-etf{display:grid;grid-template-columns:1fr auto;align-items:end;gap:6px}
 @media (max-width:360px){.pa-card,.pa-head{padding:10px}.pa-root{font-size:13px}.pa-donut{width:76px;height:76px}.pa-nav button{padding:5px 3px}}
 @media (prefers-color-scheme:dark){.pa-root{color-scheme:dark;--pa-bg:#192423;--pa-fg:#e9f2ef;--pa-sub:#bbcdc7;--pa-soft:#263d3a;--pa-border:#3d5752;--pa-brand:#81c9bd;--pa-action:#122e29;--pa-green:#89d4a8;--pa-red:#f2a399;--pa-alert:#3c3320;--pa-alert-text:#f8db91}.pa-root .pa-field :is(input,select){color-scheme:dark!important}}
@@ -490,7 +517,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-smart-dca-budget-currency-v53";
+window.__TASKROUTINE_BUILD__="2026-11-05-smart-dca-broker-layout-v54";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1106,7 +1133,19 @@ function allocationDateAfter(day, months) {
         const classes=Object.fromEntries(Object.entries(raw.classes||{}).filter(([key,v])=>allocationSymbolOK(key)&&[...ALLOCATION_KEYS,"outside"].includes(v)));
         const plans=(Array.isArray(raw.plans)?raw.plans:[]).filter(p=>p && typeof p.id==="string" && typeof p.accountId==="string" &&
             ALLOCATION_KEYS.includes(p.bucket) && (!p.symbol || allocationSymbolOK(p.symbol)) && allocationCents(p.amount)>0 && allocationDay(p.date));
-        return {rules,quotes,classes,fx:allocationQuote(raw.fx,true),etfs,etfMode:raw.etfMode==="portfolio"?"portfolio":"stock",
+        const dcaBrokers=[];
+        const brokerKeys=new Set();
+        for(const row of Array.isArray(raw.dcaBrokers)?raw.dcaBrokers:[]){
+            if(!row||!ALLOCATION_KEYS.includes(row.bucket)||typeof row.accountId!=="string"||!["THB","USD"].includes(row.currency))continue;
+            const key=dcaBrokerKey(row.bucket,row.accountId);
+            if(brokerKeys.has(key))continue;
+            brokerKeys.add(key);
+            dcaBrokers.push({bucket:row.bucket,accountId:row.accountId,currency:row.currency,
+                amount:range(row.amount,null,1e12),amountCurrency:row.amountCurrency==="USD"?"USD":"THB"});
+        }
+        const dcaDestinations=Object.fromEntries(ALLOCATION_KEYS.filter(key=>typeof raw.dcaDestinations?.[key]==="string")
+            .map(key=>[key,raw.dcaDestinations[key]]));
+        return {rules,quotes,classes,dcaBrokers,dcaDestinations,fx:allocationQuote(raw.fx,true),etfs,etfMode:raw.etfMode==="portfolio"?"portfolio":"stock",
             dcaScope:raw.dcaScope==="stocks"?"stocks":"portfolio",
             dcaStocks:[...new Set((Array.isArray(raw.dcaStocks)?raw.dcaStocks:[]).map(allocationSymbol).filter(dcaTickerOK))],
             budget:range(raw.budget,0,1e12),
@@ -1194,7 +1233,7 @@ function allocationDateAfter(day, months) {
                 if(bucket==="unclassified")issues.push(symbol+" · รอระบุกลุ่ม");
                 if(isStale(quote))stale.push(symbol);
                 if(needsFx && isStale(fx))stale.push("USD/THB");
-                holdings.push({symbol,bucket,quote,value,units:p.units,account:a,cost:historic,
+                holdings.push({symbol,bucket,quote,value,quotedValue:unitPrice==null?null:p.units*unitPrice,units:p.units,account:a,cost:historic,
                     pricePL:value!=null && nativeAtMarket!=null?value-nativeAtMarket:null,
                     fxPL:currency==="THB"?0:nativeAtMarket!=null && historic!=null?nativeAtMarket-historic:null});
             }
@@ -1221,6 +1260,55 @@ function allocationDateAfter(day, months) {
             cashFx:allocationSum(cashFx),commissions:allocationSum(commissions),
             allocationTotal:allocationSum(Object.values(buckets))};
     }
+    const dcaBrokerKey=(bucket,accountId)=>JSON.stringify([bucket,accountId]);
+    function dcaBrokerPortfolio(portfolio,accounts,settings) {
+        const {holdings,fx}=portfolio, groups=new globalThis.Map(), accountMap=new globalThis.Map(accounts.map(account=>[account.id,account]));
+        const rows=[], destinations={};
+        const convert=(n,from,to)=>n==null?null:from===to||n===0?n:
+            fx?.value>0 ? (from==="USD"?n*fx.value:n/fx.value) : null;
+        const defaultCurrency=(bucket,account)=>account?accountCurrency(account):bucket==="stock"?"USD":"THB";
+        const preferredAccount=(bucket,account)=>{
+            const name=accountLabel(account,accounts);
+            return bucket==="stock"?accountCurrency(account)==="USD" && /dime|webull/i.test(name):
+                bucket==="gold"?/gold|ทอง/i.test(name):/binance/i.test(name);
+        };
+        const brokerage=accounts.filter(a=>!a.archived&&(a.portfolioEnabled||["broker","investment"].includes(a.accountType)));
+        for(const holding of holdings){
+            const key=dcaBrokerKey(holding.bucket,holding.account.id);
+            if(!groups.has(key))groups.set(key,[]);
+            groups.get(key).push(holding);
+        }
+        for(const bucket of ALLOCATION_KEYS){
+            const prefs=settings.dcaBrokers.filter(row=>row.bucket===bucket && (!row.accountId||accountMap.has(row.accountId)));
+            const bucketRows=new globalThis.Map();
+            for(const holding of holdings.filter(row=>row.bucket===bucket))bucketRows.set(holding.account.id,null);
+            for(const pref of prefs)bucketRows.set(pref.accountId,pref);
+            if(bucketRows.size===0)bucketRows.set(brokerage.find(a=>preferredAccount(bucket,a))?.id||"",null);
+            for(const [accountId,pref] of bucketRows){
+                const account=accountMap.get(accountId), key=dcaBrokerKey(bucket,accountId);
+                const source=groups.get(key)||[];
+                const currency=pref?.currency||defaultCurrency(bucket,account);
+                const manual=pref?.amount!=null;
+                const auto=unit=>allocationSum(source.map(item=>item.quote
+                    ? convert(item.quotedValue,item.quote.currency,unit) : null));
+                const amountIn=unit=>manual?convert(pref.amount,pref.amountCurrency,unit):auto(unit);
+                const other=currency==="USD"?"THB":"USD";
+                rows.push({key,bucket,accountId,account,currency,other,manual,
+                    label:account?accountLabel(account,accounts):({stock:"Dime USD",gold:"Dime! Gold",btc:"Binance TH"})[bucket],
+                    amount:amountIn(currency),equivalent:amountIn(other),value:amountIn("THB"),
+                    needsRate:!fx&&amountIn("THB")==null&&((manual&&pref.amountCurrency==="USD")||source.some(item=>item.quote?.currency==="USD"))});
+            }
+            const choices=rows.filter(row=>row.bucket===bucket);
+            destinations[bucket]=choices.find(row=>row.accountId===settings.dcaDestinations[bucket])
+                || choices.find(row=>row.account&&preferredAccount(bucket,row.account)) || choices[0];
+        }
+        const buckets=Object.fromEntries(ALLOCATION_KEYS.map(bucket=>[bucket,allocationSum(rows.filter(row=>row.bucket===bucket).map(row=>row.value))]));
+        const manualStock=rows.some(row=>row.bucket==="stock"&&row.manual);
+        const manualAll=ALLOCATION_KEYS.every(bucket=>rows.some(row=>row.bucket===bucket&&row.manual))&&rows.every(row=>row.value!=null);
+        return {rows,destinations,convert,manualStock,manualAll,buckets,allocationTotal:allocationSum(Object.values(buckets)),
+            issues:manualAll?[]:portfolio.issues};
+    }
+
     function dcaStockChoice(symbol,portfolio,settings) {
         if (!dcaTickerOK(symbol) || portfolio.holdings.some(row=>row.symbol===symbol && row.bucket!=="stock")) return false;
         return allocationBucket(symbol,null,[],settings.classes)==="stock";
@@ -1243,12 +1331,12 @@ function allocationDateAfter(day, months) {
             allocationDca(inputs,gross,current,etfs.length>0);
         const stockOrder=orders[0];
         const stockValues=etfs.map(([key])=>allocationSum((stockSymbols.get(key)||[]).map(row=>row.value)));
-        const selectedKnown=stockValues.every(value=>value!=null) && portfolio.issues.length===0;
+        const selectedKnown=stockValues.every(value=>value!=null) && portfolio.issues.length===0 && !portfolio.manualStock;
         const selectedTotal=selectedKnown?stockValues.reduce((sum,value)=>sum+value,0):0;
-        const useEstimates=custom && !selectedKnown;
+        const useEstimates=etfs.length>0 && (custom||portfolio.manualStock) && !selectedKnown;
         const etfInputs=etfs.map(([key,weight],i)=>({...settings.rules.stock,key,
             target:required>0?weight/required*100:0,value:useEstimates?0:stockValues[i]}));
-        const etfBase=custom?selectedTotal:buckets.stock;
+        const etfBase=useEstimates?0:custom?selectedTotal:buckets.stock;
         const etfOrders=allocationDca(etfInputs,stockOrder.reserved,etfBase);
         const sumMoney=(list,key)=>list.reduce((sum,r)=>sum+allocationCents(r[key]),0)/100;
         if(etfs.length){
@@ -1276,7 +1364,7 @@ function allocationDateAfter(day, months) {
         const [budgetDraft,setBudgetDraft]=useState(null);
         const [quote,setQuote]=useState({symbol:"",currency:"THB",unit:"unit",value:"",date:today});
         const [planDraft,setPlanDraft]=useState(null), [message,setMessage]=useState("");
-        const [scenario,setScenario]=useState("contribution");
+        const [brokerDrafts,setBrokerDrafts]=useState({});
         const [tickerInput,setTickerInput]=useState("");
         const p=useMemo(()=>allocationPortfolio(accounts,transactions,payments,settings,today),[accounts,transactions,payments,settings,today]);
         const budgetCurrency=settings.budgetCurrency||"THB";
@@ -1289,10 +1377,14 @@ function allocationDateAfter(day, months) {
         const budget=budgetDraft ?? (Number.isFinite(displayAmount) && displayAmount>0 ? String(Number(displayAmount.toFixed(2))) : "");
         const budgetValid=Number.isFinite(Number(budget)) && Number(budget)>=0 && Number(budget)<=1e12;
         const budgetReady=budgetValid && (!needsRate||fxRate>0) && Number.isFinite(budgetTHB) && budgetTHB<=1e12;
-        const d=allocationPlan(p,settings,budgetReady?budgetTHB:0);
+        const brokerModel=dcaBrokerPortfolio(p,accounts,settings);
+        const validAmount=value=>Number.isFinite(Number(value)) && Number(value)>=0 && Number(value)<=1e12;
+        const invalidBrokerInput=Object.values(brokerDrafts).some(value=>!validAmount(value));
+        const dcaGross=budgetReady?allocationBudgetCents(budgetTHB)/100:0;
+        const d=allocationPlan({...p,...brokerModel},settings,dcaGross);
         const actualKnown=p.issues.length===0 && p.allocationTotal!=null && p.allocationTotal>0;
         const actual=Object.fromEntries(ALLOCATION_KEYS.map(key=>[key,actualKnown?allocationPct(p.buckets[key],p.allocationTotal):null]));
-        const colors={stock:"#438981",gold:"#c28d26",btc:"#ce7446"};
+        const colors={stock:"#3b5fd7",gold:"#bb9028",btc:"#df883d"};
         const baht=new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB"});
         const usd=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"});
         const num=new Intl.NumberFormat("en-US",{maximumFractionDigits:12});
@@ -1303,7 +1395,16 @@ function allocationDateAfter(day, months) {
         const tone=n=>n==null||Math.abs(n)<.005?"":n>0?"pa-good":"pa-bad";
         const cash=(n,c)=>c==="THB"?money(n):c==="USD"?usd.format(n):num.format(n)+" "+c;
         const budgetMoney=n=>budgetDisplay==="USD"&&fxRate>0?usd.format(n/fxRate):money(n);
-        const orderMoney=(n,bucket)=>bucket==="stock"&&fxRate>0?usd.format(n/fxRate):money(n);
+        const calculatorTitle=key=>({stock:"หุ้น / ETF",gold:"ทองคำ",btc:"Bitcoin"})[key];
+        const orderMoney=(n,bucket)=>{
+            const currency=brokerModel.destinations[bucket].currency;
+            const converted=brokerModel.convert(n,"THB",currency);
+            return converted==null?money(n):cash(converted,currency);
+        };
+        const dot=key=>h("i",{className:"pa-calc-dot","aria-hidden":true,style:{background:colors[key]}});
+        const equivalent=(n,unit,label)=>h("span",{className:"pa-calc-equivalent","aria-label":label},"("+cash(n,unit)+" "+unit+")");
+        const currencySelect=(value,onChange,label)=>h("select",{"aria-label":label,value,onChange:e=>onChange(e.target.value)},
+            ...["THB","USD"].map(unit=>h("option",{value:unit,key:unit},unit)));
         const day=v=>v?new Date(v+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—";
         const card=(title,...children)=>h("section",{className:"pa-card"},h("h3",null,title),...children);
         const line=(label,value,className="")=>h("div",{className:"pa-line"},h("span",null,label),h("strong",{className},value));
@@ -1315,9 +1416,33 @@ function allocationDateAfter(day, months) {
         const select=(label,value,onChange,options)=>h("label",{className:"pa-field"},h("span",null,label),
             h("select",{value,onChange:e=>onChange(e.target.value)},options.map(([id,name])=>h("option",{key:id,value:id},name))));
         const title=key=>ALLOCATION_LABELS[key]||key;
-        const weightStatus=row=>row.actual==null?"รอมูลค่าปัจจุบัน":row.actual>row.target+.005?"เกินเป้า":row.actual<row.target-.005?"ต่ำกว่าเป้า":"ตามเป้า";
         const patch=fn=>setSettings(value=>normalizeAllocation(fn(normalizeAllocation(value))));
         const eligible=accounts.filter(a=>a.portfolioEnabled && a.portfolioMode!=="summary" && !a.archived);
+        function patchBroker(row,change){
+            setPlanDraft(null);
+            patch(s=>{
+                const key=dcaBrokerKey(row.bucket,row.accountId);
+                const prev=s.dcaBrokers.find(item=>dcaBrokerKey(item.bucket,item.accountId)===key);
+                return {...s,dcaBrokers:[...s.dcaBrokers.filter(item=>item!==prev),
+                    {bucket:row.bucket,accountId:row.accountId,currency:row.currency,...prev,...change}]};
+            });
+        }
+        function clearBrokerDraft(key){
+            setBrokerDrafts(values=>{const next={...values};delete next[key];return next;});
+        }
+        function changeBrokerAmount(row,value){
+            setBrokerDrafts(values=>({...values,[row.key]:value}));
+            if(validAmount(value))patchBroker(row,{amount:value===""?null:allocationBudgetCents(value)/100,amountCurrency:row.currency});
+        }
+        function addBrokerControl(){
+            const options=ALLOCATION_KEYS.flatMap(bucket=>eligible.filter(a=>!brokerModel.rows.some(row=>row.bucket===bucket&&row.accountId===a.id))
+                .map(a=>[dcaBrokerKey(bucket,a.id),calculatorTitle(bucket)+" · "+accountLabel(a,accounts)]));
+            return options.length>0&&select("เพิ่มโบรกเกอร์ในเครื่องคำนวณ","",key=>{
+                if(!options.some(([value])=>value===key))return;
+                const [bucket,accountId]=JSON.parse(key);
+                patchBroker({bucket,accountId,currency:accountCurrency(eligible.find(a=>a.id===accountId))},{});
+            },[["","เลือกสินทรัพย์และโบรกเกอร์"],...options]);
+        }
         const stockOptions=[...new Set([...p.stockSymbols.keys(),"SCHG","SPMO","AVUV","VXUS","VHT",...Object.keys(settings.etfs)])].sort();
         const selectedStocks=settings.dcaStocks||[];
         const dcaOptions=[...new Set([...stockOptions,...selectedStocks])].sort();
@@ -1332,7 +1457,7 @@ function allocationDateAfter(day, months) {
             patch(s=>({...s,dcaStocks:s.dcaStocks.includes(symbol)?s.dcaStocks.filter(key=>key!==symbol):[...s.dcaStocks,symbol]}));
         }
         function stockSelection(){
-            const setScope=dcaScope=>{patch(s=>({...s,dcaScope}));setScenario("contribution");setPlanDraft(null);setMessage("");};
+            const setScope=dcaScope=>{patch(s=>({...s,dcaScope}));setPlanDraft(null);setMessage("");};
             const options=dcaOptions.filter(symbol=>selectedStocks.includes(symbol)||dcaStockChoice(symbol,p,settings));
             return card("เลือกหุ้นที่จะ DCA",
                 h("div",{className:"pa-actions"},
@@ -1383,7 +1508,8 @@ function allocationDateAfter(day, months) {
             setMessage("บันทึกการตั้งค่าแล้ว");
         }
         function planBuy(bucket,symbol,amount){
-            const preferred=eligible.find(a=>symbol && p.holdings.some(item=>item.symbol===symbol&&item.account.id===a.id))
+            const preferred=eligible.find(a=>a.id===brokerModel.destinations[bucket].accountId)
+                || eligible.find(a=>symbol && p.holdings.some(item=>item.symbol===symbol&&item.account.id===a.id))
                 || eligible.find(a=>bucket==="btc"?/binance/i.test(a.name):bucket==="gold"?/gold|ทอง/i.test(a.name):accountCurrency(a)==="USD");
             setPlanDraft({bucket,symbol,amount,accountId:preferred?.id||""});
             setMessage("");
@@ -1451,73 +1577,119 @@ function allocationDateAfter(day, months) {
                             line(row.symbol+" · "+num.format(row.units)+(allocationIsGold(row.symbol)?" g":""),money(row.value)),
                             note(accountLabel(row.account,accounts)+(row.quote?" · "+day(row.quote.date)+" · "+quoteName(row.quote)+(p.isStale(row.quote)?" · ราคาค้าง":""):" · รอราคา")))))));
         }
-        function suggested(row,bucket,symbol=""){
-            return h("div",{key:row.key,className:"pa-order"},
-                line(title(row.key),orderMoney(row.buy,bucket)),
-                note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
-                row.actual!=null&&line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift)),
-                bucket==="stock" && fxRate>0 && line("ประมาณ (THB)",money(row.buy)),
-                row.buy>0 && action("เก็บเป็นแผนซื้อ",()=>planBuy(bucket,symbol,row.buy)));
+        function suggested(row,bucket){
+            const destination=brokerModel.destinations[bucket];
+            const otherAmount=brokerModel.convert(row.buy,"THB",destination.other);
+            const canDisplay=destination.currency==="THB"||fxRate>0;
+            return h("div",{key:row.key,className:"pa-calc-order"},
+                h("div",{className:"pa-calc-row"},
+                    h("div",{className:"pa-calc-label"},dot(bucket),h("div",null,
+                        h("strong",null,ALLOCATION_KEYS.includes(row.key)?calculatorTitle(row.key):row.key),
+                        note(destination.label+(row.post==null?"":" · หลังซื้อ "+pct(row.post))))),
+                    h("div",{className:"pa-calc-side"},h("strong",null,orderMoney(row.buy,bucket)),
+                        fxRate>0&&otherAmount!=null&&equivalent(otherAmount,destination.other),
+                        !canDisplay&&note("รอเรท USD/THB"))));
+        }
+        function brokerEntry(row){
+            return h("div",{key:row.key,className:"pa-calc-row"},
+                h("div",{className:"pa-calc-label"},dot(row.bucket),h("div",null,
+                    h("strong",null,calculatorTitle(row.bucket)),note(row.label+" · เป้า "+pct(settings.rules[row.bucket].target)))),
+                h("div",{className:"pa-calc-side"},
+                    h("div",{className:"pa-calc-input"},
+                        h("input",{type:"number",inputMode:"decimal",step:0.01,min:0,
+                            "aria-label":"มูลค่า "+calculatorTitle(row.bucket)+" "+row.label,
+                            placeholder:row.amount==null?"รอมูลค่า":"0",
+                            value:brokerDrafts[row.key]??(row.amount==null?"":String(Number(row.amount.toFixed(2)))),
+                            onChange:e=>changeBrokerAmount(row,e.target.value),
+                            onBlur:()=>clearBrokerDraft(row.key)}),
+                        currencySelect(row.currency,currency=>{
+                            clearBrokerDraft(row.key);patchBroker(row,{currency});
+                        },"สกุลเงิน "+calculatorTitle(row.bucket)+" "+row.label)),
+                    (fxRate>0||row.amount==null)&&row.equivalent!=null&&equivalent(row.equivalent,row.other),
+                    row.manual&&h("button",{type:"button",className:"pa-calc-reset",onClick:()=>{
+                        clearBrokerDraft(row.key);patchBroker(row,{amount:null});
+                    }},"ใช้ยอดจากพอร์ต")));
         }
         function smart(){
+            const valid=budgetReady&&!invalidBrokerInput&&d.canCalculate;
+            const total=brokerModel.issues.length?null:brokerModel.allocationTotal;
+            const chartRows=ALLOCATION_KEYS.map(key=>{
+                const value=total==null?null:allocationPct(brokerModel.buckets[key],total);
+                return h("div",{key,className:"pa-calc-chart"},
+                    line(calculatorTitle(key),pct(value)+" / "+pct(settings.rules[key].target)),
+                    h("div",{className:"pa-track",role:"meter","aria-label":calculatorTitle(key),
+                        "aria-valuemin":0,"aria-valuemax":100,"aria-valuenow":value??undefined},
+                        h("div",{style:{width:(value||0)+"%",background:colors[key]}})));
+            });
             return h(React.Fragment,null,
-                card("งบลงทุนเดือนนี้",
-                    h("div",{className:"pa-actions",role:"group","aria-label":"สกุลเงินงบ DCA"},
-                        ...["THB","USD"].map(currency=>h("button",{key:currency,type:"button","aria-pressed":budgetDisplay===currency,
-                            onClick:()=>{
-                                if(currency===budgetDisplay)return;
-                                setBudgetDraft(null);setPlanDraft(null);setMessage("");
-                                patch(s=>({...s,budgetDisplayCurrency:currency}));
-                            }},currency))),
-                    field("งบพร้อมลงทุน ("+budgetDisplay+")",budget,value=>{
-                        setBudgetDraft(value);setPlanDraft(null);setMessage("");
-                        if(Number.isFinite(Number(value)) && Number(value)>=0 && Number(value)<=1e12)
-                            patch(s=>({...s,budget:allocationBudgetCents(value)/100,budgetCurrency:budgetDisplay,budgetDisplayCurrency:budgetDisplay}));
-                    },{step:0.01,inputMode:"decimal"}),
-                    fxRate>0&&budgetReady&&line(budgetDisplay==="USD"?"เทียบเป็นบาท":"เทียบเป็นดอลลาร์",budgetDisplay==="USD"?money(budgetTHB):usd.format(budgetTHB/fxRate)),
+                h("section",{className:"pa-card pa-calculator"},
+                    h("header",null,h("h3",null,"Portfolio Rebalancing Calculator"),
+                        note("มูลค่าที่ถืออยู่ · แยกตามโบรกเกอร์")),
+                    ...brokerModel.rows.map(brokerEntry),
+                    h("div",{className:"pa-calc-row pa-calc-budget"},
+                        h("strong",null,"งบลงทุนเดือนนี้"),
+                        h("div",{className:"pa-calc-side"},
+                            h("div",{className:"pa-calc-input"},
+                                field("งบพร้อมลงทุน ("+budgetDisplay+")",budget,value=>{
+                                    setBudgetDraft(value);setPlanDraft(null);setMessage("");
+                                    if(validAmount(value))
+                                        patch(s=>({...s,budget:allocationBudgetCents(value)/100,budgetCurrency:budgetDisplay,budgetDisplayCurrency:budgetDisplay}));
+                                },{step:0.01,inputMode:"decimal"}),
+                                currencySelect(budgetDisplay,currency=>{
+                                    setBudgetDraft(null);setPlanDraft(null);setMessage("");
+                                    patch(s=>({...s,budgetDisplayCurrency:currency}));
+                                },"สกุลเงินงบ DCA")),
+                            fxRate>0&&budgetReady&&equivalent(budgetDisplay==="USD"?budgetTHB:budgetTHB/fxRate,budgetDisplay==="USD"?"THB":"USD",
+                                budgetDisplay==="USD"?"เทียบเป็นบาท":"เทียบเป็นดอลลาร์"))),
                     fxRate>0&&note("1 USD = "+num.format(fxRate)+" THB · "+day(p.fx.date)+(p.isStale(p.fx)?" · เรทค้าง":"")),
-                    needsRate&&!(fxRate>0)&&h("div",{className:"pa-actions"},
-                        note("ต้องมีเรท USD/THB เพื่อคำนวณงบ USD"),
+                    !(fxRate>0)&&(needsRate||brokerModel.rows.some(row=>row.needsRate))&&h("div",{className:"pa-alert"},
+                        note("ต้องมีเรท USD/THB เพื่อคำนวณงบ USD หรือมูลค่าข้ามสกุล"),
                         action("กรอกเรท USD/THB",()=>{openPanel("prices");editQuote("FX");})),
-                    line("มูลค่าที่ใช้จัดสรร",p.issues.length?"—":money(p.allocationTotal)),
-                    info("เงินที่โอนเข้าโบรกเกอร์แล้ว","กรอกเฉพาะเงินที่พร้อมซื้อรอบนี้ได้เลย เงินสดไม่อยู่ในมูลค่าสินทรัพย์ที่ใช้จัดสรร งบนี้จึงถูกนับครั้งเดียว"),
-                    (!budgetValid||budgetTHB>1e12)&&note("ตรวจจำนวนเงิน DCA อีกครั้ง")),
-                stockSelection(),
-                d.stocksOnly&&!d.canCalculate?card("ยังไม่มีหุ้นสำหรับ DCA",note("เลือกหุ้นหรือ ETF อย่างน้อย 1 ตัว")):
-                !d.canCalculate?card("รอข้อมูล",note(!d.validEtfs?"ตรวจผลรวมสัดส่วน ETF ในตั้งค่า":[...p.issues,...p.missing].join(" · ")),action(!d.validEtfs?"ตั้งค่า":"ไปที่ราคาและเรท",()=>openPanel(!d.validEtfs?"settings":"prices"))):
-                    budgetReady&&h(React.Fragment,null,
-                        card(d.stocksOnly?"ยอดแนะนำซื้อหุ้น":"เปรียบเทียบวิธีปรับพอร์ต",
-                            !d.stocksOnly&&h("div",{className:"pa-actions"},action("ใช้เงินใหม่",()=>setScenario("contribution"),scenario==="contribution"),action("ซื้อและขาย",()=>setScenario("full"),scenario==="full")),
-                            p.stale.length>0&&note("ใช้ราคาค้างสำหรับประมาณการ · "+p.stale.join(" · ")),
-                            (d.stocksOnly||scenario==="contribution")?h(React.Fragment,null,
-                                line("แนะนำซื้อรวม",budgetMoney(d.buys)),line("ค่าธรรมเนียมประมาณการ",budgetMoney(d.fees)),
-                                line("เงินยังไม่จัดสรร",budgetMoney(d.unallocated)),
-                                info("วิธีคำนวณ","กระจายงบตามส่วนที่ขาดจากเป้าหลังเติมเงิน พักซื้อกลุ่มที่เกินเป้าปัจจุบัน ยอดที่ต่ำกว่าขั้นต่ำหรือปัดลงจะแสดงเป็นเงินเหลือ"),
-                                d.custom&&note(d.useSavedWeights?"ใช้น้ำหนักเป้าหมายเดิมเฉพาะตัวที่เลือก":"ใช้เป้าหมายเท่ากันสำหรับตัวที่เลือก"),
-                                d.useEstimates&&note("มูลค่าปัจจุบันยังไม่ครบ รอบนี้แบ่งงบตามน้ำหนักเป้าหมาย"),
-                                d.stocksOnly?h(React.Fragment,null,
-                                    ...d.etfOrders.map(row=>suggested(row,"stock",row.key)),
-                                    h("details",null,h("summary",null,"สัดส่วนพอร์ตรวมหลังซื้อ"),
-                                        ...d.orders.map(row=>h("div",{key:row.key},line(title(row.key),pct(row.actual)+" → "+pct(row.post)))))):
-                                h(React.Fragment,null,...d.orders.map(row=>row.key==="stock"&&d.etfOrders.length?h("div",{key:row.key,className:"pa-order"},
-                                    line(title(row.key),orderMoney(row.buy,row.key)),note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
-                                    line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift))):
-                                    suggested(row,row.key,row.key==="btc"?"BTC":row.key==="gold"?"XAU":"")),
-                                d.etfOrders.length>0&&h("details",{open:d.custom||undefined},h("summary",null,"แผนซื้อหุ้น / ETF รายตัว"),
-                                    note(d.custom?"สัดส่วนเทียบเฉพาะตัวที่เลือก":"ใช้เฉพาะงบที่จัดให้กลุ่มหุ้น · สัดส่วนเทียบภายในกลุ่ม"),
-                                    ...d.etfOrders.map(row=>suggested(row,"stock",row.key))))):h(React.Fragment,null,
-                                note("จำลองก่อนค่าธรรมเนียม Spread และภาษี"),
-                                ...d.orders.map(row=>h("div",{key:row.key,className:"pa-order"},
-                                    line(title(row.key),Math.abs(row.full)<.005?"—":(row.full>0?"ซื้อ ":"ขาย ")+money(Math.abs(row.full))),
-                                    line("จริง "+pct(row.actual)+" → เป้า "+pct(row.target),"เหลือ 0 จุด"))),
-                                info("การขาย","หน้านี้คำนวณเฉพาะยอดจำลอง การขายจริงบันทึกจากบัญชีลงทุนเดิม")))),
-                planDraft&&card("Suggested Order",
+                    (!budgetValid||budgetTHB>1e12||invalidBrokerInput)&&note("ตรวจยอดเงินที่กรอกอีกครั้ง"),
+                    h("div",{className:"pa-calc-total"},note("มูลค่าพอร์ตปัจจุบัน"),
+                        h("strong",null,money(total)),fxRate>0&&total!=null&&equivalent(total/fxRate,"USD"),
+                        total!=null&&budgetReady&&note("หลังเติมงบ "+money(total+dcaGross))),
+                    h("section",{className:"pa-calc-section"},h("h3",null,"สัดส่วนที่ถืออยู่ตอนนี้"),...chartRows),
+                    h("section",{className:"pa-calc-section"},h("h3",null,d.stocksOnly?"ยอดแนะนำซื้อหุ้น":"คำแนะนำซื้อเดือนนี้"),
+                        d.stocksOnly&&!d.canCalculate?note("ยังไม่มีหุ้นสำหรับ DCA · เลือกในตัวเลือกเพิ่มเติม"):
+                        !d.canCalculate?note(!d.validEtfs?"ตรวจผลรวมสัดส่วน ETF ในตั้งค่า":"กรอกมูลค่าที่ขาด หรืออัปเดตราคาและเรท"):
+                        valid?h(React.Fragment,null,
+                            ...(d.stocksOnly?d.etfOrders:d.orders).map(row=>suggested(row,d.stocksOnly?"stock":row.key)),
+                            h("div",{className:"pa-calc-footer"},line("รวมเงินซื้อ",budgetMoney(d.buys)),
+                                fxRate>0&&equivalent(budgetDisplay==="USD"?d.buys:d.buys/fxRate,budgetDisplay==="USD"?"THB":"USD"),
+                                d.fees>0&&line("ค่าธรรมเนียมประมาณการ",budgetMoney(d.fees)),
+                                d.unallocated>0&&line("เงินยังไม่จัดสรร",budgetMoney(d.unallocated))),
+                            !d.stocksOnly&&d.etfOrders.length>0&&h("details",null,h("summary",null,"ดูยอดซื้อหุ้น / ETF รายตัว"),
+                                d.useEstimates&&note("แบ่งตามเป้าหมายรายตัวจากข้อมูลที่มี"),
+                                ...d.etfOrders.map(row=>suggested(row,"stock"))),
+                            d.buys>0&&h("details",null,h("summary",null,"เก็บแผนซื้อ"),
+                                ...[...d.orders.filter(row=>row.key!=="stock"||!d.etfOrders.length),...d.etfOrders].filter(row=>row.buy>0).map(row=>{
+                                    const bucket=ALLOCATION_KEYS.includes(row.key)?row.key:"stock";
+                                    const symbol=bucket==="btc"?"BTC":bucket==="gold"?"XAU":row.key==="stock"?"":row.key;
+                                    return h("div",{key:row.key,className:"pa-calc-save"},
+                                        line(symbol||calculatorTitle(bucket),orderMoney(row.buy,bucket)),
+                                        action("เก็บเป็นแผนซื้อ",()=>planBuy(bucket,symbol,row.buy)));
+                                }))):note("รอข้อมูลเพื่อคำนวณยอดซื้อ")),
+                    h("details",null,h("summary",null,"ตัวเลือกเพิ่มเติม"),
+                        stockSelection(),
+                        ...ALLOCATION_KEYS.filter(bucket=>brokerModel.rows.filter(row=>row.bucket===bucket).length>1).map(bucket=>
+                            h("div",{key:bucket},select("โบรกเกอร์สำหรับซื้อ "+calculatorTitle(bucket),brokerModel.destinations[bucket].accountId,
+                                accountId=>{setPlanDraft(null);patch(s=>({...s,dcaDestinations:{...s.dcaDestinations,[bucket]:accountId}}));},
+                                brokerModel.rows.filter(row=>row.bucket===bucket).map(row=>[row.accountId,row.label])))),
+                        addBrokerControl(),
+                        valid&&!d.stocksOnly&&h("details",null,h("summary",null,"จำลองซื้อและขาย"),
+                            note("ยอดประมาณการก่อนค่าธรรมเนียมและภาษี"),
+                            ...d.orders.map(row=>h("div",{key:row.key},line(calculatorTitle(row.key),
+                                Math.abs(row.full)<.005?"—":(row.full>0?"ซื้อ ":"ขาย ")+orderMoney(Math.abs(row.full),row.key))))),
+                        p.stale.length>0&&note("ราคาค้าง · "+p.stale.join(" · ")),
+                        p.issues.length>0&&note(p.issues.join(" · ")),
+                        info("ยอดที่กรอกเอง","ใช้แทนมูลค่าของสินทรัพย์กลุ่มนั้นในโบรกเกอร์เดียวกันสำหรับเครื่องคำนวณเท่านั้น"))),
+                planDraft&&card("บันทึกแผนซื้อ",
                     line((planDraft.symbol||title(planDraft.bucket)),orderMoney(planDraft.amount,planDraft.bucket)),
                     select("บัญชีที่จะซื้อ",planDraft.accountId,accountId=>setPlanDraft({...planDraft,accountId}),[["","เลือกบัญชี"],...eligible.map(a=>[a.id,accountLabel(a,accounts)])]),
                     !eligible.length&&note("เปิดพอร์ตแบบรายสินทรัพย์ในบัญชีที่จะใช้ซื้อ"),
                     h("div",{className:"pa-actions"},action("บันทึกแผน",savePlan,true,!planDraft.accountId),action("ยกเลิก",()=>setPlanDraft(null)))),
-                card("แผนซื้อและรายการที่ซื้อจริง",
-                    !settings.plans.length&&note("เลือกเก็บแผนจากยอดที่ระบบแนะนำ"),
+                settings.plans.length>0&&h("section",{className:"pa-card"},h("details",null,h("summary",null,"แผนซื้อที่บันทึกไว้ ("+settings.plans.length+")"),
                     ...settings.plans.map(item=>{
                         const bought=p.executed.get(item.id), a=accounts.find(row=>row.id===item.accountId);
                         return h("div",{key:item.id,className:"pa-order"},line(item.symbol||title(item.bucket),money(item.amount)),
@@ -1525,7 +1697,7 @@ function allocationDateAfter(day, months) {
                             bought?line("จ่ายจริง",cash(-portfolioCash(bought.row),accountCurrency(bought.account))):
                                 h("div",{className:"pa-actions"},action("บันทึกซื้อจริง",()=>onTrade(item.accountId,item),true,!eligible.some(a=>a.id===item.accountId)),
                                     action("เอาแผนออก",()=>patch(s=>({...s,plans:s.plans.filter(x=>x.id!==item.id)})))));
-                    })));
+                    }))));
         }
         function prices(){
             return h(React.Fragment,null,
