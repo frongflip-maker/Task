@@ -437,6 +437,50 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 .pf-day-list>details[open]>summary{margin:0;background:#eceee6}
 .pf-row-detail{padding:12px 10px;display:grid;gap:10px}
 @media(max-width:360px){.pf-day{grid-template-columns:44px minmax(0,1fr);gap:6px}.pf-day-list>details>summary{padding-inline:8px}.pf-day-list summary .pf-value{font-size:12px}}
+.pa-root{--pa-bg:#fffefa;--pa-fg:#1d3030;--pa-sub:#4e6260;--pa-soft:#e9efec;--pa-border:#ccd8d3;--pa-brand:#1c5e58;--pa-action:#fff;--pa-green:#246544;--pa-red:#a53e36;--pa-alert:#f6edd5;--pa-alert-text:#684800;display:grid;gap:12px;min-width:0;color:var(--pa-fg);touch-action:pan-y;font-size:14px}
+.pa-root *{box-sizing:border-box}
+.pa-root h2,.pa-root h3,.pa-root p{margin:0}
+.pa-root h2{font-size:clamp(20px,5.5vw,28px);line-height:1.2;font-weight:800}
+.pa-root h3{font-weight:800;font-size:16px}
+.pa-card,.pa-head{background:var(--pa-bg);border:1px solid var(--pa-border);border-radius:18px;padding:14px;min-width:0}
+.pa-card{display:grid;gap:9px}
+.pa-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pa-total{font-weight:800;font-size:clamp(25px,7vw,36px);margin:4px 0;overflow-wrap:anywhere}
+.pa-hero{background:linear-gradient(150deg,var(--pa-soft),var(--pa-bg) 55%)}
+.pa-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;background:var(--pa-soft);border-radius:15px}
+.pa-root button{font-size:13px;line-height:1.25;min-height:44px;padding:7px 10px;border-radius:11px;background:var(--pa-soft);color:var(--pa-fg);font-weight:750;overflow-wrap:anywhere}
+.pa-root button[aria-pressed=true],.pa-root button.pa-primary{background:var(--pa-brand);color:var(--pa-action)}
+.pa-root button:disabled{opacity:.5}
+.pa-actions{display:flex;flex-wrap:wrap;gap:6px}
+.pa-root :focus-visible{outline:2px solid var(--pa-brand);outline-offset:2px}
+.pa-note{font-size:13px;color:var(--pa-sub);line-height:1.5;overflow-wrap:anywhere}
+.pa-line{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:6px;min-width:0;font-variant-numeric:tabular-nums}
+.pa-line span{color:var(--pa-sub);overflow-wrap:anywhere}
+.pa-line strong{white-space:nowrap;text-align:right;font-weight:750}
+.pa-good{color:var(--pa-green)}
+.pa-bad{color:var(--pa-red)}
+.pa-root details{border-top:1px solid var(--pa-border);padding:4px 0}
+.pa-root details .pa-line{margin:6px 0}
+.pa-root summary{padding:10px 0;font-weight:700;cursor:pointer;min-height:40px}
+.pa-info summary{font-size:13px;color:var(--pa-sub)}
+.pa-alloc{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:14px}
+.pa-donut{height:100px;width:100px;border-radius:50%;display:grid;place-items:center}
+.pa-donut span{width:70%;height:70%;border-radius:50%;background:var(--pa-bg);display:grid;place-items:center;font-weight:800}
+.pa-legend{display:grid;gap:6px}
+.pa-legend div{display:grid;grid-template-columns:9px 1fr auto;gap:6px;align-items:center}
+.pa-legend i{width:8px;height:8px;border-radius:50%}
+.pa-bar-row,.pa-order,.pa-holding{padding-top:8px;border-top:1px solid var(--pa-border);display:grid;gap:6px;min-width:0}
+.pa-track{height:8px;position:relative;border-radius:8px;background:var(--pa-soft)}
+.pa-track div{height:100%;border-radius:8px}
+.pa-track i{position:absolute;top:-2px;bottom:-2px;width:2px;border-radius:2px;background:var(--pa-fg)}
+.pa-alert{background:var(--pa-alert);color:var(--pa-alert-text);border-radius:10px;padding:8px;overflow-wrap:anywhere}
+.pa-field{display:grid;gap:4px;min-width:0;color:var(--pa-sub);font-weight:700}
+.pa-field :is(input,select){display:block;min-height:44px;min-width:0;width:100%;max-width:100%;padding:7px 9px;border:1px solid var(--pa-border);border-radius:10px;color:var(--pa-fg);background:var(--pa-bg);font-size:16px}
+.pa-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pa-etf{display:grid;grid-template-columns:1fr auto;align-items:end;gap:6px}
+@media (max-width:360px){.pa-card,.pa-head{padding:10px}.pa-root{font-size:13px}.pa-donut{width:76px;height:76px}.pa-nav button{padding:5px 3px}}
+@media (prefers-color-scheme:dark){.pa-root{color-scheme:dark;--pa-bg:#192423;--pa-fg:#e9f2ef;--pa-sub:#bbcdc7;--pa-soft:#263d3a;--pa-border:#3d5752;--pa-brand:#81c9bd;--pa-action:#122e29;--pa-green:#89d4a8;--pa-red:#f2a399;--pa-alert:#3c3320;--pa-alert-text:#f8db91}.pa-root .pa-field :is(input,select){color-scheme:dark!important}}
+
 </style>
 </head>
 <body>
@@ -444,7 +488,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="2026-11-05-account-list-scroll-v49";
+window.__TASKROUTINE_BUILD__="2026-11-05-portfolio-allocation-v51";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -929,7 +973,535 @@ try {
     const HISTORY_KEY = "discipline_os_history_v1";
     const HISTORY_MAX_ENTRIES = 6;
     const HISTORY_MAX_BYTES = 12000000;
-    const SCHEMA_VERSION = 21;
+const ALLOCATION_KEYS = [
+    "stock",
+    "gold",
+    "btc"
+];
+const ALLOCATION_LABELS = {
+    stock: "หุ้น / ETF",
+    gold: "ทองคำ 99.99%",
+    btc: "Bitcoin"
+};
+const ALLOCATION_DEFAULTS = {
+    stock: {
+        target: 85,
+        low: 80,
+        high: 90,
+        sellLow: 75,
+        sellHigh: 95,
+        fee: 0,
+        minimum: 0,
+        step: 0.01
+    },
+    gold: {
+        target: 5,
+        low: 3,
+        high: 7,
+        sellLow: null,
+        sellHigh: 10,
+        fee: 0,
+        minimum: 0,
+        step: 0.01
+    },
+    btc: {
+        target: 10,
+        low: 7,
+        high: 13,
+        sellLow: null,
+        sellHigh: 15,
+        fee: 0,
+        minimum: 0,
+        step: 0.01
+    }
+};
+const ALLOCATION_STALE_DAYS = 7;
+const ALLOCATION_GRAMS_PER_OZ = 31.1034768;
+const allocationCents = (value, rounding = Math.round)=>{
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 && n <= 1e12 ? rounding(n * 100) : 0;
+};
+const allocationBudgetCents = (value)=>allocationCents(value, (n)=>Math.floor(n + 1e-9));
+const allocationPct = (value, total)=>total > 0 ? value / total * 100 : 0;
+const allocationSum = (values)=>values.some((n)=>n == null) ? null : values.reduce((sum, n)=>sum + (n ?? 0), 0);
+function allocationDca(items, budget, currentTotal = items.reduce((sum, item)=>sum + item.value, 0), nested = false) {
+    const gross = allocationBudgetCents(budget);
+    const projected = currentTotal + gross / 100;
+    const deficits = items.map((item)=>allocationPct(item.value, currentTotal) > item.target + 1e-8 ? 0 : Math.max(0, projected * item.target / 100 - item.value));
+    const total = deficits.reduce((sum, n)=>sum + n, 0);
+    const quotas = deficits.map((n)=>total > 0 ? gross * n / total : 0);
+    const shares = quotas.map(Math.floor);
+    if (total > 0) {
+        const remaining = gross - shares.reduce((sum, n)=>sum + n, 0);
+        const ranked = quotas.map((n, i)=>({
+                i,
+                remainder: n - shares[i]
+            })).filter((item)=>deficits[item.i] > 0).sort((a, b)=>b.remainder - a.remainder || a.i - b.i);
+        ranked.slice(0, remaining).forEach(({ i })=>shares[i]++);
+    }
+    return items.map((item, i)=>{
+        const reserved = shares[i];
+        const fee = nested && item.key === "stock" ? 0 : allocationCents(item.fee, (n)=>Math.ceil(n - 1e-9));
+        const step = nested && item.key === "stock" ? 1 : Math.max(1, allocationCents(item.step));
+        const minimum = nested && item.key === "stock" ? 0 : allocationCents(item.minimum, (n)=>Math.ceil(n - 1e-9));
+        const rounded = Math.floor(Math.max(0, reserved - fee) / step) * step;
+        const buy = rounded >= minimum ? rounded : 0;
+        return {
+            key: item.key,
+            buy: buy / 100,
+            fee: buy > 0 ? fee / 100 : 0,
+            reserved: reserved / 100
+        };
+    });
+}
+function allocationRebalanceStatus(actual, rule) {
+    if (rule.sellHigh !== null && actual > rule.sellHigh + 1e-8) return "sell";
+    if (rule.sellLow !== null && actual < rule.sellLow - 1e-8) return "review";
+    if (actual < rule.low - 1e-8 || actual > rule.high + 1e-8) return "range";
+    return "normal";
+}
+function allocationDateAfter(day, months) {
+    if (!day) return "";
+    const [year, month, anchor] = day.split("-").map(Number);
+    const next = new Date(Date.UTC(year, month - 1 + months, 1));
+    const end = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+    next.setUTCDate(Math.min(anchor, end));
+    return next.toISOString().slice(0, 10);
+}
+
+
+    const allocationSymbol = value => String(value ?? "").trim().toUpperCase();
+    const allocationSymbolOK = value => /^[A-Z0-9][A-Z0-9._: /-]{0,23}$/.test(value);
+    const allocationDay = value => /^\d{4}-\d{2}-\d{2}$/.test(value || "") && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
+    const allocationIsGold = symbol => allocationSymbol(symbol)==="XAU";
+    const allocationIsBtc = symbol => /^(BTC|XBT|BTC\/THB)$/.test(allocationSymbol(symbol));
+    function allocationQuote(raw,fx=false) {
+        const value=Number(raw?.value);
+        if (!(value>0 && value<=1e12) || !allocationDay(raw?.date)) return null;
+        if (!fx && !["THB","USD"].includes(raw.currency)) return null;
+        return {value,date:raw.date,updatedAt:Number.isFinite(Date.parse(raw.updatedAt))?raw.updatedAt:"",
+            ...(fx?{}:{currency:raw.currency,unit:raw.unit==="oz"?"oz":"unit"}),source:"manual"};
+    }
+    function normalizeAllocation(raw={}) {
+        raw=raw && typeof raw==="object" ? raw : {};
+        const range=(v,def,max=100)=>v==null || v==="" || !Number.isFinite(Number(v)) || Number(v)<0 || Number(v)>max?def:Number(v);
+        const rules=Object.fromEntries(ALLOCATION_KEYS.map(key=>{
+            const def=ALLOCATION_DEFAULTS[key], rule=raw.rules?.[key]||{};
+            const optional=(k)=>Object.hasOwn(rule,k) && (rule[k]==null || rule[k]==="")?null:range(rule[k],def[k]);
+            return [key,{target:range(rule.target,def.target),low:range(rule.low,def.low),high:range(rule.high,def.high),
+                sellLow:optional("sellLow"),sellHigh:optional("sellHigh"),
+                fee:range(rule.fee,0,1e12),minimum:range(rule.minimum,0,1e12),step:Math.max(.01,range(rule.step,.01,1e12))}];
+        }));
+        if (Math.abs(ALLOCATION_KEYS.reduce((sum,key)=>sum+rules[key].target,0)-100)>1e-6) {
+            for(const key of ALLOCATION_KEYS)rules[key].target=ALLOCATION_DEFAULTS[key].target;
+        }
+        const quotes=Object.fromEntries(Object.entries(raw.quotes||{}).flatMap(([key,value])=>{
+            const q=allocationQuote(value);
+            return allocationSymbolOK(key) && q ? [[key,q]] : [];
+        }));
+        const etfs=Object.fromEntries(Object.entries(raw.etfs||{}).filter(([key,v])=>allocationSymbolOK(key)&&v!==null&&v!==""&&range(v,-1)>=0).map(([key,v])=>[key,Number(v)]));
+        const classes=Object.fromEntries(Object.entries(raw.classes||{}).filter(([key,v])=>allocationSymbolOK(key)&&[...ALLOCATION_KEYS,"outside"].includes(v)));
+        const plans=(Array.isArray(raw.plans)?raw.plans:[]).filter(p=>p && typeof p.id==="string" && typeof p.accountId==="string" &&
+            ALLOCATION_KEYS.includes(p.bucket) && (!p.symbol || allocationSymbolOK(p.symbol)) && allocationCents(p.amount)>0 && allocationDay(p.date));
+        return {rules,quotes,classes,fx:allocationQuote(raw.fx,true),etfs,etfMode:raw.etfMode==="portfolio"?"portfolio":"stock",
+            budget:range(raw.budget,0,1e12),reviewMonths:Math.max(1,Math.floor(range(raw.reviewMonths,6,60))),
+            reviewed:allocationDay(raw.reviewed)?raw.reviewed:"",plans};
+    }
+    function allocationBucket(symbol,account,entries,classes={}) {
+        if (allocationIsBtc(symbol)) return "btc";
+        if (allocationIsGold(symbol)) return "gold";
+        if (Object.hasOwn(classes,symbol)) return classes[symbol];
+        if (/gold|ทอง/i.test([account?.name,account?.platform].join(" ")) || /^(XAUUSD|XAU\/USD|GOLD 99\.99%)$/.test(symbol)) return "unclassified";
+        if (/binance/i.test([account?.name,account?.platform].join(" ")) ||
+            /^(ETH|SOL|XRP|BNB|DOGE|ADA|USDT|USDC|DOT|AVAX|LINK|LTC|SHIB|BCH|TRX|SUI|TON|ETC|XLM|HBAR)$/.test(symbol) ||
+            entries.some(r=>allocationSymbol(r.symbol)===symbol && r.tradeMode==="crypto")) return "unclassified";
+        return "stock";
+    }
+    function allocationPortfolio(accounts,transactions,payments,settings,today) {
+        const cashByCurrency={}, accountsWithHistory=[], holdings=[], issues=[], missing=[], stale=[];
+        const quotes=new globalThis.Map();
+        const addQuote=(key,q)=>{
+            if (!q || q.date>today || !(q.value>0)) return;
+            const prev=quotes.get(key);
+            if (!prev || q.date>prev.date || (q.date===prev.date && (q.updatedAt||"") >= (prev.updatedAt||""))) quotes.set(key,q);
+        };
+        for(const a of accounts){
+            const entries=(a.portfolioEntries||[]).filter(r=>r.date<=today);
+            const currency=accountCurrency(a);
+            for(const [date,value] of Object.entries(a.portfolioMarketRates||{})){
+                if(currency==="USD" && allocationDay(date)) addQuote("FX",{date,value:Number(value),source:"statement"});
+            }
+            for(const r of entries){
+                if(r.type!=="quote" || !allocationDay(r.date))continue;
+                addQuote("ASSET:"+allocationSymbol(r.symbol),{date:r.date,value:Number(r.amount),currency,unit:"unit",source:"statement"});
+            }
+            accountsWithHistory.push({...a,portfolioEntries:entries});
+        }
+        // Prefer the newest dated price. A manual price wins on the same date.
+        for(const [key,q] of Object.entries(settings.quotes))addQuote("ASSET:"+key,q);
+        addQuote("FX",settings.fx);
+        const fx=quotes.get("FX") || null;
+        const isStale=q=>!!q && (Date.parse(today)-Date.parse(q.date))/86400000 >= ALLOCATION_STALE_DAYS;
+        const txns=transactions.filter(r=>r.date<=today), paid=payments.filter(r=>r.date<=today);
+        const history=brokerAnalysis(accountsWithHistory,portfolioTimeline(accountsWithHistory,txns,paid).filter(e=>e.date<=today));
+        const realizedPrice=[], realizedFx=[], cashFx=[], commissions=[];
+        const executed=new globalThis.Map();
+        const realizedByAccount=new globalThis.Map();
+        for(const r of history.results){
+            if(!realizedByAccount.has(r.accountId))realizedByAccount.set(r.accountId,[]);
+            realizedByAccount.get(r.accountId).push(r);
+        }
+        const scoped=new Set();
+        for(const a of accountsWithHistory){
+            const entries=a.portfolioEntries;
+            const currency=accountCurrency(a);
+            if(a.portfolioEnabled || entries.length || ["broker","investment"].includes(a.accountType)){
+                scoped.add(a.id);
+                cashByCurrency[currency]=(cashByCurrency[currency]||0)+nativeAccountBalance(a,txns,paid);
+            }
+            for(const row of entries)if(row.type==="buy" && row.allocationOrderId)executed.set(row.allocationOrderId,{row,account:a});
+            if(!entries.length)continue;
+            let book;
+            try{book=portfolioBook(entries);}
+            catch(e){issues.push(a.name+" · "+e.message);continue;}
+            if(a.portfolioMode==="summary" && book.snapshot?.amount>0)issues.push(a.name+" · มียอดรวมจาก Snapshot กรุณาตรวจยอดถือครองรายตัวก่อนคำนวณ DCA");
+            for(const result of realizedByAccount.get(a.id)||[]){
+                if(result.kind==="trade")realizedPrice.push(result.thb);
+                if(result.kind==="fxAsset")realizedFx.push(result.thb);
+            }
+            for(const p of book.assets.values()){
+                if(!(p.units>0))continue;
+                const symbol=allocationSymbol(p.symbol);
+                const bucket=allocationBucket(symbol,a,entries,settings.classes);
+                const quote=quotes.get("ASSET:"+symbol)||null;
+                const markRate=quote?.currency==="THB"?1:quote?.currency==="USD"?fx?.value:null;
+                const nativeRate=currency==="THB"?1:currency==="USD"?fx?.value:null;
+                const needsFx=quote?.currency==="USD" || currency==="USD" && p.cost!=null;
+                const unitPrice=quote ? quote.value/(allocationIsGold(symbol) && quote.unit==="oz"?ALLOCATION_GRAMS_PER_OZ:1) : null;
+                const value=unitPrice!=null && markRate ? p.units*unitPrice*markRate:null;
+                const historic=currency==="THB" ? p.cost : history.wallets.get(a.id)?.positions.get(p.symbol)?.thb.cost ?? null;
+                const nativeAtMarket=p.cost!=null && nativeRate ? p.cost*nativeRate:null;
+                if(!quote)missing.push(symbol+" · รอราคา");
+                else if(!markRate)missing.push(symbol+" · รอเรท USD/THB");
+                if(bucket==="unclassified")issues.push(symbol+" · รอระบุกลุ่ม");
+                if(isStale(quote))stale.push(symbol);
+                if(needsFx && isStale(fx))stale.push("USD/THB");
+                holdings.push({symbol,bucket,quote,value,units:p.units,account:a,cost:historic,
+                    pricePL:value!=null && nativeAtMarket!=null?value-nativeAtMarket:null,
+                    fxPL:currency==="THB"?0:nativeAtMarket!=null && historic!=null?nativeAtMarket-historic:null});
+            }
+        }
+        for(const r of history.results){
+            if(!scoped.has(r.accountId))continue;
+            if(r.kind==="fxCash")cashFx.push(r.thb);
+            if(r.kind==="commission")commissions.push(r.thb);
+        }
+        const buckets=Object.fromEntries(ALLOCATION_KEYS.map(key=>[key,allocationSum(holdings.filter(p=>p.bucket===key).map(p=>p.value))]));
+        const stockSymbols=new globalThis.Map();
+        for(const p of holdings.filter(p=>p.bucket==="stock")){
+            const list=stockSymbols.get(p.symbol)||[];
+            stockSymbols.set(p.symbol,[...list,p]);
+        }
+        const cashTHB=allocationSum(Object.entries(cashByCurrency).map(([currency,value])=>Math.abs(value)<1e-9?0:
+            currency==="THB"?value:currency==="USD" && fx?value*fx.value:null));
+        if(cashByCurrency.USD && isStale(fx))stale.push("USD/THB");
+        const sumField=key=>allocationSum(holdings.map(p=>p[key]));
+        return {holdings,buckets,stockSymbols,cashByCurrency,cashTHB,fx,quotes,isStale,executed,
+            issues:[...new Set(issues)],missing:[...new Set(missing)],stale:[...new Set(stale)],
+            value:sumField("value"),cost:sumField("cost"),pricePL:sumField("pricePL"),fxPL:sumField("fxPL"),
+            realizedPrice:allocationSum(realizedPrice),realizedFx:allocationSum(realizedFx),
+            cashFx:allocationSum(cashFx),commissions:allocationSum(commissions),
+            allocationTotal:allocationSum(Object.values(buckets))};
+    }
+    function allocationPlan(portfolio,settings,budget) {
+        const {buckets,stockSymbols,allocationTotal:current}=portfolio;
+        const gross=allocationBudgetCents(budget)/100;
+        const etfs=Object.entries(settings.etfs);
+        const stockTarget=settings.rules.stock.target;
+        const required=settings.etfMode==="stock"?100:stockTarget;
+        const validEtfs=!etfs.length || Math.abs(etfs.reduce((sum,[,v])=>sum+v,0)-required)<1e-6;
+        const canCalculate=portfolio.issues.length===0 && ALLOCATION_KEYS.every(key=>buckets[key]!=null) && validEtfs;
+        if(!canCalculate)return {canCalculate,validEtfs};
+        const inputs=ALLOCATION_KEYS.map(key=>({...settings.rules[key],key,value:buckets[key]}));
+        const orders=allocationDca(inputs,gross,current,etfs.length>0);
+        const stockOrder=orders[0];
+        const etfInputs=etfs.map(([key,weight])=>({...settings.rules.stock,key,
+            target:required>0?weight/required*100:0,value:(stockSymbols.get(key)||[]).reduce((sum,p)=>sum+(p.value||0),0)}));
+        const etfOrders=allocationDca(etfInputs,stockOrder.reserved,buckets.stock);
+        const sumMoney=(list,key)=>list.reduce((sum,r)=>sum+allocationCents(r[key]),0)/100;
+        if(etfs.length){
+            stockOrder.buy=sumMoney(etfOrders,"buy");
+            stockOrder.fee=sumMoney(etfOrders,"fee");
+        }
+        const buys=sumMoney(orders,"buy"), fees=sumMoney(orders,"fee");
+        const unallocated=Math.max(0,allocationCents(gross)-allocationCents(buys)-allocationCents(fees))/100;
+        const planned=(rows,list,before,added)=>rows.map((item,i)=>{
+            const order=list[i];
+            const actual=allocationPct(item.value,before), post=allocationPct(item.value+order.buy,before+added);
+            return {...item,...order,actual,post,drift:post-item.target,budgetPct:allocationPct(order.buy,gross),
+                full:(before+gross)*item.target/100-item.value};
+        });
+        return {canCalculate,validEtfs,gross,fees,unallocated,buys,orders:planned(inputs,orders,current,buys),
+            etfOrders:planned(etfInputs,etfOrders,buckets.stock,stockOrder.buy)};
+    }
+
+    function PortfolioAllocation({accounts,transactions,payments,settings,setSettings,onBack,onTrade}) {
+        const h=React.createElement;
+        const today=dkey(new Date());
+        const [panel,setPanel]=useState("overview"), [draft,setDraft]=useState(null);
+        const [budget,setBudget]=useState(String(settings.budget||""));
+        const [quote,setQuote]=useState({symbol:"",currency:"THB",unit:"unit",value:"",date:today});
+        const [planDraft,setPlanDraft]=useState(null), [message,setMessage]=useState("");
+        const [scenario,setScenario]=useState("contribution");
+        const p=useMemo(()=>allocationPortfolio(accounts,transactions,payments,settings,today),[accounts,transactions,payments,settings,today]);
+        const budgetValid=budget==="" || Number.isFinite(Number(budget)) && Number(budget)>=0 && Number(budget)<=1e12;
+        const d=allocationPlan(p,settings,budgetValid?budget:0);
+        const actualKnown=p.issues.length===0 && p.allocationTotal!=null && p.allocationTotal>0;
+        const actual=Object.fromEntries(ALLOCATION_KEYS.map(key=>[key,actualKnown?allocationPct(p.buckets[key],p.allocationTotal):null]));
+        const colors={stock:"#438981",gold:"#c28d26",btc:"#ce7446"};
+        const baht=new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB"});
+        const usd=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"});
+        const num=new Intl.NumberFormat("en-US",{maximumFractionDigits:12});
+        const money=n=>n==null?"—":baht.format(Math.abs(n)<.005?0:n);
+        const gain=n=>n==null?"—":(n>=.005?"+":"")+money(n);
+        const pct=n=>n==null?"—":n.toLocaleString("en-US",{maximumFractionDigits:2})+"%";
+        const pp=n=>n==null?"—":(n>=.005?"+":"")+(Math.abs(n)<.005?0:n).toLocaleString("en-US",{maximumFractionDigits:2})+" จุด";
+        const tone=n=>n==null||Math.abs(n)<.005?"":n>0?"pa-good":"pa-bad";
+        const cash=(n,c)=>c==="THB"?money(n):c==="USD"?usd.format(n):num.format(n)+" "+c;
+        const day=v=>v?new Date(v+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"—";
+        const card=(title,...children)=>h("section",{className:"pa-card"},h("h3",null,title),...children);
+        const line=(label,value,className="")=>h("div",{className:"pa-line"},h("span",null,label),h("strong",{className},value));
+        const note=body=>h("p",{className:"pa-note"},body);
+        const info=(label,body)=>h("details",{className:"pa-info"},h("summary",null,label),note(body));
+        const action=(label,onClick,primary=false,disabled=false)=>h("button",{type:"button",className:primary?"pa-primary":"",onClick,disabled},label);
+        const field=(label,value,onChange,opts={})=>h("label",{className:"pa-field"},h("span",null,label),
+            h("input",{type:"number",min:0,step:"any",value,onChange:e=>onChange(e.target.value),...opts}));
+        const select=(label,value,onChange,options)=>h("label",{className:"pa-field"},h("span",null,label),
+            h("select",{value,onChange:e=>onChange(e.target.value)},options.map(([id,name])=>h("option",{key:id,value:id},name))));
+        const title=key=>ALLOCATION_LABELS[key]||key;
+        const weightStatus=row=>row.actual>row.target+.005?"เกินเป้า":row.actual<row.target-.005?"ต่ำกว่าเป้า":"ตามเป้า";
+        const patch=fn=>setSettings(value=>normalizeAllocation(fn(normalizeAllocation(value))));
+        const eligible=accounts.filter(a=>a.portfolioEnabled && a.portfolioMode!=="summary" && !a.archived);
+        const stockOptions=[...new Set([...p.stockSymbols.keys(),"SCHG","SPMO","AVUV","VXUS","VHT",...Object.keys(settings.etfs)])].sort();
+        const openPanel=next=>{setPanel(next);setMessage("");setPlanDraft(null);if(next==="settings")setDraft(normalizeAllocation(settings));};
+        const quoteName=q=>q?.source==="manual"?"กรอกเอง":"ราคาจากพอร์ตเดิม";
+        function editQuote(symbol){
+            const q=(symbol==="FX"?settings.fx:settings.quotes[symbol]) || p.quotes.get(symbol==="FX"?"FX":"ASSET:"+symbol);
+            setQuote({symbol,currency:q?.currency||"THB",unit:q?.unit||"unit",value:q?.value??"",date:q?.date||today});
+        }
+        function saveQuote(){
+            const symbol=allocationSymbol(quote.symbol);
+            const fx=symbol==="FX", record=allocationQuote({...quote,updatedAt:new Date().toISOString()},fx);
+            if(!allocationSymbolOK(symbol)||!record||record.date>today){setMessage("ตรวจชื่อสินทรัพย์ ราคา และวันที่อีกครั้ง");return;}
+            patch(s=>fx?{...s,fx:record}:{...s,quotes:{...s.quotes,[symbol]:record}});
+            setMessage("บันทึกราคาแล้ว");
+        }
+        function saveRules(){
+            const valid=(v,min=0,max=100)=>v!==""&&v!=null&&Number.isFinite(Number(v))&&Number(v)>=min&&Number(v)<=max;
+            const rules=Object.values(draft.rules);
+            if(!rules.every(r=>valid(r.target)) || Math.abs(rules.reduce((sum,r)=>sum+Number(r.target),0)-100)>1e-6){
+                setMessage("สัดส่วนหลักต้องรวมกันได้ 100%");return;
+            }
+            if(!rules.every(r=>valid(r.low)&&valid(r.high)&&Number(r.low)<=Number(r.high)&&
+                (r.sellLow===""||r.sellLow==null||valid(r.sellLow,0,Number(r.low)))&&
+                (r.sellHigh===""||r.sellHigh==null||valid(r.sellHigh,Number(r.high)))&&
+                valid(r.fee,0,1e12)&&valid(r.minimum,0,1e12)&&valid(r.step,.01,1e12))){
+                setMessage("ตรวจกรอบเตือน ค่าธรรมเนียม และยอดซื้อขั้นต่ำ");return;
+            }
+            const weights=Object.values(draft.etfs), required=draft.etfMode==="stock"?100:Number(draft.rules.stock.target);
+            if(weights.length && (!weights.every(v=>valid(v,0,required)) || Math.abs(weights.reduce((sum,v)=>sum+Number(v),0)-required)>1e-6)){
+                setMessage("สัดส่วน ETF ต้องรวมเป็น "+pct(required));return;
+            }
+            if(!valid(draft.reviewMonths,1,60)||!Number.isInteger(Number(draft.reviewMonths))){
+                setMessage("รอบทบทวนต้องเป็นจำนวนเต็ม 1–60 เดือน");return;
+            }
+            patch(s=>({...s,rules:draft.rules,etfs:draft.etfs,etfMode:draft.etfMode,reviewMonths:draft.reviewMonths}));
+            setMessage("บันทึกการตั้งค่าแล้ว");
+        }
+        function planBuy(bucket,symbol,amount){
+            const preferred=eligible.find(a=>symbol && p.holdings.some(item=>item.symbol===symbol&&item.account.id===a.id))
+                || eligible.find(a=>bucket==="btc"?/binance/i.test(a.name):bucket==="gold"?/gold|ทอง/i.test(a.name):accountCurrency(a)==="USD");
+            setPlanDraft({bucket,symbol,amount,accountId:preferred?.id||""});
+            setMessage("");
+        }
+        function savePlan(){
+            if(!eligible.some(a=>a.id===planDraft.accountId)){setMessage("เลือกบัญชีลงทุนสำหรับแผนนี้");return;}
+            const item={...planDraft,id:uid(),date:today};
+            patch(s=>({...s,plans:[item,...s.plans]}));
+            setPlanDraft(null);setMessage("บันทึกแผนซื้อแล้ว");
+        }
+        const nextReview=allocationDateAfter(settings.reviewed,settings.reviewMonths);
+        const alerts=actualKnown?ALLOCATION_KEYS.flatMap(key=>{
+            const status=allocationRebalanceStatus(actual[key],settings.rules[key]);
+            return status==="normal"?[]:[{key,status}];
+        }):[];
+        const assetKeys=[...new Set([...p.holdings.map(row=>row.symbol),...Object.keys(settings.quotes),...Object.keys(settings.etfs),"XAU","BTC"])].sort();
+        const selectedSymbol=allocationSymbol(quote.symbol);
+        const selectedQuote=selectedSymbol==="FX"?p.fx:p.quotes.get("ASSET:"+selectedSymbol);
+        const savedManual=selectedSymbol==="FX"?settings.fx:settings.quotes[selectedSymbol];
+        function overview(){
+            const angles=actualKnown?[actual.stock,actual.stock+actual.gold]:[0,0];
+            const chart=actualKnown?"conic-gradient("+colors.stock+" 0 "+angles[0]+"%, "+colors.gold+" "+angles[0]+"% "+angles[1]+"%, "+colors.btc+" "+angles[1]+"% 100%)":"var(--pa-soft)";
+            const hasProblem=p.issues.length>0 || p.missing.length>0;
+            const cost=p.issues.some(v=>v.includes("Snapshot")||v.includes("ขายเกิน"))?null:p.cost;
+            const pnl=(label,price,fx)=>line(label,gain(allocationSum([price,fx])),tone(allocationSum([price,fx])));
+            return h(React.Fragment,null,
+                h("section",{className:"pa-card pa-hero"},
+                    h("div",null,h("h3",null,"มูลค่าพอร์ตรวม"),h("div",{className:"pa-total"},hasProblem||p.cashTHB==null?"รอข้อมูล":money(allocationSum([p.value,p.cashTHB]))),note("สินทรัพย์และเงินสดในบัญชีลงทุน · THB")),
+                    line("สินทรัพย์ที่ถืออยู่",hasProblem?"—":money(p.value)),
+                    line("ต้นทุนสินทรัพย์ที่ยังถือ",money(cost)),
+                    line("เงินสดในบัญชีลงทุน",money(p.cashTHB)),
+                    Object.keys(p.cashByCurrency).length>0 && note(Object.entries(p.cashByCurrency).map(([c,n])=>cash(n,c)).join(" · ")),
+                    info("ดูผลตอบแทน","ผลจากราคาสินทรัพย์ใช้ต้นทุนเฉลี่ยรวมค่าซื้อขาย ผลค่าเงินเทียบกับต้นทุนบาทเดิม ขีด — หมายถึงข้อมูลที่ต้องใช้ยังไม่ครบ"),
+                    pnl("กำไร/ขาดทุนที่ยังไม่เกิดขึ้น",p.pricePL,p.fxPL),
+                    pnl("กำไร/ขาดทุนจากที่ขายแล้ว",p.realizedPrice,p.realizedFx),
+                    h("details",null,h("summary",null,"แยกผลจากราคาและค่าเงิน"),
+                        line("ยังถือ · ราคาสินทรัพย์",gain(p.pricePL),tone(p.pricePL)),
+                        line("ยังถือ · อัตราแลกเปลี่ยน",gain(p.fxPL),tone(p.fxPL)),
+                        line("ขายแล้ว · ราคาสินทรัพย์",gain(p.realizedPrice),tone(p.realizedPrice)),
+                        line("ขายแล้ว · อัตราแลกเปลี่ยน",gain(p.realizedFx),tone(p.realizedFx)),
+                        line("แลกเงินสดกลับ · แยกจากผลขาย",gain(p.cashFx),tone(p.cashFx)),
+                        line("ปรับค่าคอมมิชชันแยก",gain(p.commissions),tone(p.commissions)))),
+                hasProblem && card("ข้อมูลที่ต้องตรวจ",note([...p.issues,...p.missing].join(" · ")),action("ไปที่ราคาและเรท",()=>openPanel("prices"))),
+                p.stale.length>0 && card("ราคาอายุ 7 วันขึ้นไป",note(p.stale.join(" · ")),action("ตรวจราคา",()=>openPanel("prices"))),
+                card("Target vs Actual",
+                    h("div",{className:"pa-alloc"},h("div",{className:"pa-donut",style:{background:chart},"aria-hidden":true},h("span",null,actualKnown?"100%":"—")),
+                        h("div",{className:"pa-legend"},...ALLOCATION_KEYS.map(key=>h("div",{key},h("i",{style:{background:colors[key]}}),title(key),h("strong",null,pct(actual[key])))))),
+                    ...ALLOCATION_KEYS.map(key=>h("div",{key,className:"pa-bar-row"},
+                        line(title(key),money(p.buckets[key])),
+                        h("div",{className:"pa-track","aria-hidden":true},h("div",{style:{width:(actual[key]||0)+"%",background:colors[key]}}),
+                            h("i",{style:{left:"clamp(0px, "+settings.rules[key].target+"%, calc(100% - 2px))"}})),
+                        line("จริง "+pct(actual[key])+" · เป้า "+pct(settings.rules[key].target),
+                            actualKnown?pp(actual[key]-settings.rules[key].target):"—"))),
+                    p.holdings.some(row=>row.bucket==="outside") && note("สินทรัพย์นอกแผน "+money(allocationSum(p.holdings.filter(row=>row.bucket==="outside").map(row=>row.value)))+" · รวมในมูลค่าสินทรัพย์")),
+                card("ทบทวนพอร์ต",
+                    ...alerts.map(({key,status})=>h("div",{key,className:"pa-alert"},title(key)+" "+pct(actual[key])+" · "+
+                        (status==="sell"?"ประเมินการขายเพื่อลดสัดส่วน":status==="review"?"ทบทวนสัดส่วนที่ต่ำมาก":"สัดส่วนออกนอกกรอบ"))),
+                    alerts.some(x=>x.status==="sell")&&note("การขายอาจมีค่าธรรมเนียม Spread และภาษี"),
+                    actualKnown&&!alerts.length&&note("สัดส่วนอยู่ในกรอบที่ตั้งไว้"),
+                    line("ตรวจล่าสุด",day(settings.reviewed)),line("นัดถัดไป",day(nextReview)+(nextReview&&nextReview<=today?" · ถึงกำหนด":"")),
+                    action("บันทึกว่าตรวจวันนี้",()=>patch(s=>({...s,reviewed:today})))),
+                p.holdings.length>0 && card("ถืออยู่ในบัญชี",
+                    h("details",null,h("summary",null,"ดูสินทรัพย์และราคาที่ใช้"),
+                        ...p.holdings.map(row=>h("div",{key:row.account.id+"/"+row.symbol,className:"pa-holding"},
+                            line(row.symbol+" · "+num.format(row.units)+(allocationIsGold(row.symbol)?" g":""),money(row.value)),
+                            note(accountLabel(row.account,accounts)+(row.quote?" · "+day(row.quote.date)+" · "+quoteName(row.quote)+(p.isStale(row.quote)?" · ราคาค้าง":""):" · รอราคา")))))));
+        }
+        function suggested(row,bucket,symbol=""){
+            return h("div",{key:row.key,className:"pa-order"},
+                line(title(row.key),money(row.buy)),
+                note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
+                line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift)),
+                symbol && line("เทียบเป็น USD",p.fx?usd.format(row.buy/p.fx.value):"รอเรท"),
+                row.buy>0 && action("เก็บเป็นแผนซื้อ",()=>planBuy(bucket,symbol,row.buy)));
+        }
+        function smart(){
+            return h(React.Fragment,null,
+                card("งบลงทุนเดือนนี้",
+                    field("งบพร้อมลงทุน (THB)",budget,value=>{
+                        setBudget(value);setMessage("");if(value===""||Number(value)>=0&&Number(value)<=1e12)patch(s=>({...s,budget:allocationBudgetCents(value)/100}));
+                    },{step:0.01}),
+                    line("มูลค่าที่ใช้จัดสรร",p.issues.length?"—":money(p.allocationTotal)),
+                    info("เงินที่โอนเข้าโบรกเกอร์แล้ว","กรอกเฉพาะเงินที่พร้อมซื้อรอบนี้ได้เลย เงินสดไม่อยู่ในมูลค่าสินทรัพย์ที่ใช้จัดสรร งบนี้จึงถูกนับครั้งเดียว"),
+                    !budgetValid&&note("ตรวจจำนวนเงิน DCA อีกครั้ง")),
+                !d.canCalculate?card("รอข้อมูล",note(!d.validEtfs?"ตรวจผลรวมสัดส่วน ETF ในตั้งค่า":[...p.issues,...p.missing].join(" · ")),action(!d.validEtfs?"ตั้งค่า":"ไปที่ราคาและเรท",()=>openPanel(!d.validEtfs?"settings":"prices"))):
+                    budgetValid&&h(React.Fragment,null,
+                        card("เปรียบเทียบวิธีปรับพอร์ต",
+                            h("div",{className:"pa-actions"},action("ใช้เงินใหม่",()=>setScenario("contribution"),scenario==="contribution"),action("ซื้อและขาย",()=>setScenario("full"),scenario==="full")),
+                            p.stale.length>0&&note("ใช้ราคาค้างสำหรับประมาณการ · "+p.stale.join(" · ")),
+                            scenario==="contribution"?h(React.Fragment,null,
+                                line("แนะนำซื้อรวม",money(d.buys)),line("ค่าธรรมเนียมประมาณการ",money(d.fees)),
+                                line("เงินยังไม่จัดสรร",money(d.unallocated)),
+                                info("วิธีคำนวณ","กระจายงบตามส่วนที่ขาดจากเป้าหลังเติมเงิน พักซื้อกลุ่มที่เกินเป้าปัจจุบัน ยอดที่ต่ำกว่าขั้นต่ำหรือปัดลงจะแสดงเป็นเงินเหลือ"),
+                                ...d.orders.map(row=>row.key==="stock"&&d.etfOrders.length?h("div",{key:row.key,className:"pa-order"},
+                                    line(title(row.key),money(row.buy)),note(pct(row.budgetPct)+" ของงบ · "+weightStatus(row)),
+                                    line("จริง "+pct(row.actual)+" → หลังซื้อ "+pct(row.post),"เหลือ "+pp(row.drift))):
+                                    suggested(row,row.key,row.key==="btc"?"BTC":row.key==="gold"?"XAU":"")),
+                                d.etfOrders.length>0&&h("details",null,h("summary",null,"แผนซื้อ ETF รายตัว"),
+                                    note("ใช้เฉพาะงบที่จัดให้กลุ่มหุ้น · สัดส่วนเทียบภายในกลุ่ม"),
+                                    ...d.etfOrders.map(row=>suggested(row,"stock",row.key)))):h(React.Fragment,null,
+                                note("จำลองก่อนค่าธรรมเนียม Spread และภาษี"),
+                                ...d.orders.map(row=>h("div",{key:row.key,className:"pa-order"},
+                                    line(title(row.key),Math.abs(row.full)<.005?"—":(row.full>0?"ซื้อ ":"ขาย ")+money(Math.abs(row.full))),
+                                    line("จริง "+pct(row.actual)+" → เป้า "+pct(row.target),"เหลือ 0 จุด"))),
+                                info("การขาย","หน้านี้คำนวณเฉพาะยอดจำลอง การขายจริงบันทึกจากบัญชีลงทุนเดิม")))),
+                planDraft&&card("Suggested Order",
+                    line((planDraft.symbol||title(planDraft.bucket)),money(planDraft.amount)),
+                    select("บัญชีที่จะซื้อ",planDraft.accountId,accountId=>setPlanDraft({...planDraft,accountId}),[["","เลือกบัญชี"],...eligible.map(a=>[a.id,accountLabel(a,accounts)])]),
+                    !eligible.length&&note("เปิดพอร์ตแบบรายสินทรัพย์ในบัญชีที่จะใช้ซื้อ"),
+                    h("div",{className:"pa-actions"},action("บันทึกแผน",savePlan,true,!planDraft.accountId),action("ยกเลิก",()=>setPlanDraft(null)))),
+                card("แผนซื้อและรายการที่ซื้อจริง",
+                    !settings.plans.length&&note("เลือกเก็บแผนจากยอดที่ระบบแนะนำ"),
+                    ...settings.plans.map(item=>{
+                        const bought=p.executed.get(item.id), a=accounts.find(row=>row.id===item.accountId);
+                        return h("div",{key:item.id,className:"pa-order"},line(item.symbol||title(item.bucket),money(item.amount)),
+                            note((bought?"Executed Transaction":"Planned Order")+" · "+day(bought?.row.date||item.date)+(a?" · "+accountLabel(a,accounts):"")),
+                            bought?line("จ่ายจริง",cash(-portfolioCash(bought.row),accountCurrency(bought.account))):
+                                h("div",{className:"pa-actions"},action("บันทึกซื้อจริง",()=>onTrade(item.accountId,item),true,!eligible.some(a=>a.id===item.accountId)),
+                                    action("เอาแผนออก",()=>patch(s=>({...s,plans:s.plans.filter(x=>x.id!==item.id)})))));
+                    })));
+        }
+        function prices(){
+            return h(React.Fragment,null,
+                card("ราคาและเรท USD/THB",
+                    select("เลือกข้อมูลที่จะกรอก",quote.symbol,editQuote,[["","เลือกสินทรัพย์หรือเรท"],["FX","USD/THB"],...assetKeys.map(s=>[s,s])]),
+                    quote.symbol && h(React.Fragment,null,
+                        field(quote.symbol==="FX"?"บาทต่อ 1 USD":"ราคาตลาด",quote.value,value=>setQuote({...quote,value})),
+                        quote.symbol!=="FX" && select("สกุลเงินราคา",quote.currency,currency=>setQuote({...quote,currency}),[["THB","THB"],["USD","USD"]]),
+                        allocationIsGold(selectedSymbol)&&select("หน่วยราคา",quote.unit,unit=>setQuote({...quote,unit}),[["unit","ต่อกรัม"],["oz","ต่อ Troy Ounce"]]),
+                        field("วันที่ของราคา",quote.date,date=>setQuote({...quote,date}),{type:"date",max:today}),
+                        action("บันทึกราคา",saveQuote,true),
+                        selectedQuote&&note(day(selectedQuote.date)+" · "+quoteName(selectedQuote)+(p.isStale(selectedQuote)?" · ราคาค้าง":"")+
+                            (selectedQuote.updatedAt?" · อัปเดต "+new Date(selectedQuote.updatedAt).toLocaleString("en-GB"):"")),
+                        savedManual&&action("ลบราคาที่กรอกเอง",()=>{
+                            patch(s=>{if(quote.symbol==="FX")return {...s,fx:null};const quotes={...s.quotes};delete quotes[selectedSymbol];return {...s,quotes};});
+                            setQuote({...quote,value:"",date:today});setMessage("");
+                        })),
+                    info("หน่วยทองคำ","บันทึกทองจริงเป็น XAU จำนวนเป็นกรัม ระบบแปลงราคาต่อ Troy Ounce เป็นราคาต่อกรัมก่อนคูณจำนวน ส่วน ETF ทองคำอยู่ในกลุ่มหุ้น / ETF")),
+                card("ราคาที่ใช้ประเมิน",
+                    ...[["FX",p.fx],...assetKeys.map(s=>[s,p.quotes.get("ASSET:"+s)])].map(([s,q])=>h("div",{key:s,className:"pa-order"},
+                        line(s==="FX"?"USD/THB":s,q?num.format(q.value)+" "+(q.currency||"THB/USD")+(allocationIsGold(s)?q.unit==="oz"?"/oz":"/g":""):"รอราคา"),
+                        q&&note(day(q.date)+" · "+quoteName(q)+(p.isStale(q)?" · ราคาค้าง":""))))),
+                p.holdings.some(row=>row.bucket==="unclassified"||Object.hasOwn(settings.classes,row.symbol))&&card("จัดกลุ่มสินทรัพย์เพิ่มเติม",
+                    ...[...new Set(p.holdings.filter(row=>row.bucket==="unclassified"||Object.hasOwn(settings.classes,row.symbol)).map(row=>row.symbol))].map(s=>
+                        h("div",{key:s},select(s,settings.classes[s]||"",value=>patch(state=>({...state,classes:{...state.classes,[s]:value}})),
+                            [["","ตามประเภทเดิม"],["stock","หุ้น / ETF"],["gold","ทองคำ"],["outside","นอกแผน"]])))));
+        }
+        function configure(){
+            const labels={target:"เป้าหมาย %",low:"กรอบปกติต่ำสุด %",high:"กรอบปกติสูงสุด %",sellLow:"ทบทวนเมื่อต่ำกว่า %",sellHigh:"ทบทวนขายเมื่อสูงกว่า %",fee:"ค่าธรรมเนียมต่อรายการ (THB)",minimum:"ยอดซื้อขั้นต่ำ (THB)",step:"หน่วยปัดลง (THB)"};
+            return h(React.Fragment,null,
+                card("เป้าหมายและกรอบทบทวน",
+                    line("รวมสัดส่วน",pct(ALLOCATION_KEYS.reduce((sum,key)=>sum+(Number(draft.rules[key].target)||0),0))),
+                    ...ALLOCATION_KEYS.map(key=>h("details",{key},h("summary",null,title(key)+" · "+pct(Number(draft.rules[key].target))),
+                        h("div",{className:"pa-fields"},...Object.entries(labels).map(([prop,label])=>h("div",{key:prop},field(label,draft.rules[key][prop]??"",value=>
+                            setDraft({...draft,rules:{...draft.rules,[key]:{...draft.rules[key],[prop]:value}}}))))))),
+                    field("ทบทวนทุก (เดือน)",draft.reviewMonths,reviewMonths=>setDraft({...draft,reviewMonths}),{min:1,max:60,step:1})),
+                card("สัดส่วน ETF",
+                    select("ฐานของเป้าหมาย ETF",draft.etfMode,etfMode=>{
+                        if(etfMode===draft.etfMode)return;
+                        const stock=Number(draft.rules.stock.target);
+                        if(!(stock>0)&&Object.keys(draft.etfs).length){setMessage("กำหนดเป้าหมายหุ้นมากกว่า 0% ก่อนสลับฐาน ETF");return;}
+                        const factor=etfMode==="portfolio"?stock/100:stock>0?100/stock:1;
+                        setDraft({...draft,etfMode,etfs:Object.fromEntries(Object.entries(draft.etfs).map(([key,v])=>[key,Number((Number(v)*factor).toFixed(8))]))});
+                    },[["stock","% ของกลุ่มหุ้น"],["portfolio","% ของพอร์ตรวม"]]),
+                    line("รวมสัดส่วน ETF",pct(Object.values(draft.etfs).reduce((sum,n)=>sum+(Number(n)||0),0))+" / "+pct(draft.etfMode==="stock"?100:Number(draft.rules.stock.target))),
+                    select("เพิ่ม ETF จากพอร์ต", "", symbol=>symbol&&setDraft({...draft,etfs:{...draft.etfs,[symbol]:0}}),
+                        [["","เลือกสัญลักษณ์"],...stockOptions.filter(s=>!Object.hasOwn(draft.etfs,s)).map(s=>[s,s])]),
+                    ...Object.entries(draft.etfs).map(([s,v])=>h("div",{key:s,className:"pa-etf"},
+                        field(s+" (%)",v,value=>setDraft({...draft,etfs:{...draft.etfs,[s]:value}})),
+                        action("เอา "+s+" ออก",()=>{const etfs={...draft.etfs};delete etfs[s];setDraft({...draft,etfs});}))),
+                    action("บันทึกการตั้งค่า",saveRules,true)));
+        }
+        return h("div",{className:"pa-root"},
+            h("header",{className:"pa-head"},h("div",null,h("h2",null,"Portfolio Allocation"),note("หุ้น · ทองคำ · Bitcoin")),action("กลับ",onBack)),
+            h("nav",{className:"pa-nav","aria-label":"Portfolio Allocation"},
+                ...[["overview","ภาพรวม"],["dca","Smart DCA"],["prices","ราคา"],["settings","ตั้งค่า"]].map(([id,label])=>
+                    h("button",{type:"button",key:id,"aria-pressed":id===panel,onClick:()=>openPanel(id)},label))),
+            message&&h("div",{role:"status",className:"pa-alert"},message),
+            panel==="overview"?overview():panel==="dca"?smart():panel==="prices"?prices():draft&&configure());
+    }
+
+    const SCHEMA_VERSION = 22;
     const localAdapter = {
         load() { try {
             const s = localStorage.getItem(STORAGE_KEY);
@@ -1268,6 +1840,7 @@ try {
         s.statementOrder ?? (s.statementOrder = {});
         s.expenseTargets ?? (s.expenseTargets = {});
         s.investmentPlans ?? (s.investmentPlans = []);
+        s.allocationSettings = normalizeAllocation(s.allocationSettings);
         s.taxTypeMap ?? (s.taxTypeMap = {});
         s.foreignTax = normalizeForeignTax(s.foreignTax);
         delete s.quests;
@@ -1823,7 +2396,7 @@ try {
             if(canClassify && ["review","interest","dividend"].includes(meta.kind))kind=meta.kind;
             if(id.startsWith("transaction:") && meta.withheldTax!=="" && meta.withheldTax!=null){tax=Number(meta.withheldTax);gross=net+tax;}
             const country=taxCountryCode(meta.sourceCountry||a.taxIncomeCountry);
-            const crypto=r.tradeMode==="crypto";
+            const crypto=r.tradeMode==="crypto" || allocationIsBtc(r.symbol);
             items.push({id,rowId:r.id,accountId:a.id,accountName:a.name,date:r.date,year:String(r.date||"").slice(0,4),
                 title:(FOREIGN_TAX_LABELS[kind]||kind)+(r.symbol?" · "+r.symbol:r.title?" · "+r.title:""),kind,
                 currency:accountCurrency(a),gross,tax,net,pnl,sourceCountry:country,
@@ -1838,7 +2411,7 @@ try {
                 const id="portfolio:"+a.id+":"+r.id;
                 if(r.type==="sell"){
                     const pnl=book?.realized.get(r.id)??null;
-                    add(a,r,"trade",id,pnl==null?null:Math.max(0,pnl),0,pnl==null?null:Math.max(0,pnl),pnl);
+                    add(a,r,allocationIsGold(r.symbol)?"review":"trade",id,pnl==null?null:Math.max(0,pnl),0,pnl==null?null:Math.max(0,pnl),pnl);
                 }else if(["interest","dividend"].includes(r.type)){
                     add(a,r,r.type,id,Number(r.amount)||0,Number(r.tax)||0,(Number(r.amount)||0)-(Number(r.tax)||0));
                 }else if(["fee_refund","fee_charge"].includes(r.type)){
@@ -2459,7 +3032,7 @@ try {
                     count:items.length
                 })))));
     }
-    function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, foreignTax, setForeignTax, onClose }) {
+    function PortfolioPanel({ account, accounts, transactions, payments, setAccounts, foreignTax, setForeignTax, onClose, initialOrder }) {
         const h = React.createElement, currency = accountCurrency(account);
         const entries = account.portfolioEntries || [];
         const totalOnly = account.portfolioMode === "summary";
@@ -2481,8 +3054,8 @@ try {
             return Number(tradeGrossAmount(row.units,row.rate));
         };
         const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", unitPrice:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
-        const [tab,setTab] = useState(totalOnly ? "assets" : "profit"), [type,setType] = useState("");
-        const [rows,setRows] = useState([]), [date,setDate] = useState(TK), [error,setError] = useState("");
+        const [tab,setTab] = useState(totalOnly ? "assets" : "profit"), [type,setType] = useState(initialOrder ? "buy" : "");
+        const [rows,setRows] = useState(()=>initialOrder ? [{...fresh(),tradeMode:"stock",symbol:initialOrder.symbol||"",allocationOrderId:initialOrder.id}] : []), [date,setDate] = useState(TK), [error,setError] = useState("");
         const [editing,setEditing] = useState(null), [year,setYear] = useState("all");
         const [confirmDelete,setConfirmDelete] = useState(null);
         const balances = holdings.every(p => p.quote) ? holdings.reduce((sum,p) => sum + p.units * p.quote.amount,0) : null;
@@ -2490,16 +3063,19 @@ try {
         function begin(kind, old, reuse = false) {
             setType(kind); setEditing(old && !reuse ? old.id : null); setDate(old && !reuse ? old.date : TK);
             const unitPrice = old?.unitPrice ?? (old && ["buy","sell"].includes(kind) && old.tradeMode !== "crypto" && Number(old.units)>0 && Number(old.amount)>0 ? purchaseValue(old.amount,old.units,true) : "");
-            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), ...(reuse ? {thbRate:"",eventTime:""} : {}), unitPrice, amount: old?.amount ?? "" }]);
+            setRows([{ ...fresh(), ...(old || {}), ...(old ? {tradeMode:old.tradeMode || "stock",budget:old.budget ?? old.amount ?? ""} : {}), id: old && !reuse ? old.id : uid(), ...(reuse ? {thbRate:"",eventTime:"",allocationOrderId:undefined} : {}), unitPrice, amount: old?.amount ?? "" }]);
             setError(""); setConfirmDelete(null);
         }
-        function finish() { setType(""); setEditing(null); setError(""); }
+        function finish() {
+            if (initialOrder) { onClose(); return; }
+            setType(""); setEditing(null); setError("");
+        }
         function change(index,key,value) {
             setRows(list => list.map((row,i) => {
                 if (i !== index) return row;
                 const next = {...row,[key]:value};
                 if (["buy","sell"].includes(type) && !isCrypto(next,type) && ["unitPrice","units"].includes(key) && (next.unitPrice || key==="unitPrice"))
-                    next.amount = tradeGrossAmount(next.units,next.unitPrice);
+                    next.amount = tradeGrossAmount(next.units,next.unitPrice,!allocationIsGold(next.symbol) && !allocationIsBtc(next.symbol) && !next.allocationOrderId);
                 if(isTrade(type) && !isCrypto(next,type)){
                     const totalKey=type==="buy" ? "totalPaid" : "netReceived";
                     if(key==="saleInput" && value==="net"){
@@ -2519,7 +3095,16 @@ try {
         }
         function commit(next) {
             portfolioBook(next); // Reject oversells, including those caused by changing an earlier entry.
-            setAccounts(list => list.map(a => a.id === account.id ? {...a,portfolioEntries:next} : a));
+            const linked=next.filter(r=>r.type==="buy" && r.allocationOrderId);
+            const linkedIds=new Set(linked.map(r=>r.allocationOrderId));
+            if(linked.length!==linkedIds.size || accounts.some(a=>a.id!==account.id && (a.portfolioEntries||[]).some(r=>linkedIds.has(r.allocationOrderId))))
+                throw new Error("แผนนี้บันทึกซื้อจริงไปแล้ว");
+            setAccounts(list => {
+                const current=list.find(a=>a.id===account.id);
+                if (!current || current.archived || current.portfolioEntries!==account.portfolioEntries ||
+                    list.some(a=>a.id!==account.id && (a.portfolioEntries||[]).some(r=>linkedIds.has(r.allocationOrderId)))) return list;
+                return list.map(a=>a.id===account.id ? {...a,portfolioEntries:next} : a);
+            });
         }
         function reorderHistory(day,ids){
             try{commit(reorderPortfolioDay(entries,day,ids));setError("");}
@@ -2567,7 +3152,16 @@ try {
                         result.thbRate=numeric(row.thbRate,"เรทเงินบาท ณ วันที่ทำรายการ");
                     if (["buy","sell","opening","quote","dividend"].includes(type)) {
                         result.symbol = String(row.symbol || "").trim().toUpperCase();
-                        if (!result.symbol && type !== "dividend") throw new Error("กรอกชื่อหุ้นหรือเหรียญ");
+                        if (!result.symbol && type !== "dividend") throw new Error("กรอกชื่อสินทรัพย์");
+                        if (type==="buy" && row.allocationOrderId && original?.symbol===result.symbol)
+                            result.allocationOrderId=row.allocationOrderId;
+                        if (type==="buy" && initialOrder?.id && row.allocationOrderId===initialOrder.id) {
+                            if ((initialOrder.symbol && result.symbol!==initialOrder.symbol) ||
+                                allocationBucket(allocationSymbol(result.symbol),account,entries)!==initialOrder.bucket)
+                                throw new Error("เลือกสินทรัพย์ให้ตรงกับแผนซื้อ");
+                            if (entries.some(r=>r.allocationOrderId===initialOrder.id)) throw new Error("แผนนี้บันทึกซื้อจริงไปแล้ว");
+                            result.allocationOrderId=initialOrder.id;
+                        }
                     }
                     if (isCrypto(row,type)) {
                         result.tradeMode = "crypto";
@@ -2714,10 +3308,11 @@ try {
         }
         return h(Sheet,{title:type ? portfolioTypes[type]+" · "+account.name : "พอร์ตลงทุน · "+account.name,onClose:type ? finish : onClose},
             type ? h("div",{className:"pf-stack pf-form"},
+                initialOrder && text("แผนซื้อ "+new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB"}).format(initialOrder.amount)+" · กรอกยอดที่ซื้อจริง"),
                 h(Input,{label:"วันที่",type:"date",value:date,onChange:setDate}),
                 rows.map((r,i)=>h("div",{key:r.id,className:"pf-fields"},
                     rows.length>1 && group(text("รายการที่ "+(i+1)),button("เอาออก",()=>setRows(rows.filter(x=>x.id!==r.id)))),
-                    ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : isCrypto(r,type) ? "สัญลักษณ์เหรียญ" : "หุ้น / ETF / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น BTC หรือ SCHG"}),
+                    ["buy","sell","opening","quote","dividend"].includes(type) && h(SuggestInput,{label:type==="dividend" ? "สินทรัพย์ (ถ้ามี)" : isCrypto(r,type) ? "สัญลักษณ์เหรียญ" : "หุ้น / ETF / ทองคำ / เหรียญ",value:r.symbol,onChange:v=>change(i,"symbol",v),options:[...book.assets.keys()],placeholder:"เช่น SCHG, XAU, BTC"}),
                     type==="sell" && holdings.length>0 && h("details",null,h("summary",null,"เลือกจากหุ้นที่ถืออยู่"),h("div",{className:"flex flex-wrap gap-2","aria-label":"เลือกสินทรัพย์ที่ถืออยู่"},
                         ...holdings.map(position=>h("button",{key:position.symbol,type:"button",className:"si-link","aria-pressed":String(r.symbol).trim().toUpperCase()===position.symbol,onClick:()=>change(i,"symbol",position.symbol)},position.symbol)))),
                     isCrypto(r,type) && h(React.Fragment,null,
@@ -2725,12 +3320,14 @@ try {
                         field(i,"units",type==="buy" ? "จำนวนเหรียญที่ได้รับจริง" : "จำนวนเหรียญที่ขาย"),
                         field(i,"rate","อัตรา · 1 "+(r.symbol || "เหรียญ")+" เท่ากับกี่ "+currency),
                         preview(r)),
-                    !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหุ้น / หน่วย"),
+                    !isCrypto(r,type) && ["buy","sell","opening"].includes(type) && field(i,"units",allocationIsGold(r.symbol) ? "จำนวนทอง (กรัม)" : type==="opening" ? "จำนวนหน่วยที่ถือ" : "จำนวนหุ้น / หน่วย"),
                     type==="sell" && h("div",{className:"pf-pair"},
                         text(r.symbol ? "ขายได้ "+quantity(sellAvailable(i))+" หน่วย" : "เลือกหุ้นหรือเหรียญก่อน"),
                         h("button",{type:"button",className:"si-link",disabled:!r.symbol || sellAvailable(i)<=0,"aria-label":"ขายทั้งหมด รายการที่ "+(i+1),onClick:()=>change(i,"units",String(sellAvailable(i)))},"ขายทั้งหมด")),
-                    isTrade(type) && !isCrypto(r,type) && field(i,"unitPrice",(type==="buy" ? "ราคาที่ซื้อต่อหน่วย" : "ราคาที่ขายต่อหน่วย")+" ("+currency+")"),
-                    !isCrypto(r,type) && !isTrade(type) && field(i,"amount",({fee_refund:"ยอดค่าคอมมิชชันที่ได้รับคืน",fee_charge:"ยอดค่าคอมมิชชันที่หักเพิ่ม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
+                    isTrade(type) && !isCrypto(r,type) && field(i,"unitPrice",(type==="buy" ? "ราคาที่ซื้อ" : "ราคาที่ขาย")+(allocationIsGold(r.symbol)?"ต่อกรัม":"ต่อหน่วย")+" ("+currency+")"),
+                    isTrade(type) && !isCrypto(r,type) && (r.allocationOrderId || allocationIsGold(r.symbol) || allocationIsBtc(r.symbol)) &&
+                        field(i,"amount",(type==="buy"?"ยอดซื้อ":"ยอดขาย")+"ก่อนค่าธรรมเนียม ("+currency+")"),
+                    !isCrypto(r,type) && !isTrade(type) && field(i,"amount",({fee_refund:"ยอดค่าคอมมิชชันที่ได้รับคืน",fee_charge:"ยอดค่าคอมมิชชันที่หักเพิ่ม",opening:"ต้นทุนรวม (เว้นว่างได้)",cash:"เงินสดจริง ณ สิ้นวันที่เลือก",quote:allocationIsGold(r.symbol)?"ราคาต่อกรัม":"ราคาต่อหน่วย",snapshot:"มูลค่ารวมเงินสดและสินทรัพย์",interest:"ดอกเบี้ยก่อนหักภาษี",dividend:"เงินปันผลก่อนหักภาษี"})[type]+" ("+currency+")"),
                     ["fee_refund","fee_charge"].includes(type) && field(i,"note","หมายเหตุ / อ้างอิงคำสั่งซื้อขาย (ถ้ามี)","text"),
                     isTrade(type) && !isCrypto(r,type) && r.feeUnit!=="asset" && h(React.Fragment,null,
                         h(Input,{label:(type==="buy"?"ยอดจ่ายรวม":"ยอดรับสุทธิ")+" ("+currency+")",type:"number",
@@ -2756,7 +3353,7 @@ try {
                     rows.length>1 && pair(type==="buy" ? "ยอดจ่ายรวมทุกรายการ" : "ยอดรับสุทธิทุกรายการ", hasNetCash ? money(Math.abs(netCash)) : "—"),
                     h("details",null,h("summary",null,"ดูเงินสดหลังบันทึก"),pair("เงินสดในบัญชีหลังบันทึก", hasNetCash ? money(decimalCash(cash - previousCashChange + netCash)) : "—"))),
                 type==="buy" && !editing && -netCash > cash && text("ยอดซื้อสูงกว่าเงินสดที่บันทึกไว้ ตรวจยอดโอนเข้าหรือเงินสดตั้งต้นก่อนบันทึก"),
-                isTrade(type) && !editing && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
+                isTrade(type) && !editing && !initialOrder && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
             : h("div",{className:"pf-stack"},
                 h("div",{className:"pf-tabs"},!totalOnly && button("กำไร/ขาดทุน",()=>setTab("profit"),tab==="profit"),button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns"),setForeignTax && button("ภาษี",()=>setTab("tax"),tab==="tax")),
@@ -2967,7 +3564,11 @@ try {
             React.createElement("div",{className:"text-sm font-extrabold"},studioOnly?"เงินห้องซ้อมในบัญชี":"กระเป๋าเงินในบัญชี"),
             React.createElement("p",{className:"text-[11px] mt-1 leading-relaxed",style:{color:T.muted}},"เฉพาะบัญชีที่เปิดแยกกระเป๋า · ยอดนี้รวมอยู่ในยอดบัญชีแล้ว"),
             studioOnly&&React.createElement("div",{className:"font-extrabold text-2xl mt-3",style:{color:T.purple}},moneyIn(rows.reduce((sum,r)=>sum+r.studio,0))),
-            rows.map(row=>React.createElement("div",{key:row.account.id,className:"mt-3 pt-3",style:{borderTop:`1px solid ${T.border}`}},
+            rows.map(row=>studioOnly
+                ? React.createElement("div",{key:row.account.id,className:"mt-3 pt-3 flex items-baseline justify-between gap-3",style:{borderTop:`1px solid ${T.border}`}},
+                    React.createElement("span",{className:"text-xs font-bold min-w-0"},accountLabel(row.account,accounts)),
+                    React.createElement("strong",{className:"text-sm shrink-0 tabular-nums",style:{color:row.studio<0?T.red:T.purple}},moneyIn(row.studio)))
+                : React.createElement("div",{key:row.account.id,className:"mt-3 pt-3",style:{borderTop:`1px solid ${T.border}`}},
                 React.createElement("div",{className:"text-xs font-bold mb-2"},accountLabel(row.account,accounts)),
                 React.createElement("div",{className:"grid grid-cols-2 gap-2"},React.createElement(Stat,{label:"ส่วนตัว",value:moneyIn(row.personal),color:row.personal<0?T.red:T.green}),React.createElement(Stat,{label:"Blurryroom Studio",value:moneyIn(row.studio),color:row.studio<0?T.red:T.purple})),
                 row.held>0&&React.createElement("div",{className:"text-xs mt-2",style:{color:T.orange}},`เงินรอส่งผู้อื่น ${moneyIn(row.held)}`),
@@ -3012,6 +3613,7 @@ try {
         const [txnTemplateDefaults, setTxnTemplateDefaults] = useState({});
         const [expenseTargets, setExpenseTargets] = useState({});
         const [investmentPlans, setInvestmentPlans] = useState([]);
+        const [allocationSettings, setAllocationSettings] = useState(normalizeAllocation);
         const [taxTypeMap, setTaxTypeMap] = useState({});
         const [foreignTax, setForeignTax] = useState(()=>normalizeForeignTax());
         const [accounts, setAccounts] = useState([]);
@@ -3121,7 +3723,7 @@ try {
                 return changed ? next : imports;
             });
         };
-        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed });
+        const buildSnapshot = (revision = cloudRevision.current) => ({ version: SCHEMA_VERSION, revision, savedAt: new Date().toISOString(), events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, allocationSettings, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed });
         const reportLocalSaveError = (label, error) => {
             const message = `${label}: ${error?.message || "พื้นที่จัดเก็บอาจเต็มหรือ Safari ปฏิเสธการบันทึก"}`;
             setLocalSaveError(message);
@@ -3377,6 +3979,7 @@ try {
             if (s.txnTemplateDefaults)
                 setTxnTemplateDefaults(s.txnTemplateDefaults);
             setInvestmentPlans(s.investmentPlans || []);
+            setAllocationSettings(normalizeAllocation(s.allocationSettings));
             if (s.expenseTargets)
                 setExpenseTargets(s.expenseTargets);
             if (s.taxTypeMap)
@@ -3680,7 +4283,7 @@ try {
                 setLocalSaveError(current => current.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ") ? "" : current);
                 localErrorShown.current = false;
             }
-        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, allocationSettings, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             if (!loaded || !authUser || !sb)
                 return;
@@ -3806,7 +4409,7 @@ try {
             cloudTimer.current = setTimeout(() => cloudSyncFn.current?.(), 2500);
             return () => { if (cloudTimer.current)
                 clearTimeout(cloudTimer.current); };
-        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
+        }, [loaded, authUser?.id, cloudConflict, events, bookings, incomeSources, payments, customerProfiles, loyaltyBase, transactions, capital, workouts, taskLibraryEdits, todos, nutrition, nutriTargets, foodLibrary, exPresets, workoutPresets, accounts, txnCategories, fixedCosts, closedMonths, statementTotals, statementImports, statementOrder, expensePresets, incomePresets, payerNames, txnTemplateDefaults, expenseTargets, investmentPlans, allocationSettings, taxTypeMap, foreignTax, fitnessSplit, fitnessStartDay, fitnessConfirmed]);
         useEffect(() => {
             const flush = () => { if (cloudDirty.current) cloudSyncFn.current?.(); };
             const pull = () => { cloudPullFn.current?.(); };
@@ -3880,6 +4483,7 @@ try {
             setPayerNames([]);
             setExpenseTargets({});
             setInvestmentPlans([]);
+            setAllocationSettings(normalizeAllocation());
             setTaxTypeMap({});
             setForeignTax(normalizeForeignTax());
             setTxnTemplateDefaults({});
@@ -4679,7 +5283,7 @@ try {
             exportEventICS, exportDayICS, exportWeekICS, authUser, cloudState, cloudMsg, cloudConflict, localSaveError, hasPendingSync, resolveCloudConflict, syncCloudNow, signInWithGoogle, signOutSupabase,
             fitnessSplit, saveFitnessSplit, fitnessStartDay, setFitnessStartDay, fitnessConfirmed, confirmFitnessWeek,
             workouts, updateWorkouts: setWorkouts,
-            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, taxTypeMap, setTaxTypeMap, foreignTax, setForeignTax,
+            nutrition, setNutrition, nutriTargets, setNutriTargets, foodLibrary, setFoodLibrary, exPresets, setExPresets, workoutPresets, setWorkoutPresets, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, allocationSettings, setAllocationSettings, taxTypeMap, setTaxTypeMap, foreignTax, setForeignTax,
             exportData, importData, clearAllData, dataMsg, historyEntries, restoreHistory, clearHistory, pwaInstalled, pwaCanPrompt: !!installPrompt, pwaIsIos, requestPwaInstall,
             toggleEvent, delEvent, delEventSeries, editEvent, editEventSeries, shiftEventSeries, addEvent, addBooking, editBooking, updateReconcileStatus, offerUndo, fireToast, openAdd, addSheet, clearAdd, setChromeless, goTab: setTab, todos, addTodo, toggleTodo, delTodo, updateIncomeSourceExpected };
         const NAV = [["today", Home, "วันนี้"], ["calendar", CalendarDays, "ปฏิทิน"], ["studio", Music, "สตูดิโอ"], ["budget", Wallet, "บัญชี"], ["fitness", Dumbbell, "ฟิตเนส"], ["settings", Settings, "ตั้งค่า"]];
@@ -6373,21 +6977,21 @@ try {
                         React.createElement("div", { className: "p-2 rounded-lg", style: { background: hex(T.blue, .08), border: `1px solid ${hex(T.blue, .25)}` } }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, "งานสอน"), React.createElement("div", { className: "text-xs font-extrabold", style: { color: T.blue } }, fmtBaht(teachingIncome))),
                         React.createElement("div", { className: "p-2 rounded-lg", style: { background: hex(T.cyan, .08), border: `1px solid ${hex(T.cyan, .25)}` } }, React.createElement("div", { className: "text-[9px]", style: { color: T.muted } }, "Calendar Studio"), React.createElement("div", { className: "text-xs font-extrabold", style: { color: T.cyan } }, fmtBaht(calendarStudioIncome)))),
                     React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "รวมการจอง รายรับที่กรอกเอง และ Studio Event จาก Calendar · รายจ่ายแสดงยอดสุทธิหลังเงินคืน"),
-                    !accounts.some(a=>a.pocketEnabled) && React.createElement("div", { className: "mt-3 pt-3 flex items-center justify-between", style: { borderTop: `1px solid ${T.border}` } },
+                    React.createElement("div", { className: "mt-3 pt-3 flex items-center justify-between gap-2", style: { borderTop: `1px solid ${T.border}` } },
                         React.createElement("div", { className: "flex items-center gap-2" },
                             React.createElement(Wallet, { size: 14, style: { color: T.gold } }),
-                            React.createElement("span", { className: "text-[11px]", style: { color: T.sub } }, "\u0E40\u0E07\u0E34\u0E19\u0E15\u0E49\u0E19"),
-                            capEdit ? (React.createElement("input", { autoFocus: true, type: "number", value: capVal, onChange: e => setCapVal(e.target.value), onBlur: () => { updateCapital(capVal); setCapEdit(false); }, onKeyDown: e => { if (e.key === "Enter") {
+                            React.createElement("span", { className: "text-[11px]", style: { color: T.sub } }, "เงินตั้งต้นห้องซ้อม"),
+                            capEdit ? (React.createElement("input", { autoFocus: true, type: "number", "aria-label": "เงินตั้งต้นห้องซ้อม", value: capVal, onChange: e => setCapVal(e.target.value), onBlur: () => { updateCapital(capVal); setCapEdit(false); }, onKeyDown: e => { if (e.key === "Enter") {
                                     updateCapital(capVal);
                                     setCapEdit(false);
-                                } }, className: "w-24 px-2 py-1 rounded-lg text-sm outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.gold}` } })) : (React.createElement("button", { onClick: () => setCapEdit(true), className: "text-sm font-bold flex items-center gap-1", style: { color: T.text } },
+                                } }, className: "w-24 px-2 py-1 rounded-lg text-sm outline-none", style: { background: T.surf2, color: T.text, border: `1px solid ${T.gold}` } })) : (React.createElement("button", { type: "button", "aria-label": "แก้ไขเงินตั้งต้นห้องซ้อม", onClick: () => setCapEdit(true), className: "text-sm font-bold flex items-center gap-1", style: { color: T.text } },
                                 fmtBaht(capital),
                                 " ",
                                 React.createElement(Pencil, { size: 11, style: { color: T.muted } })))),
                         React.createElement("div", { className: "text-right" },
-                            React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "เงินต้น + ผลสุทธิสะสม"),
+                            React.createElement("div", { className: "text-[10px]", style: { color: T.muted } }, "เงินตั้งต้น + ผลสุทธิสะสม"),
                             React.createElement("div", { className: "text-lg font-extrabold", style: { color: balance >= 0 ? T.gold : T.red } }, fmtBaht(balance)))),
-                    !accounts.some(a=>a.pocketEnabled) && finMode === "month" && React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "* \u0E22\u0E2D\u0E14\u0E04\u0E07\u0E40\u0E2B\u0E25\u0E37\u0E2D\u0E23\u0E27\u0E21\u0E17\u0E38\u0E01\u0E40\u0E14\u0E37\u0E2D\u0E19 (\u0E40\u0E07\u0E34\u0E19\u0E15\u0E49\u0E19 + \u0E2A\u0E38\u0E17\u0E18\u0E34\u0E2A\u0E30\u0E2A\u0E21) \u2014 \u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E23\u0E32\u0E22\u0E23\u0E31\u0E1A/\u0E08\u0E48\u0E32\u0E22/\u0E2A\u0E38\u0E17\u0E18\u0E34\u0E14\u0E49\u0E32\u0E19\u0E1A\u0E19\u0E04\u0E37\u0E2D\u0E02\u0E2D\u0E07\u0E40\u0E14\u0E37\u0E2D\u0E19\u0E17\u0E35\u0E48\u0E40\u0E25\u0E37\u0E2D\u0E01")))),
+                    finMode === "month" && React.createElement("div", { className: "text-[10px] mt-2", style: { color: T.muted } }, "ยอดสะสมรวมทุกเดือน · รายรับและรายจ่ายด้านบนเป็นของเดือนที่เลือก")))),
             sub === "finance" && React.createElement(PocketSummary,{accounts,transactions,payments,sources:incomeSources,studioOnly:true}),
             sub === "finance" && React.createElement("div", { className: "flex gap-2" },
                 sub === "finance" && React.createElement("button", { onClick: () => setTxnOpen(true), className: "flex-1 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-[.98]", style: { minHeight: 50, padding: "12px 16px", background: "#FFFFFF", color: T.red, border: `1px solid ${hex(T.red, .38)}`, boxShadow: "0 8px 20px rgba(182,73,73,.10)" } },
@@ -9768,7 +10372,7 @@ try {
         }
         return {wallets,results};
     }
-    function tradeGrossAmount(units, unitPrice) {
+    function tradeGrossAmount(units, unitPrice, round99 = true) {
         if (![units, unitPrice].every(value => Number.isFinite(Number(value)) && Number(value) > 0)) return "";
         // Multiply decimal digits before rounding to avoid half-cent errors such as 1.005.
         function decimalParts(value) {
@@ -9781,7 +10385,7 @@ try {
         const shift = quantity.scale + price.scale - 2;
         const factor = 10n ** BigInt(Math.abs(shift));
         let cents = shift > 0 ? (product + factor / 2n) / factor : product * factor;
-        if (cents % 100n === 99n) cents += 1n;
+        if (round99 && cents % 100n === 99n) cents += 1n;
         return String(cents / 100n) + "." + String(cents % 100n).padStart(2,"0");
     }
     function purchaseValue(quantity,unitPrice,convertFromTHB=false) {
@@ -9959,7 +10563,7 @@ try {
 
     function Budget(props) {
         const { foreignTax, setForeignTax } = props;
-        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder = {}, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, offerUndo, fireToast } = props;
+        const { events, bookings, incomeSources = [], payments = [], addIncomeSourcePayment, updateIncomeSourcePayment, deleteIncomeSourcePayment, addPaidStudioBookingIncome, addManualIncomeWithAllocations, deleteIncomeSourceOnly, customerProfiles = {}, transactions, updateReconcileStatus, accounts, setAccounts, txnCategories, setTxnCategories, renameTxnCategory, deleteTxnCategory, addTxn, updateTxn, delTxn, fixedCosts, setFixedCosts, closedMonths, setClosedMonths, statementTotals, setStatementTotals, statementImports, setStatementImports, statementOrder = {}, setStatementOrder, expensePresets, setExpensePresets, incomePresets, setIncomePresets, payerNames, setPayerNames, txnTemplateDefaults, setTxnTemplateDefaults, expenseTargets, setExpenseTargets, investmentPlans, setInvestmentPlans, allocationSettings, setAllocationSettings, offerUndo, fireToast } = props;
         const B_SUBS = ["summary", "transactions", "due", "monthclose"];
         const [sub, setSubRaw] = useState(() => { try {
             const v = localStorage.getItem("dos_budget_sub");
@@ -9976,6 +10580,7 @@ try {
         const [budgetView, setBudgetView] = useState("overview");
         const [openFamilies,setOpenFamilies]=useState({});
         const [portfolioId, setPortfolioId] = useState(null);
+        const [portfolioOrder, setPortfolioOrder] = useState(null);
         const [taxOpen, setTaxOpen] = useState(false);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId && a.portfolioEnabled);
         const [budgetNow, setBudgetNow] = useState(Date.now());
@@ -10374,7 +10979,7 @@ try {
             React.createElement("h1",{className:"text-2xl font-extrabold",style:{order:-4}},"บัญชี"),
             React.createElement("nav",{className:"si-nav","aria-label":"เมนูบัญชี",style:{order:-3}},
                 ...[["overview","ภาพรวม"],["transactions","รายการ"],["due","ค้างรับ"],["accounts","บัญชีและพอร์ต"]].map(([id,label])=>{
-                    const active=["transactions","due"].includes(sub) ? sub : sub==="summary" && ["accounts","investment"].includes(budgetView) ? "accounts" : "overview";
+                    const active=["transactions","due"].includes(sub) ? sub : sub==="summary" && ["accounts","investment","allocation"].includes(budgetView) ? "accounts" : "overview";
                     return React.createElement("button",{key:id,"aria-current":active===id?"page":undefined,style:{flex:id==="accounts"?1.35:1,minWidth:0,whiteSpace:"nowrap"},onClick:()=>{
                         const section=["transactions","due"].includes(id);
                         setSub(section?id:"summary");
@@ -10386,6 +10991,11 @@ try {
                 React.createElement("button",{onClick:()=>setBudgetView("reports")},"รายงาน"),
                 React.createElement("button",{onClick:()=>setSub("monthclose")},"ตรวจ Statement และปิดเดือน")),
             sub==="summary" && budgetView==="accounts" && React.createElement("button",{className:"si-link",style:{order:2},onClick:()=>setBudgetView("investment")},"แผนลงทุนและพอร์ตทั้งหมด"),
+            sub==="summary" && ["accounts","investment"].includes(budgetView) && React.createElement("button",{className:"si-link",style:{order:2,minHeight:44},onClick:()=>setBudgetView("allocation")},"Portfolio Allocation · Smart DCA"),
+            sub==="summary" && budgetView==="allocation" && React.createElement(PortfolioAllocation,{
+                accounts,transactions,payments,settings:allocationSettings,setSettings:setAllocationSettings,
+                onBack:()=>setBudgetView("investment"),onTrade:(id,order)=>{setPortfolioOrder(order);setPortfolioId(id);}
+            }),
             sub==="summary" && budgetView==="accounts" && React.createElement("button",{className:"si-link",style:{order:3},onClick:()=>setTaxOpen(true)},"ภาษีเงินลงทุน"),
             (sub==="due" || sub==="monthclose" || sub==="summary" && ["reports","investment"].includes(budgetView)) && React.createElement("h2",{className:"text-base font-bold"},sub==="due"?"ค้างรับ":sub==="monthclose"?"ตรวจ Statement และปิดเดือน":budgetView==="reports"?"รายงาน":"แผนลงทุนและพอร์ต"),
             sub === "summary" && budgetView === "overview" && React.createElement("div", { className: "flex items-center justify-between gap-2", style: { order: -1 } }, React.createElement("button", { "aria-label": "เดือนก่อนหน้า", onClick: () => setMk(value => addMonthKey(value,-1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronLeft,{size:18})), React.createElement("input", { type: "month", "aria-label": "เดือนภาพรวมบัญชี", value: mk, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { setMk(e.target.value); } }, style: { padding: "8px 10px", maxWidth: 170, borderRadius: 10, background: T.surf, color: T.text, border: `1px solid ${T.border}`, fontSize: 13 } }), React.createElement("button", { "aria-label": "เดือนถัดไป", onClick: () => setMk(value => addMonthKey(value,1)), className: "p-2 rounded-xl", style: { background: T.surf } }, React.createElement(ChevronRight,{size:18}))),
@@ -11059,7 +11669,8 @@ try {
                     setFixedCosts(fs => fs.map(x => x.id === payFc.id ? { ...x, lastAccountId: accId, fixedCostTrackingVersion: 2 } : x));
                     setPayFc(null);
                 } }),
-            selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id, account:selectedPortfolio, accounts, transactions, payments, setAccounts, foreignTax, setForeignTax, onClose:()=>setPortfolioId(null) }),
+            selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id+"/"+(portfolioOrder?.id||""), account:selectedPortfolio, accounts, transactions, payments,
+                setAccounts, foreignTax, setForeignTax, initialOrder:portfolioOrder, onClose:()=>{setPortfolioId(null);setPortfolioOrder(null);} }),
             taxOpen && React.createElement(Sheet,{title:"ภาษีเงินลงทุน",onClose:()=>setTaxOpen(false)},React.createElement(ForeignTaxPanel,{accounts,transactions,payments,setAccounts,foreignTax,setForeignTax})),
             editAcc && (React.createElement(Sheet, { onClose: () => setEditAcc(null), title: editAcc.id ? "แก้ไขบัญชี" : "เพิ่มบัญชี" },
                 React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D\u0E1A\u0E31\u0E0D\u0E0A\u0E35", value: editAcc.name, onChange: v => setEditAcc({ ...editAcc, name: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E01\u0E2A\u0E34\u0E01\u0E23\u0E44\u0E17\u0E22, \u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14" }),
