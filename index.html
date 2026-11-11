@@ -406,6 +406,10 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 body,#boot,#err{background:#F5F4ED;color:#202F2E}.app-shell{font-variant-numeric:tabular-nums}
 .si-nav{display:flex;gap:4px;padding:4px;border:1px solid #d5dad0;background:#eceee6;border-radius:15px}.si-nav button{flex:1;min-height:44px;border-radius:11px;font-size:13px;font-weight:700;color:#455753}.si-nav button[aria-current=page]{background:#22645c;color:white}
 .si-tools{display:flex;gap:8px;flex-wrap:wrap}.si-tools button,.si-link{background:#eceee6;color:#225b53;border-radius:10px;padding:8px 12px;min-height:40px;font-size:13px;font-weight:650}
+.pf-context-back{display:flex;align-items:center;gap:11px;width:100%;min-height:58px;padding:9px 12px;text-align:left;border:1px solid #d5dad0;border-radius:16px;background:#fffefa;box-shadow:0 7px 20px rgba(40,65,58,.06);transition:transform .16s ease,box-shadow .16s ease}.pf-context-back:active{transform:scale(.985)}
+.pf-context-back-icon{display:grid;place-items:center;flex:0 0 36px;height:36px;border-radius:12px;background:#e4eee8;color:#22645c}.pf-context-back-copy{display:block;min-width:0;flex:1}.pf-context-back-copy small{display:block;color:#61716b;font-size:10px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-context-back-copy strong{display:block;margin-top:2px;color:#202f2e;font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-account-tray{padding:10px 10px 12px;border-top:1px solid #d5dad0;background:linear-gradient(180deg,#f0f3ec 0%,#fffefa 100%);animation:pfTrayIn .2s ease-out both}.pf-account-tray-label{margin:0 2px 8px;color:#61716b;font-size:10px;font-weight:700}.pf-account-actions{display:grid;gap:8px}.pf-account-action{display:flex;min-width:0;min-height:74px;padding:9px 5px 8px;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px solid #d5dad0;border-radius:14px;background:#fffefa;color:#202f2e;text-align:center;box-shadow:0 4px 12px rgba(40,65,58,.04);transition:transform .16s ease,border-color .16s ease,background .16s ease}.pf-account-action:active{transform:scale(.96);border-color:#22645c;background:#edf4ef}.pf-account-action-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#e4eee8;color:#22645c}.pf-account-action strong{font-size:10px;line-height:1.25;overflow-wrap:anywhere}
+@keyframes pfTrayIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:translateY(0)}}
 .calendar-event-actions{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px}
 .calendar-event-actions button{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;min-height:44px;padding:0;border-radius:12px}
 .calendar-event-actions button svg{width:22px;height:22px;flex:0 0 22px;stroke-width:2.25}
@@ -549,7 +553,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-portfolio-split-v4";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-portfolio-navigation-v6";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -4363,7 +4367,7 @@ function allocationDateAfter(day, months) {
             } catch (e) { setError(e.message); }
         }
         const title=h("div",{className:"pf-stack"},
-            h("h2",{className:"text-xl font-extrabold"},"Investment Strategy Wallet"),
+            !hideAccountPicker&&h("h2",{className:"text-xl font-extrabold"},"Investment Strategy Wallet"),
             note("จัดสรรเงินสดจากบัญชีลงทุนเดิม การจัดสรรมีผลเฉพาะในแผนของคุณ"));
         if (!account) return h("div",{className:"pf-stack sw-root"},title,card("empty",note("เพิ่มบัญชีประเภท Broker / เงินลงทุน หรือเปิดใช้พอร์ตในบัญชีที่มีอยู่")));
         const picker=hideAccountPicker?h(PortfolioScopedAccountBanner,{account,accounts,transactions,payments,today}):h(PortfolioAccountBanners,{label:"เลือกบัญชี",choices:eligible,accounts,transactions,payments,today,selected:account.id,onSelect:id=>{
@@ -4382,10 +4386,7 @@ function allocationDateAfter(day, months) {
             button("กันเงิน",()=>start("reserve")),button("ปลดเงินที่กันไว้",()=>start("unreserve")),
             account.portfolioEnabled && button("เปิดพอร์ตและบันทึกรายการ",()=>onTrade(account.id)));
         return h("div",{className:"pf-stack sw-root"},title,picker,
-            card("cash",h("h3",{className:"font-bold"},"เงินสดในบัญชี · "+currency),
-                pair("เงินสดจริง ณ วันนี้",money(model.cash)),
-                STRATEGY_IDS.some(id=>model.pending[id]>0n) && pair("เงินขายรอชำระ",money(STRATEGY_IDS.reduce((sum,id)=>sum+model.pending[id],0n))),
-                pair("เงินสดยังไม่จัดสรรที่พร้อมใช้",money(model.availableFor("free"))),
+            card("manage",h("h3",{className:"font-bold"},"จัดการทุน"),
                 h("details",null,h("summary",null,"เงินต้นจากบัญชีภายนอก"),
                     pair("เติมเงินลงทุนสะสม",money(funding.gross)),pair("เงินเติมสุทธิหลังถอน",money(funding.net)),
                     pair("ยอดเงินสดเริ่มต้นบัญชี",money(Number(account.startBalance)||0)),
@@ -4823,7 +4824,7 @@ function allocationDateAfter(day, months) {
                     writable && !execution && !queue && button("ลบไม้",()=>{setError("");setRemoving({stock,tranche});})));
         }
         const head=h("div",{className:"sa-card"},
-            h("h2",{className:"text-xl font-extrabold"},"Stock Accumulation"),
+            !hideAccountPicker&&h("h2",{className:"text-xl font-extrabold"},"Stock Accumulation"),
             note("เลือกหุ้นและแบ่งไม้ล่วงหน้า เงินสดที่พร้อมใช้มาจาก Stock Accumulation ของบัญชีที่เลือก"));
         if (!account) return h("div",{className:"pf-stack sw-root sa-root"},head,
             card(note("เปิดใช้พอร์ตแบบติดตามรายสินทรัพย์ในบัญชีที่ต้องการวางแผน")));
@@ -4846,7 +4847,9 @@ function allocationDateAfter(day, months) {
             error && !draft && !removing && alert(error),
             detailItem ? h(React.Fragment,null,
                 h("div",{className:"flex items-center justify-between gap-2"},
-                    button("กลับภาพรวมหุ้น",()=>setDetailId("")),
+                    h("button",{type:"button",onClick:()=>setDetailId(""),className:"pf-context-back",style:{flex:"1 1 auto",minWidth:0},"aria-label":"กลับไปหุ้นในแผน"},
+                        h("span",{className:"pf-context-back-icon"},h(ChevronLeft,{size:18})),
+                        h("span",{className:"pf-context-back-copy"},h("small",null,"Stock Accumulation"),h("strong",null,"กลับไปหุ้นในแผน"))),
                     h("div",{className:"text-right min-w-0"},h("h3",{className:"text-xl font-extrabold"},detailItem.stock.symbol),
                         h("p",{className:"text-xs",style:{color:T.muted}},(detailItem.stock.name||"หุ้นในแผน")+" · "+ACCUMULATION_STATUSES[detailItem.stock.status]))),
                 card(h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}},
@@ -5078,7 +5081,7 @@ function allocationDateAfter(day, months) {
         const field=(label,value,onChange,props={})=>h("label",{className:"sa-field"},h("span",null,label),
             h("input",{type:"text",inputMode:"decimal",value,onChange:e=>onChange(e.target.value),...props}));
         const title=h("div",{className:"sa-card"},
-            h("h2",{className:"text-xl font-extrabold mb-2"},"SGOV Cash Parking"),
+            !hideAccountPicker&&h("h2",{className:"text-xl font-extrabold mb-2"},"SGOV Cash Parking"),
             note("เงินพักอยู่ในพอร์ต USD เดิม ระบบแยกเงินสดพร้อมใช้ มูลค่า SGOV และยอดขายรอชำระ"));
         if (!account) return h("div",{className:"pf-stack sw-root sa-root"},title,card(note("เปิดพอร์ตแบบรายสินทรัพย์ในบัญชี USD ก่อน")));
         const close=()=>{setDraft(null);setError("");};
@@ -5590,6 +5593,7 @@ function allocationDateAfter(day, months) {
         catch {
             return "today";
         } });
+        const [portfolioHomeSignal,setPortfolioHomeSignal]=useState(0);
         const [events, setEvents] = useState(seedEvents);
         const [bookings, setBookings] = useState(seedBookings);
         const [incomeSources, setIncomeSources] = useState([]);
@@ -7444,7 +7448,7 @@ function allocationDateAfter(day, months) {
                     tab === "calendar" && React.createElement(Calendar, { ...shared }),
                     tab === "studio" && React.createElement(Studio, { ...shared }),
                     tab === "budget" && React.createElement(Budget, { ...shared, key:"accounts", rootMode:"accounts" }),
-                    tab === "portfolio" && React.createElement(Budget, { ...shared, key:"portfolio", rootMode:"portfolio" }),
+                    tab === "portfolio" && React.createElement(Budget, { ...shared, key:"portfolio", rootMode:"portfolio", portfolioHomeSignal }),
                     tab === "fitness" && React.createElement(Fitness, { ...shared }),
                     tab === "settings" && React.createElement(SettingsPage, { ...shared })),
                 undoInfo && (React.createElement("div", { className: "fixed left-0 right-0 flex justify-center z-50", style: { bottom: 206 } },
@@ -7474,7 +7478,7 @@ function allocationDateAfter(day, months) {
                     React.createElement("div", { className: "app-shell", style: { padding: navCompact ? "6px 8px 10px" : "8px 8px 12px", background: `linear-gradient(to top, ${T.bg}, ${hex(T.bg, .85)} 70%, transparent)`, transition: "padding .18s ease" } },
                         React.createElement("div", { className: "flex items-center justify-around rounded-2xl", style: { padding: navCompact ? 4 : 6, background: T.surf, border: `1px solid ${T.border}`, transition: "padding .18s ease" } }, NAV.map(([id, Icon, label]) => {
                             const on = tab === id;
-                            return (React.createElement("button", { key: id, onClick: () => setTab(id), "aria-label": label, className: "flex-1 min-w-0 flex flex-col items-center px-0.5 rounded-xl active:scale-90", style: { background: on ? hex(T.purple, .14) : "transparent", gap: navCompact ? 0 : 2, paddingTop: navCompact ? 4 : 6, paddingBottom: navCompact ? 4 : 6, transition: "padding .18s ease, gap .18s ease, background .18s ease" } },
+                            return (React.createElement("button", { key: id, onClick: () => { if(on&&id==="portfolio")setPortfolioHomeSignal(value=>value+1);setTab(id); }, "aria-label": label, className: "flex-1 min-w-0 flex flex-col items-center px-0.5 rounded-xl active:scale-90", style: { background: on ? hex(T.purple, .14) : "transparent", gap: navCompact ? 0 : 2, paddingTop: navCompact ? 4 : 6, paddingBottom: navCompact ? 4 : 6, transition: "padding .18s ease, gap .18s ease, background .18s ease" } },
                                 React.createElement(Icon, { size: navCompact ? 16 : 18, style: { color: on ? T.purple : T.muted } }),
                                 React.createElement("span", { className: "font-semibold truncate w-full text-center", style: { fontSize: "clamp(7.5px,2.25vw,9px)", color: on ? T.text : T.muted, maxHeight: navCompact ? 0 : 14, opacity: navCompact ? 0 : 1, overflow: "hidden", transition: "max-height .18s ease, opacity .18s ease" } }, label)));
                         })))))));
@@ -12273,27 +12277,33 @@ function allocationDateAfter(day, months) {
         accounts.filter(isSpendableAccount).forEach(a => { const currency = accountCurrency(a); usable[currency] = (usable[currency] || 0) + (a.pocketEnabled ? accountPocketBalances(a,transactions,payments,incomeSources).personal : nativeAccountBalance(a,transactions,payments)); });
         const availableAccounts=accounts.filter(a=>!a.archived);
         const [favoriteId,setFavoriteId]=useState(()=>{try{return localStorage.getItem("taskroutine_favorite_account")||"";}catch{return "";}});
+        const [showAllAccounts,setShowAllAccounts]=useState(false);
         const favorite=availableAccounts.find(a=>a.id===favoriteId)||null;
         const chooseFavorite=id=>{setFavoriteId(id);try{localStorage.setItem("taskroutine_favorite_account",id);}catch{}};
         const favoriteBalance=favorite?nativeAccountBalance(favorite,transactions,payments):null;
+        const remainingAccounts=orderedAccounts(availableAccounts).filter(a=>a.id!==favorite?.id);
+        const accountBanner=(account,isFavorite=false)=>{
+            const balance=nativeAccountBalance(account,transactions,payments);
+            return React.createElement("button",{key:account.id,onClick:onAccounts,"aria-label":`เปิดบัญชี ${accountLabel(account,accounts)}`,className:"w-full text-left p-3 rounded-xl",style:{background:isFavorite?hex(T.green,.09):T.surf2,border:`1px solid ${isFavorite?hex(T.green,.34):T.border}`}},
+                React.createElement("div",{className:"flex items-center gap-3"},
+                    React.createElement("span",{className:"w-9 h-9 rounded-xl flex items-center justify-center shrink-0",style:{background:isFavorite?hex(T.green,.14):T.surf,color:isFavorite?T.green:T.muted}},React.createElement(Wallet,{size:17})),
+                    React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},accountLabel(account,accounts)),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},accountCurrency(account)+(isFavorite?" · บัญชีโปรด":" · ยอดเงินรวม"))),
+                    React.createElement("strong",{className:"text-base tabular-nums shrink-0",style:{color:balance<0?T.red:isFavorite?T.green:T.text}},moneyIn(balance,accountCurrency(account))),React.createElement(ChevronRight,{size:16,style:{color:T.muted}})));
+        };
         return React.createElement(React.Fragment,null,
-            React.createElement("section", { className: "finance-panel p-4", style: { order: 1, background: T.surf, border: `1px solid ${T.border}`, borderRadius: 22 } },
-                React.createElement("div", { className: "flex justify-between items-center gap-2" }, React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "เงินใช้ได้ปัจจุบัน"), React.createElement("button", { onClick: onAccounts, className: "text-xs font-bold py-2", style: { color: T.purple } }, "ดูบัญชี →")),
+            React.createElement("section", { className: "finance-panel p-4", style: { order: 1, background: `linear-gradient(135deg,${hex(T.green,.16)},${hex(T.purple,.08)} 58%,${T.surf})`, border: `1px solid ${hex(T.green,.26)}`, borderRadius: 22, boxShadow:"0 12px 30px rgba(40,65,58,.08)" } },
+                React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "เงินใช้ได้ปัจจุบัน"),
                 (Object.entries(usable).length ? Object.entries(usable) : [["THB",0]]).map(([currency,value]) => React.createElement("div", { key: currency, className: "font-extrabold tabular-nums", style: { fontSize: currency === "THB" ? 32 : 22, lineHeight: 1.35, letterSpacing: "-.04em", color: value < 0 ? T.red : T.text } }, moneyIn(value,currency))),
                 React.createElement("p", { className: "text-[11px] mt-1", style: { color: T.muted } }, "ยอดรวมบัญชีใช้จ่าย · บัญชีที่แยกกระเป๋านับเฉพาะส่วนตัว"),
-                React.createElement("div", { className: "grid grid-cols-2 gap-3 mt-4 pt-4", style: { borderTop: `1px solid ${T.border}` } }, [["รายได้จากงาน",income,T.green],["รายจ่ายจริง",expense,T.orange]].map(([label,value,color]) => React.createElement("div", { key: label }, React.createElement("div", { className: "text-xs", style: { color: T.sub } }, label), React.createElement("div", { className: "font-extrabold text-xl mt-1 tabular-nums", style: { color } }, fmtBaht(value))))),
-                React.createElement("div", { className: "flex justify-between gap-3 mt-4 p-3 rounded-xl", style: { background: T.surf2 } }, React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "สุทธิจากงานเดือนที่เลือก"), React.createElement("strong", { className: "text-sm tabular-nums", style: { color: income-expense >= 0 ? T.green : T.red } }, fmtBaht(income-expense))),
-                React.createElement("details", { className: "mt-3 text-xs", style: { color: T.muted } }, React.createElement("summary", { style: { cursor: "pointer", padding: "5px 0" } }, "รายละเอียดเงินเข้า"), React.createElement("p", { className: "mt-2 leading-relaxed" }, `เงินเข้าทั้งหมด ${fmtBaht(cashIn)} รวมยอดรับเงินในเดือนที่เลือก รายได้จากงานแสดงแยกจากเงินคืน เงินส่วนตัว และเงินของผู้อื่น เงินโอนไม่รวมในรายรับ–รายจ่าย`))),
+                React.createElement("div", { className: "grid grid-cols-3 gap-2 mt-4 pt-4", style: { borderTop: `1px solid ${hex(T.green,.22)}` } }, [["รายได้",income,T.green],["รายจ่าย",expense,T.orange],["เงินสุทธิ",income-expense,income-expense>=0?T.green:T.red]].map(([label,value,color]) => React.createElement("div", { key: label,className:"min-w-0 p-2.5 rounded-xl",style:{background:hex(T.surf,.76),border:`1px solid ${T.border}`}}, React.createElement("div", { className: "text-[10px] truncate", style: { color: T.sub } }, label), React.createElement("div", { className: "font-extrabold text-sm mt-1 tabular-nums truncate", style: { color } }, fmtBaht(value)))))),
             React.createElement("section", { className: "finance-panel p-3 rounded-2xl", style: { order:2,minWidth:0,background:T.surf,border:`1px solid ${T.border}` } },
                 React.createElement("div",{className:"flex items-center justify-between gap-2"},
                     React.createElement("div",{className:"flex items-center gap-2 text-xs font-extrabold"},React.createElement(Star,{size:16,style:{color:T.green}}),"บัญชีโปรด"),
-                    React.createElement("button",{onClick:onAccounts,className:"text-[10px] font-bold py-1",style:{color:T.purple}},"บัญชีทั้งหมด →")),
+                    React.createElement("button",{type:"button",onClick:()=>setShowAllAccounts(value=>!value),"aria-expanded":showAllAccounts,className:"text-[10px] font-bold py-1 flex items-center gap-1",style:{color:T.purple}},showAllAccounts?"ย่อบัญชี":"บัญชีทั้งหมด",React.createElement(ChevronDown,{size:14,style:{transform:showAllAccounts?"rotate(180deg)":"none",transition:"transform .18s"}}))),
                 availableAccounts.length?React.createElement("select",{value:favorite?.id||"",onChange:e=>chooseFavorite(e.target.value),"aria-label":"เลือกบัญชีโปรด",className:"w-full mt-2 px-3 py-2.5 rounded-xl text-xs font-bold",style:{minWidth:0,background:T.surf2,color:T.text,border:`1px solid ${T.border}`}},React.createElement("option",{value:""},"เลือกบัญชีโปรด"),...availableAccounts.map(a=>React.createElement("option",{key:a.id,value:a.id},accountLabel(a,accounts)))):React.createElement("p",{className:"text-xs mt-2",style:{color:T.muted}},"ยังไม่มีบัญชี"),
-                React.createElement("button",{onClick:onAccounts,"aria-label":"เปิดบัญชีโปรด",className:"w-full text-left mt-2 p-3 rounded-xl",style:{background:favorite?hex(T.green,.08):T.surf2,border:`1px solid ${favorite?hex(T.green,.28):T.border}`}},
-                    React.createElement("div",{className:"flex items-center gap-3"},
-                        React.createElement("span",{className:"w-9 h-9 rounded-xl flex items-center justify-center shrink-0",style:{background:favorite?hex(T.green,.13):T.surf,color:favorite?T.green:T.muted}},React.createElement(Wallet,{size:17})),
-                        React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},favorite?accountLabel(favorite,accounts):"ยังไม่ได้เลือกบัญชี"),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},favorite?accountCurrency(favorite)+" · บัญชีโปรด":"เลือกจากรายการด้านบน")),
-                        React.createElement("strong",{className:"text-base tabular-nums shrink-0",style:{color:favoriteBalance<0?T.red:favorite?T.green:T.muted}},favorite?moneyIn(favoriteBalance,accountCurrency(favorite)):"—"),React.createElement(ChevronRight,{size:16,style:{color:T.muted}})))),
+                favorite?React.createElement("div",{className:"mt-2"},accountBanner(favorite,true)):React.createElement("div",{className:"mt-2 p-3 rounded-xl text-xs",style:{background:T.surf2,color:T.muted,border:`1px solid ${T.border}`}},"เลือกบัญชีโปรดเพื่อแสดงยอดบัญชีที่ใช้บ่อย"),
+                showAllAccounts&&React.createElement("div",{className:"flex flex-col gap-2 mt-2 pt-2","data-testid":"all-accounts-inline",style:{borderTop:`1px solid ${T.border}`}},
+                    remainingAccounts.length?remainingAccounts.map(a=>accountBanner(a,false)):React.createElement("p",{className:"text-xs py-2 text-center",style:{color:T.muted}},"ไม่มีบัญชีอื่น"))),
             React.createElement("button", { onClick: onAdd, className: "w-full py-3 rounded-xl text-sm font-bold", style: { order: 4, background: T.purple, color: "#fff" } }, "+ บันทึกรายการ"));
     }
 
@@ -12789,8 +12799,15 @@ function allocationDateAfter(day, months) {
         const [portfolioOrder, setPortfolioOrder] = useState(null);
         const [portfolioInitialTab,setPortfolioInitialTab]=useState(null);
         const [portfolioAssetSymbol,setPortfolioAssetSymbol]=useState("");
+        const portfolioReturnScroll=React.useRef(0);
         const [taxOpen, setTaxOpen] = useState(false);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId && a.portfolioEnabled);
+        useEffect(()=>{
+            if(rootMode!=="portfolio"||!props.portfolioHomeSignal)return;
+            setSub("summary");setBudgetView("investment");setPortfolioContextAccountId("");setPortfolioAssetSymbol("");
+            setPortfolioId(null);setPortfolioOrder(null);setPortfolioInitialTab(null);
+            requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"auto"}));
+        },[props.portfolioHomeSignal]);
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
         const [mk, setMk] = useState(monthKey(TK));
@@ -13184,20 +13201,27 @@ function allocationDateAfter(day, months) {
         };
         const srcTag = (k, category) => k === "reimbursement" ? { t: "เงินสำรองจ่าย", c: T.orange } : k === "incomeSource" ? { t: normalizeIncomeCategory(category || "Work"), c: T.green } : { t: k === "booking" ? "Studio" : normalizeIncomeCategory(category || (k === "event" ? "Work" : "Work")), c: k === "booking" ? T.blue : k === "event" ? T.purple : T.cyan };
         const portfolioContextAccount=accounts.find(a=>a.id===portfolioContextAccountId)||null;
+        const portfolioFeatureLabel={strategy:"Investment Strategy Wallet",accumulation:"Stock Accumulation",sgov:"SGOV Cash Parking"}[budgetView]||"Portfolio";
+        const returnPortfolioHome=()=>{
+            const top=portfolioReturnScroll.current||0;
+            setBudgetView("investment");
+            requestAnimationFrame(()=>window.scrollTo({top,behavior:"auto"}));
+        };
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             React.createElement("h1",{className:"text-2xl font-extrabold",style:{order:-4}},rootMode==="portfolio"?"Portfolio":"บัญชี"),
             rootMode==="accounts" && React.createElement("nav",{className:"si-nav","aria-label":"เมนูบัญชี",style:{order:-3}},
-                ...[["overview","ภาพรวม"],["transactions","รายการ"],["due","ค้างรับ"]].map(([id,label])=>{
-                    const active=["transactions","due"].includes(sub) ? sub : "overview";
+                ...[["overview","ภาพรวม"],["transactions","รายการ"],["due","ค้างรับ"],["reports","รายงาน"]].map(([id,label])=>{
+                    const active=["transactions","due"].includes(sub) ? sub : (sub==="monthclose"||budgetView==="reports"?"reports":"overview");
                     return React.createElement("button",{key:id,"aria-current":active===id?"page":undefined,style:{flex:1,minWidth:0,whiteSpace:"nowrap"},onClick:()=>{
                         const section=["transactions","due"].includes(id);
-                        setSub(section?id:"summary");
-                        if(!section)setBudgetView(id);
+                        if(section){setSub(id);return;}
+                        setSub("summary");
+                        setBudgetView(id);
                     }},label);
                 })),
-            rootMode==="accounts" && sub==="summary" && budgetView==="overview" && React.createElement("div",{className:"si-tools",style:{order:8}},
-                React.createElement("button",{onClick:()=>setBudgetView("reports")},"รายงาน"),
-                React.createElement("button",{onClick:()=>setSub("monthclose")},"ตรวจ Statement และปิดเดือน")),
+            rootMode==="accounts" && (sub==="monthclose" || sub==="summary" && budgetView==="reports") && React.createElement("nav",{className:"si-nav","aria-label":"เมนูย่อยรายงาน",style:{order:-2}},
+                React.createElement("button",{type:"button","aria-current":sub==="summary"?"page":undefined,onClick:()=>{setSub("summary");setBudgetView("reports");}},"สรุปรายงาน"),
+                React.createElement("button",{type:"button","aria-current":sub==="monthclose"?"page":undefined,onClick:()=>setSub("monthclose")},"Statement / ปิดเดือน")),
             rootMode==="portfolio" && sub==="summary" && ["investment","allocation"].includes(budgetView) && React.createElement(React.Fragment,null,
                 React.createElement("nav",{className:"si-nav","aria-label":"เมนู Portfolio",
                     style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:2,minWidth:0,order:-3}},
@@ -13207,8 +13231,11 @@ function allocationDateAfter(day, months) {
                                 lineHeight:1.2,whiteSpace:"normal",overflowWrap:"anywhere",
                                 background:budgetView===id?T.green:"transparent",color:budgetView===id?"#fff":T.sub}},label)))),
             rootMode==="portfolio" && sub==="summary" && ["strategy","accumulation","sgov"].includes(budgetView) && React.createElement("button",{
-                type:"button",onClick:()=>{setBudgetView("investment");setPortfolioContextAccountId("");},className:"text-left text-xs font-bold py-1",style:{color:T.muted}},
-                "Portfolio › "+(portfolioContextAccount?accountLabel(portfolioContextAccount,accounts):"บัญชีลงทุน")),
+                type:"button",onClick:returnPortfolioHome,className:"pf-context-back","aria-label":"กลับหน้า Portfolio"},
+                React.createElement("span",{className:"pf-context-back-icon"},React.createElement(ChevronLeft,{size:18})),
+                React.createElement("span",{className:"pf-context-back-copy"},
+                    React.createElement("small",null,"กลับไป Portfolio · "+(portfolioContextAccount?accountLabel(portfolioContextAccount,accounts):"บัญชีลงทุน")),
+                    React.createElement("strong",null,portfolioFeatureLabel))),
             rootMode==="portfolio" && sub==="summary" && budgetView==="strategy" && React.createElement(StrategyWalletPanel,{
                 accounts,transactions,payments,settings:allocationSettings,setSettings:setAllocationSettings,setAccounts,
                 initialAccountId:portfolioContextAccountId,hideAccountPicker:true,
@@ -13239,7 +13266,11 @@ function allocationDateAfter(day, months) {
                 const entry=(title,subtitle,click)=>React.createElement("button",{onClick:click,className:"finance-panel w-full p-3 rounded-xl text-left flex items-center gap-3",style:{background:T.surf,border:`1px solid ${T.border}`}},
                     React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-xs"},title),React.createElement("span",{className:"block text-[10px] mt-1",style:{color:T.muted}},subtitle)),React.createElement(ChevronRight,{size:16,style:{color:T.muted}}));
                 const openAccountAssets=id=>{setPortfolioInitialTab("assets");setPortfolioId(id);};
-                const openPortfolioFeature=(view,accountId)=>{setPortfolioContextAccountId(accountId);setBudgetView(view);};
+                const openPortfolioFeature=(view,accountId)=>{
+                    portfolioReturnScroll.current=window.scrollY||0;
+                    setPortfolioContextAccountId(accountId);setBudgetView(view);
+                    requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"auto"}));
+                };
                 return React.createElement(React.Fragment,null,
                     React.createElement(Glass,{className:"p-4"},
                         React.createElement("div",{className:"text-xs",style:{color:T.sub}},"มูลค่าสินทรัพย์"),
@@ -13254,9 +13285,9 @@ function allocationDateAfter(day, months) {
                                 const currency=accountCurrency(a),balance=nativeAccountBalance(a,transactions,payments,null,today);
                                 const open=portfolioMenuAccountId===a.id;
                                 const links=[
-                                    accumulationScope(a)&&["accumulation","Stock Accumulation","สะสมหุ้นรายตัวและแบ่งไม้ซื้อ"],
-                                    strategyAccount(a)&&["strategy","Strategy Wallet","จัดสรรทุนระหว่างกลยุทธ์"],
-                                    sgovScope(a)&&["sgov","SGOV Cash Parking","พักเงิน USD และจัดการเงินสำรอง"]
+                                    accumulationScope(a)&&["accumulation","สะสมหุ้น","Stock Accumulation",TrendingUp],
+                                    strategyAccount(a)&&["strategy","จัดสรรทุน","Strategy Wallet",LayersIcon],
+                                    sgovScope(a)&&["sgov","พักเงิน SGOV","SGOV Cash Parking",Wallet]
                                 ].filter(Boolean);
                                 return React.createElement("section",{key:a.id,className:"finance-panel rounded-2xl overflow-hidden",style:{background:T.surf,border:`1px solid ${open?hex(T.green,.45):T.border}`}},
                                     React.createElement("button",{type:"button",onClick:()=>setPortfolioMenuAccountId(open?"":a.id),"aria-expanded":open,className:"w-full p-3 text-left flex items-center gap-3"},
@@ -13264,10 +13295,14 @@ function allocationDateAfter(day, months) {
                                         React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},accountLabel(a,accounts)),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},currency+" · เงินสดในบัญชี")),
                                         React.createElement("strong",{className:"text-sm tabular-nums shrink-0",style:{color:balance<0?T.red:open?T.green:T.text}},moneyIn(balance,currency)),
                                         React.createElement(ChevronDown,{size:16,style:{color:T.muted,transform:open?"rotate(180deg)":"none",transition:"transform .18s"}})),
-                                    open&&React.createElement("div",{className:"px-3 pb-3",style:{borderTop:`1px solid ${T.border}`}},
-                                        links.length?links.map(([view,label,subtitle],index)=>React.createElement("button",{key:view,type:"button",onClick:()=>openPortfolioFeature(view,a.id),className:"w-full py-3 flex items-center gap-3 text-left",style:{borderTop:index?`1px solid ${T.border}`:"none"}},
-                                            React.createElement("span",{className:"min-w-0 flex-1 pl-1"},React.createElement("strong",{className:"block text-xs"},label),React.createElement("small",{className:"block text-[9px] mt-0.5",style:{color:T.muted}},subtitle)),React.createElement(ChevronRight,{size:15,style:{color:T.muted}})))
-                                            :React.createElement("p",{className:"text-xs py-3",style:{color:T.muted}},"บัญชีนี้ยังไม่ได้เปิดใช้แผนลงทุน")));
+                                    open&&React.createElement("div",{className:"pf-account-tray"},
+                                        links.length?React.createElement(React.Fragment,null,
+                                            React.createElement("div",{className:"pf-account-tray-label"},"เครื่องมือของบัญชีนี้"),
+                                            React.createElement("div",{className:"pf-account-actions",style:{gridTemplateColumns:`repeat(${links.length},minmax(0,1fr))`}},
+                                                ...links.map(([view,label,fullLabel,Icon])=>React.createElement("button",{key:view,type:"button",onClick:()=>openPortfolioFeature(view,a.id),className:"pf-account-action","aria-label":"เปิด "+fullLabel,title:fullLabel},
+                                                    React.createElement("span",{className:"pf-account-action-icon"},React.createElement(Icon,{size:16})),
+                                                    React.createElement("strong",null,label)))))
+                                            :React.createElement("p",{className:"text-xs py-3 text-center",style:{color:T.muted}},"บัญชีนี้ยังไม่ได้เปิดใช้แผนลงทุน")));
                             })):React.createElement("button",{onClick:()=>props.goTab?.("budget"),className:"w-full py-3 rounded-xl text-xs font-bold",style:{background:T.surf2,color:T.green}},"เพิ่มบัญชีลงทุนจากหน้าบัญชี")),
                     React.createElement("section",{className:"finance-panel rounded-2xl overflow-hidden",style:{background:T.surf,border:`1px solid ${T.border}`}},
                         React.createElement("div",{className:"p-3 flex items-start justify-between gap-3"},
