@@ -133,6 +133,7 @@ svg{display:block;vertical-align:middle}
 .active\:scale-\[\.98\]:active{transform:scale(.98)}
 .active\:scale-\[\.99\]:active{transform:scale(.99)}
 .aspect-square{aspect-ratio:1/1}
+.block{display:block}
 .bottom-0{bottom:0rem}
 .cursor-pointer{cursor:pointer}
 .disabled\:opacity-40:disabled{opacity:0.4}
@@ -566,6 +567,114 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 .sa-order{background:var(--sw-field)}
 .sa-root .pf-pair>strong{max-width:54%}
 @media(max-width:360px){.sa-two{grid-template-columns:minmax(0,1fr)}}
+
+/* V13: shared layout primitives. Presentation only; ledger/storage are unchanged. */
+.ui-subpage-head{display:grid;justify-items:start;gap:12px;min-width:0}
+.ui-subpage-head h2{font-size:22px;line-height:1.3;font-weight:800;overflow-wrap:break-word}
+.pf-context-back{display:inline-flex;justify-self:start;align-items:center;gap:6px;width:auto;max-width:100%;min-height:44px;padding:8px 12px;border-radius:12px;border:1px solid #d5dad0;background:#eceee6;box-shadow:none;font-size:13px;font-weight:700;color:#225b53}
+.pf-context-back svg{flex:none}
+.ui-account-banner{padding:14px!important;border-radius:14px;min-width:0}
+.ui-account-line{display:flex;align-items:center;gap:10px;min-width:0}
+.ui-account-icon{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:11px}
+.ui-account-name{flex:1;min-width:0;display:grid;gap:3px}
+.ui-account-name strong{display:block;white-space:normal;overflow-wrap:break-word;line-height:1.4;font-size:14px}
+.ui-account-name small{display:block;margin:0;font-size:12px;line-height:1.4}
+.ui-account-balance{flex:0 1 auto;min-width:0;max-width:44%;text-align:right;font-size:17px;line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:break-word}
+.ui-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+.ui-metric{display:grid;align-content:start;gap:6px;min-width:0;font-variant-numeric:tabular-nums}
+.ui-metric>span{display:block;font-size:12px;line-height:1.45;min-height:2.9em;color:var(--sw-muted,#61716b)}
+.ui-metric>strong{display:block;font-size:clamp(16px,4.4vw,21px);line-height:1.25;overflow-wrap:break-word}
+.ui-metric+.ui-metric{border-left:1px solid var(--sw-border,#d5dad0);padding-left:10px}
+.sw-card.p-3{padding:16px}.sa-card{gap:12px}.sa-root{overflow-wrap:break-word}
+.sw-note{font-size:12px;line-height:1.65}
+.sw-root .pf-pair{align-items:start;gap:12px;line-height:1.5}
+.sw-root .pf-pair>span{flex:1 1 48%;opacity:1;color:var(--sw-muted)}
+.sw-root .pf-pair>strong{flex:0 1 52%;max-width:58%;overflow-wrap:break-word;line-height:1.5}
+.sa-actions{gap:8px}.sa-actions>.sw-button{flex:0 1 auto;padding:10px 14px;line-height:1.4}
+.pf-actions>button,.pf-tabs>button,.si-link{min-height:44px;line-height:1.4}
+.pf-actions>button,.pf-tabs>button{padding:10px 12px;overflow-wrap:break-word}
+.pf-stack small{line-height:1.5}
+.pf-stack details{padding:0;border-block:1px solid #b8aa9333}
+.pf-stack details>summary,.si-fold>summary{display:flex;align-items:center;gap:8px;list-style:none;min-height:48px;padding:12px 4px;font-size:13px;line-height:1.5;font-weight:650;cursor:pointer}
+.pf-stack details>summary::-webkit-details-marker,.si-fold>summary::-webkit-details-marker{display:none}
+.pf-stack details>summary::after,.si-fold>summary::after{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);flex:none;margin-left:auto;margin-right:5px;transition:transform .16s}
+.pf-stack details[open]>summary::after,.si-fold[open]>summary::after{transform:rotate(225deg)}
+.pf-stack details[open]>summary{margin-bottom:10px}
+.pf-stack details.sw-card{padding:0;border:1px solid var(--sw-border);border-radius:14px}
+.pf-stack details.sw-card>summary{padding:12px 16px}
+.pf-stack details.sw-card>:not(summary){margin:0 16px 16px}
+.sa-root .sa-watch>summary>span:first-child::before{content:none}
+.sa-root .sa-watch>summary{min-height:48px;margin:0}
+.sa-root .sa-watch>summary>span:first-child{flex:1}
+.sa-queue>summary>svg{flex:none;color:var(--sw-muted)}
+.sa-count{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:7px;background:var(--sw-field);font-size:12px}
+.sa-list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sa-list-heading h3{font-size:16px;line-height:1.4}
+.sa-list-heading button{font-size:12px;padding:7px 10px}
+.sa-target-summary{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:12px;line-height:1.5;color:var(--sw-muted)}
+.sa-target-summary>span:first-child{font-weight:700;color:var(--sw-fg)}
+.sa-watchlist{min-width:0;font-variant-numeric:tabular-nums}
+.sa-stock-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.68fr) minmax(0,.72fr) minmax(0,.9fr) 24px;gap:8px;align-items:center}
+.sa-stock-grid>*{min-width:0}
+.sa-table-head{position:sticky;top:8px;z-index:2;min-height:38px;background:var(--sw-card);border-bottom:1px solid var(--sw-border);font-size:11px;font-weight:650;color:var(--sw-muted)}
+.sa-table-head>span:not(:first-child){text-align:center}
+.sa-stock-row{min-height:56px;padding:4px 0;border-bottom:1px solid var(--sw-border);cursor:pointer}
+.sa-stock-row:last-child{border-bottom:0}
+.sa-stock-name{display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:44px;width:100%;text-align:left}
+.sa-stock-name strong{font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.sa-stock-name small{font-size:10px;line-height:1.3;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--sw-muted)}
+.sa-number{text-align:center;font-size:13px;font-weight:650;display:block;line-height:1.4}
+.sa-target-input{display:flex;align-items:center;gap:1px;border:1px solid var(--sw-border);border-radius:9px;background:var(--sw-field);padding:0 4px;min-height:44px}
+.sw-root .sa-target-input input{border:0!important;background:transparent!important;min-height:42px;width:100%;padding:4px 0;text-align:center;font-size:16px;appearance:textfield}
+.sa-target-input input::-webkit-inner-spin-button,.sa-target-input input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.sa-target-input>span{font-size:10px;flex:none}
+.sa-progress{display:grid;justify-items:stretch;gap:5px;text-align:center;font-size:12px;font-weight:650;line-height:1.3}
+.sa-progress-track{height:4px;border-radius:4px;overflow:hidden;background:var(--sw-field);width:100%}
+.sa-progress-track>span{display:block;height:100%;border-radius:inherit;background:var(--sw-accent)}
+.sa-row-open{display:grid;place-items:center;min-height:44px;width:24px;color:var(--sw-muted)}
+.sa-target-save{display:grid;gap:8px;margin-top:4px}
+.sa-target-save>button{width:100%;opacity:1}
+.sa-target-save>button:disabled{opacity:.5;cursor:not-allowed}
+.ui-input-field{display:grid;gap:6px;min-width:0}
+.ui-input-field>div{margin:0;line-height:1.45}
+.ui-input-field>input{min-height:44px;font-size:16px;line-height:1.4}
+.ui-stat-card>div:first-child{line-height:1.5;margin-bottom:6px}
+.ui-stat-card>div:last-child{font-size:clamp(17px,4.5vw,22px);line-height:1.3;overflow-wrap:break-word;margin:0}
+.ui-section-heading{flex-wrap:wrap;row-gap:6px}
+.ui-section-heading h2{flex:1;min-width:0;line-height:1.5}
+.ui-collapse-trigger{min-height:52px!important;padding:12px 14px;gap:10px;line-height:1.4;text-align:left}
+.ui-collapse-trigger>svg{flex:none}
+.ui-collapse-trigger>span:first-of-type{min-width:0;overflow-wrap:break-word}
+.ui-collapse-trigger>span:nth-of-type(2){flex:none;margin-left:2px}
+[data-sheet-header]{padding:14px 16px 12px;gap:12px;align-items:flex-start}
+[data-sheet-header] h3{font-size:18px;line-height:1.4;min-width:0;flex:1;align-self:center}
+[data-sheet-header]>button{width:44px;height:44px;min-height:44px;flex:0 0 44px}
+[data-sheet-body]{padding:16px 16px max(24px,env(safe-area-inset-bottom));scroll-padding-block:16px}
+[data-sheet-body] .pf-total,[data-sheet-body] .pf-receipt,[data-sheet-body] .pf-fields{padding:14px}
+[data-sheet-body] .pf-pair{line-height:1.5;align-items:start}
+[data-sheet-body] .pf-pair>span{min-width:0;flex:1}
+[data-sheet-body] .pf-pair>strong{max-width:58%;flex:0 1 auto;overflow-wrap:break-word}
+[data-sheet-body] .pf-tabs{gap:8px;padding-bottom:12px}
+[data-sheet-body] .pf-tabs button{font-size:13px;line-height:1.4}
+@media(max-width:359px){
+ .ui-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ui-metric:last-child:nth-child(odd){grid-column:1/-1;border-left:0;padding:10px 0 0;border-top:1px solid var(--sw-border)}
+ .ui-metric>span{min-height:0}
+ .sa-stock-grid{gap:5px;grid-template-columns:minmax(0,1fr) minmax(0,.7fr) minmax(0,.7fr) minmax(0,.85fr) 20px}
+ .sa-table-head{font-size:10px}.sa-number{font-size:12px}.sa-stock-name strong{font-size:13px}.sa-row-open{width:20px}
+ .ui-account-icon{width:30px;height:30px}.ui-account-line{gap:8px}.ui-account-banner{padding:12px!important}.ui-account-balance{font-size:15px}
+ .pf-funding-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-color-scheme:dark){
+ .pf-context-back{background:#30423e;color:#d4eee6;border-color:#465c56}
+ 
+ .pf-account-tray{background:#202f2d;border-color:#465c56}
+ .pf-account-action{background:#263b36;color:#edf4f2;border-color:#465c56}
+ .pf-account-action-icon{background:#304b43;color:#b4dbcf}
+ .pf-account-tray-label{color:#b5c8c2}
+}
+@media(prefers-reduced-motion:reduce){.pf-account-tray{animation:none}.pf-context-back,.pf-account-action{transition:none}}
+
 </style>
 </head>
 <body>
@@ -573,7 +682,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-other-actions-v12";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-balanced-layout-v13";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -4335,14 +4444,14 @@ function allocationDateAfter(day, months) {
         if (!account) return null;
         const currency=accountCurrency(account);
         const balance=nativeAccountBalance(account,transactions,payments,null,today);
-        return React.createElement("section",{"aria-label":"บัญชีที่เลือก",className:"finance-panel p-3 rounded-2xl",
+        return React.createElement("section",{"aria-label":"บัญชีที่เลือก",className:"finance-panel ui-account-banner",
                 style:{background:hex(T.green,.08),border:`1px solid ${hex(T.green,.35)}`}},
-            React.createElement("div",{className:"flex items-center gap-3"},
-                React.createElement("span",{className:"w-10 h-10 rounded-xl flex items-center justify-center shrink-0",style:{background:hex(T.green,.13),color:T.green}},React.createElement(Wallet,{size:19})),
-                React.createElement("span",{className:"min-w-0 flex-1"},
+            React.createElement("div",{className:"ui-account-line"},
+                React.createElement("span",{className:"ui-account-icon",style:{background:hex(T.green,.13),color:T.green}},React.createElement(Wallet,{size:19})),
+                React.createElement("span",{className:"ui-account-name"},
                     React.createElement("strong",{className:"block text-sm truncate"},accountLabel(account,accounts)),
                     React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},currency+" · บัญชีที่เลือก")),
-                React.createElement("strong",{className:"text-base tabular-nums shrink-0",style:{color:balance<0?T.red:T.green}},moneyIn(balance,currency))));
+                React.createElement("strong",{className:"ui-account-balance",style:{color:balance<0?T.red:T.green}},moneyIn(balance,currency))));
     }
 
     function StrategyWalletPanel({accounts,transactions,payments,settings,setSettings,setAccounts,onTrade,initialAccountId="",hideAccountPicker=false}) {
@@ -4661,6 +4770,8 @@ function allocationDateAfter(day, months) {
         const [removing,setRemoving]=useState(null);
         const [detailId,setDetailId]=useState("");
         const [targetDrafts,setTargetDrafts]=useState({});
+        const [editingTargets,setEditingTargets]=useState(false);
+        useEffect(()=>setEditingTargets(false),[selected]);
         const account=eligible.find(a=>a.id===selected) || eligible.find(a=>!a.archived) || eligible[0];
         const currency=accountCurrency(account);
         const data=useMemo(()=>{
@@ -4706,7 +4817,7 @@ function allocationDateAfter(day, months) {
                     if(target>stock.maximum)throw new Error(stock.symbol+" · Target ต้องไม่เกิน Maximum "+stock.maximum+"%");
                     return {...stock,target};
                 });
-                updatePlan({...plan,stocks});setError("");setMessage("บันทึก Target ของหุ้นแล้ว");
+                updatePlan({...plan,stocks});setEditingTargets(false);setError("");setMessage("บันทึก Target ของหุ้นแล้ว");
             }catch(e){setError(e.message);}
         }
         const updateStock=(id,fn)=>updatePlan({...plan,stocks:plan.stocks.map(s=>s.id===id?fn(s):s)});
@@ -4861,7 +4972,7 @@ function allocationDateAfter(day, months) {
         }
         const head=h("div",{className:"sa-card"},
             !hideAccountPicker&&h("h2",{className:"text-xl font-extrabold"},"Stock Accumulation"),
-            note("เลือกหุ้นและแบ่งไม้ล่วงหน้า เงินสดที่พร้อมใช้มาจาก Stock Accumulation ของบัญชีที่เลือก"));
+            note("วางแผนสะสมหุ้นและแบ่งไม้ซื้อ ใช้เงินจากกลยุทธ์ของบัญชีนี้"));
         if (!account) return h("div",{className:"pf-stack sw-root sa-root"},head,
             card(note("เปิดใช้พอร์ตแบบติดตามรายสินทรัพย์ในบัญชีที่ต้องการวางแผน")));
         const picker=hideAccountPicker?h(PortfolioScopedAccountBanner,{account,accounts,transactions,payments,today}):h(PortfolioAccountBanners,{label:"เลือกบัญชี",choices:eligible,accounts,transactions,payments,today,selected:account.id,onSelect:id=>{
@@ -4871,11 +4982,14 @@ function allocationDateAfter(day, months) {
         if (!data?.plan) return h("div",{className:"pf-stack sw-root sa-root"},head,picker,alert(data?.error));
         const detailItem=data.stocks.find(item=>item.stock.id===detailId)||null;
         const targetDraftTotal=accumulationTargetTotal(plan.stocks.map(stock=>({...stock,target:Number(targetDrafts[stock.id]??stock.target)||0})))/100;
-        const stat=(label,value,color=T.text)=>h("div",{style:{minWidth:0}},h("span",{className:"text-[10px]",style:{color:T.muted}},label),h("strong",{className:"block text-lg mt-1 tabular-nums",style:{color}},value));
-        const gridStyle={display:"grid",gridTemplateColumns:"minmax(0,1.25fr) minmax(0,.8fr) minmax(0,.75fr) minmax(0,.9fr) 16px",alignItems:"center",gap:5};
+        const stat=(label,value,color=T.text)=>h("div",{className:"ui-metric"},h("span",null,label),h("strong",{style:{color}},value));
+        const targetDirty=plan.stocks.some(stock=>String(targetDrafts[stock.id]??stock.target)!==String(stock.target));
+        const targetInvalid=targetDraftTotal>100 || plan.stocks.some(stock=>{const raw=String(targetDrafts[stock.id]??stock.target).trim();const n=Number(raw);return raw==="" || !Number.isFinite(n) || n<0 || n>stock.maximum;});
+        const actualPct=item=>data.equity>0?item.actual:null;
+        const resetTargets=()=>{setTargetDrafts(Object.fromEntries(plan.stocks.map(stock=>[stock.id,String(stock.target)])));setEditingTargets(false);setError("");};
         return h("div",{className:"pf-stack sw-root sa-root"},!detailItem&&head,!detailItem&&picker,
-            !detailItem&&card(h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}},
-                stat("ทุนจัดสรร",money(data.capital)),stat("มูลค่ากลยุทธ์",money(data.equity)),stat("เงินสดพร้อมใช้",money(data.available),data.available<0?T.red:T.green)),
+            !detailItem&&card(h("div",{className:"ui-metrics"},
+                stat("ทุนจัดสรร",money(data.capital)),stat("มูลค่ากลยุทธ์",money(data.equity)),stat("เงินพร้อมใช้",money(data.available),data.available<0?T.red:T.green)),
                 data.wallet.pending.stock>0n && pair("เงินขายรอชำระ",money(data.wallet.pending.stock)),
                 !data.wallet.funded && alert("ตรวจยอดจัดสรรที่ Strategy Wallet ก่อนใช้เงินจากแผนนี้"),
                 data.staleHoldings && note("มูลค่ากลยุทธ์บางส่วนใช้ราคาหรือเรทเก่า")),
@@ -4883,14 +4997,12 @@ function allocationDateAfter(day, months) {
             error && !draft && !removing && alert(error),
             detailItem ? h(React.Fragment,null,
                 h("div",{className:"flex items-center justify-between gap-2"},
-                    h("button",{type:"button",onClick:()=>setDetailId(""),className:"pf-context-back",style:{flex:"1 1 auto",minWidth:0},"aria-label":"กลับไปหุ้นในแผน"},
-                        h("span",{className:"pf-context-back-icon"},h(ChevronLeft,{size:18})),
-                        h("span",{className:"pf-context-back-copy"},h("small",null,"Stock Accumulation"),h("strong",null,"กลับไปหุ้นในแผน"))),
+                    h("button",{type:"button",onClick:()=>setDetailId(""),className:"pf-context-back","aria-label":"กลับไปหุ้นในแผน"},h(ChevronLeft,{size:17}),"หุ้นในแผน"),
                     h("div",{className:"text-right min-w-0"},h("h3",{className:"text-xl font-extrabold"},detailItem.stock.symbol),
                         h("p",{className:"text-xs",style:{color:T.muted}},(detailItem.stock.name||"หุ้นในแผน")+" · "+ACCUMULATION_STATUSES[detailItem.stock.status]))),
-                card(h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}},
-                        stat("Target Allocation",pct(detailItem.stock.target)),stat("Actual Allocation",pct(detailItem.actual)),stat("Accumulation Progress",pct(detailItem.progress),T.green)),
-                    h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10,marginTop:14,paddingTop:14,borderTop:`1px solid ${T.border}`}},
+                card(h("div",{className:"ui-metrics"},
+                        stat("Target Allocation",pct(detailItem.stock.target)),stat("Actual Allocation",pct(actualPct(detailItem))),stat("Accumulation Progress",pct(detailItem.progress),T.green)),
+                    h("div",{className:"ui-metrics",style:{paddingTop:12,borderTop:`1px solid ${T.border}`}},
                         stat("งบเป้าหมาย",money(detailItem.budget)),stat("ซื้อสะสมแล้ว",money(detailItem.paid)),stat("งบคงเหลือ",money(detailItem.remaining))),
                     h("div",{className:"mt-3 p-3 rounded-xl",style:{background:T.surf2}},pair("ราคาปัจจุบัน",price(detailItem.market.price)),quoteLine(detailItem)),
                     detailItem.stock.thesis&&note(detailItem.stock.thesis)),
@@ -4907,19 +5019,32 @@ function allocationDateAfter(day, months) {
                     plan.sort==="manual"&&detailItem.index>0&&button("เลื่อนขึ้น",()=>shift(detailItem.stock,detailItem.index,-1)),
                     plan.sort==="manual"&&detailItem.index<data.stocks.length-1&&button("เลื่อนลง",()=>shift(detailItem.stock,detailItem.index,1))))
                 : h(React.Fragment,null,
-                    card(h("h3",{className:"font-bold mb-2"},"หุ้นในแผน"),
-                        data.stocks.length>0&&h("div",{className:"text-[10px] font-bold py-2",style:{...gridStyle,color:T.muted}},h("span",null,"หุ้น"),h("span",null,"Target"),h("span",null,"Actual"),h("span",null,"Progress"),h("span",null)),
-                        !data.stocks.length&&note("เพิ่มหุ้นตัวแรกและตั้ง Target % ได้ก่อนซื้อจริง"),
-                        ...data.stocks.map(item=>h("div",{key:item.stock.id,className:"py-2",style:{...gridStyle,borderTop:`1px solid ${T.border}`},onClick:e=>{if(!e.target.closest("input,button"))setDetailId(item.stock.id);}},
-                            h("button",{type:"button",onClick:()=>setDetailId(item.stock.id),className:"text-left min-w-0"},h("strong",{className:"block text-sm"},item.stock.symbol),item.stock.name&&h("span",{className:"block text-[9px] truncate",style:{color:T.muted}},item.stock.name)),
-                            h("input",{type:"number",disabled:!writable,min:0,max:item.stock.maximum,step:"any",inputMode:"decimal",value:targetDrafts[item.stock.id]??item.stock.target,onChange:e=>setTargetDrafts(values=>({...values,[item.stock.id]:e.target.value})),"aria-label":"Target "+item.stock.symbol,className:"w-full px-1 py-2 rounded-lg text-xs font-bold",style:{minWidth:0,textAlign:"center",background:T.surf2,color:T.text,border:`1px solid ${T.border}`}}),
-                            h("span",{className:"text-xs font-bold text-center px-1 py-2 rounded-lg",style:{background:hex(T.green,.1),color:item.actual!=null&&item.actual>item.stock.maximum?T.orange:T.green}},pct(item.actual)),
-                            h("span",{className:"text-[10px] font-bold"},h("span",{className:"block text-center"},pct(item.progress)),h("span",{className:"block mt-1",style:{height:5,borderRadius:8,background:T.surf2,overflow:"hidden"}},h("span",{style:{display:"block",height:"100%",width:Math.min(100,item.progress||0)+"%",background:T.green}}))),
-                            h("button",{type:"button","aria-label":"ดูรายละเอียด "+item.stock.symbol,onClick:()=>setDetailId(item.stock.id)},h(ChevronRight,{size:17,style:{color:T.muted}})))),
-                        data.stocks.length>0&&h(React.Fragment,null,
-                            h("button",{type:"button",className:"w-full py-3 mt-2 rounded-xl text-xs font-bold",disabled:!writable||targetDraftTotal>100,onClick:saveTargets,style:{background:targetDraftTotal<=100?hex(T.green,.1):hex(T.red,.1),color:targetDraftTotal<=100?T.green:T.red,border:`1px solid ${targetDraftTotal<=100?hex(T.green,.35):hex(T.red,.35)}`}},"บันทึก Target · รวม "+pct(targetDraftTotal)),
-                            h("p",{className:"text-xs text-center mt-2",style:{color:T.muted}},(plan.unassigned==="cash"?"Cash Target ":"Unassigned Target ")+pct(Math.max(0,100-targetDraftTotal))))),
-                    h("details",{className:"sw-card p-3"},h("summary",{className:"font-bold"},"คิวโอกาสซื้อ ("+data.queue.length+")"),
+                    card(h("div",{className:"sa-list-heading"},h("h3",{className:"font-bold"},"หุ้นในแผน"),
+                            writable&&data.stocks.length>0&&button(editingTargets?"Cancel":"Edit targets",()=>editingTargets?resetTargets():setEditingTargets(true),false,{"aria-pressed":editingTargets})),
+                        data.stocks.length>0&&h("div",{className:"sa-target-summary","aria-live":"polite"},
+                            h("span",{style:{color:targetInvalid?T.red:undefined}},"Target "+pct(targetDraftTotal)),
+                            h("span",null,(plan.unassigned==="cash"?"Cash Target ":"Unassigned ")+pct(Math.max(0,100-targetDraftTotal)))),
+                        !data.stocks.length&&note("เพิ่มหุ้นและตั้ง Target % ได้ก่อนซื้อจริง"),
+                        data.stocks.length>0&&h("div",{className:"sa-watchlist",role:"table","aria-label":"หุ้นในแผน"},
+                            h("div",{className:"sa-stock-grid sa-table-head",role:"row"},...['Stock','Target','Actual','Progress',''].map((label,i)=>h("span",{key:i,role:"columnheader"},label))),
+                            ...data.stocks.map(item=>h("div",{key:item.stock.id,className:"sa-stock-grid sa-stock-row",role:"row",onClick:e=>{if(!e.target.closest("input,button,label"))setDetailId(item.stock.id);}},
+                                h("div",{role:"cell"},h("button",{type:"button",onClick:()=>setDetailId(item.stock.id),className:"sa-stock-name","aria-label":"ดูหุ้น "+item.stock.symbol},
+                                    h("strong",null,item.stock.symbol),item.stock.name&&h("small",{title:item.stock.name},item.stock.name))),
+                                h("div",{role:"cell"},editingTargets?h("label",{className:"sa-target-input"},
+                                    h("input",{type:"number",disabled:!writable,min:0,max:item.stock.maximum,step:"any",inputMode:"decimal",value:targetDrafts[item.stock.id]??item.stock.target,
+                                        onChange:e=>setTargetDrafts(values=>({...values,[item.stock.id]:e.target.value})),"aria-label":"Target "+item.stock.symbol}),h("span",{"aria-hidden":true},"%")):
+                                    h("span",{className:"sa-number"},pct(item.stock.target))),
+                                h("div",{role:"cell",className:"sa-number",title:actualPct(item)==null?"รอมูลค่ากลยุทธ์เพื่อคำนวณ Actual":undefined,style:{color:item.actual!=null&&item.actual>item.stock.maximum?T.orange:undefined}},pct(actualPct(item))),
+                                h("div",{role:"cell",className:"sa-progress",title:item.progress==null?"ยังไม่มีงบเป้าหมายสำหรับคำนวณ Progress":undefined},
+                                    h("span",null,pct(item.progress)),
+                                    h("div",{className:"sa-progress-track",role:item.progress==null?undefined:"progressbar","aria-label":"Accumulation progress "+item.stock.symbol,
+                                        "aria-valuemin":0,"aria-valuemax":100,"aria-valuenow":item.progress==null?undefined:Math.min(100,Math.max(0,item.progress)),"aria-valuetext":item.progress==null?"ยังไม่มีงบเป้าหมาย":pct(item.progress)},
+                                        h("span",{style:{width:Math.min(100,Math.max(0,item.progress||0))+"%"}}))),
+                                h("div",{role:"cell"},h("button",{type:"button",className:"sa-row-open","aria-label":"ดูรายละเอียด "+item.stock.symbol,onClick:()=>setDetailId(item.stock.id)},h(ChevronRight,{size:17})))))),
+                        editingTargets&&targetDirty&&h("div",{className:"sa-target-save"},
+                            button("บันทึก Target · รวม "+pct(targetDraftTotal),saveTargets,true,{disabled:!writable||targetInvalid}),
+                            targetInvalid&&h("p",{role:"alert",className:"sw-note"},"กรอก Target ไม่เกิน Maximum ของแต่ละหุ้น และรวมไม่เกิน 100%"))),
+                    h("details",{className:"sw-card sa-queue"},h("summary",null,h(LayersIcon,{size:18}),h("span",null,"คิวโอกาสซื้อ"),h("span",{className:"sa-count"},data.queue.length)),
                         h("div",{className:"mt-3"},select("เรียงคิวตาม",plan.sort,ACCUMULATION_SORTS,sort=>{try{updatePlan({...plan,sort});setError("");}catch(e){setError(e.message);}}),
                             note("แต่ละไม้ใช้เงินกองกลางเดียวกัน เลือกบันทึกทีละไม้แล้วระบบจะคำนวณใหม่"),
                             !data.queue.length&&note("ยังไม่มีไม้ที่ราคาเข้าเงื่อนไข"),...data.queue.map(({item,row})=>trancheView(item,row,true)))),
@@ -8961,7 +9086,7 @@ function allocationDateAfter(day, months) {
         const [open, setOpen] = useState(!!defaultOpen);
         const c = color || T.purple;
         return (React.createElement("div", null,
-            React.createElement("button", { onClick: () => setOpen(o => !o), className: "w-full flex items-center gap-2.5 p-3.5 rounded-xl active:scale-[.99]", style: { background: T.surf, border: `1px solid ${open ? hex(c, .5) : T.border}`, minHeight: 54 } },
+            React.createElement("button", { onClick: () => setOpen(o => !o), className: "ui-collapse-trigger w-full flex items-center gap-2.5 p-3.5 rounded-xl active:scale-[.99]", style: { background: T.surf, border: `1px solid ${open ? hex(c, .5) : T.border}`, minHeight: 54 } },
                 Icon && React.createElement(Icon, { size: 18, style: { color: c } }),
                 React.createElement("span", { className: "font-extrabold text-sm" }, title),
                 React.createElement("span", { className: "text-[11px] font-bold px-2 py-0.5 rounded-full", style: { background: hex(c, .16), color: c } }, count),
@@ -13441,12 +13566,10 @@ function allocationDateAfter(day, months) {
                             onClick:()=>setBudgetView(id),style:{minWidth:0,padding:"8px 4px",fontSize:"clamp(11px, 3vw, 14px)",
                                 lineHeight:1.2,whiteSpace:"normal",overflowWrap:"anywhere",
                                 background:budgetView===id?T.green:"transparent",color:budgetView===id?"#fff":T.sub}},label)))),
-            rootMode==="portfolio" && sub==="summary" && ["strategy","accumulation","sgov"].includes(budgetView) && React.createElement("button",{
-                type:"button",onClick:returnPortfolioHome,className:"pf-context-back","aria-label":"กลับหน้า Portfolio"},
-                React.createElement("span",{className:"pf-context-back-icon"},React.createElement(ChevronLeft,{size:18})),
-                React.createElement("span",{className:"pf-context-back-copy"},
-                    React.createElement("small",null,"กลับไป Portfolio · "+(portfolioContextAccount?accountLabel(portfolioContextAccount,accounts):"บัญชีลงทุน")),
-                    React.createElement("strong",null,portfolioFeatureLabel))),
+            rootMode==="portfolio" && sub==="summary" && ["strategy","accumulation","sgov"].includes(budgetView) && React.createElement("header",{className:"ui-subpage-head"},
+                React.createElement("button",{type:"button",onClick:returnPortfolioHome,className:"pf-context-back","aria-label":"กลับหน้า Portfolio"},
+                    React.createElement(ChevronLeft,{size:17}),"Portfolio"),
+                React.createElement("h2",null,portfolioFeatureLabel)),
             rootMode==="portfolio" && sub==="summary" && budgetView==="strategy" && React.createElement(StrategyWalletPanel,{
                 accounts,transactions,payments,settings:allocationSettings,setSettings:setAllocationSettings,setAccounts,
                 initialAccountId:portfolioContextAccountId,hideAccountPicker:true,
@@ -16516,20 +16639,20 @@ function allocationDateAfter(day, months) {
             sub === "week" && React.createElement("div", { className: "text-[10px] text-center pb-2", style: { color: T.muted } }, "\u0E15\u0E32\u0E23\u0E32\u0E07\u0E19\u0E35\u0E49\u0E0B\u0E49\u0E33\u0E17\u0E38\u0E01\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C\u0E42\u0E14\u0E22\u0E44\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E25\u0E48\u0E27\u0E07\u0E2B\u0E19\u0E49\u0E32 \u2014 \u0E1E\u0E2D\u0E16\u0E36\u0E07\u0E2A\u0E31\u0E1B\u0E14\u0E32\u0E2B\u0E4C\u0E43\u0E2B\u0E21\u0E48\u0E21\u0E32\u0E01\u0E14\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E23\u0E49\u0E32\u0E07 event \u0E08\u0E23\u0E34\u0E07\u0E40\u0E02\u0E49\u0E32 Calendar")));
     }
     const Section = ({ title, icon: Icon, dot, action, children }) => (React.createElement("div", null,
-        React.createElement("div", { className: "flex items-center gap-2.5 mb-2.5 px-1", style: { minHeight: 36 } },
+        React.createElement("div", { className: "ui-section-heading flex items-center gap-2.5 mb-2.5 px-1", style: { minHeight: 36 } },
             Icon && React.createElement(Icon, { size: 17, style: { color: T.sub } }),
             dot && React.createElement("span", { className: "w-2.5 h-2.5 rounded-full", style: { background: dot } }),
             React.createElement("h2", { className: "text-sm font-extrabold tracking-wide", style: { color: T.sub } }, title),
             action && React.createElement("div", { className: "ml-auto" }, action)),
         children));
-    const Stat = ({ label, value, color }) => (React.createElement(Glass, { className: "p-3" },
+    const Stat = ({ label, value, color }) => (React.createElement(Glass, { className: "p-3 ui-stat-card" },
         React.createElement("div", { className: "text-[11px] font-semibold", style: { color: T.muted } }, label),
         React.createElement("div", { className: "text-xl font-extrabold mt-0.5", style: { lineHeight: 1.25, color: color || T.text } }, value)));
     const Empty = ({ text }) => (React.createElement(Glass, { className: "py-8 flex items-center justify-center" },
         React.createElement("span", { className: "text-xs", style: { color: T.muted } }, text)));
     const Label = ({ children }) => React.createElement("div", { className: "text-[11px] font-semibold mb-1", style: { color: T.sub } }, children);
     function Input({ label, value, onChange, placeholder, type = "text" }) {
-        return React.createElement("div", { className: "mb-3" },
+        return React.createElement("div", { className: "mb-3 ui-input-field" },
             React.createElement(Label, null, label),
             React.createElement("input", { type: type, "aria-label": label, value: value, onChange: e => onChange(e.target.value), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }));
     }
