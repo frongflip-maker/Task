@@ -675,6 +675,21 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 }
 @media(prefers-reduced-motion:reduce){.pf-account-tray{animation:none}.pf-context-back,.pf-account-action{transition:none}}
 
+
+/* Unified account lists */
+.ui-account-list{display:flex;flex-direction:column;gap:8px}
+.ui-account-list-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;min-height:64px;min-width:0}
+.ui-account-list .ui-account-list-row{background:transparent!important;border:0!important;border-radius:0!important;border-bottom:1px solid #d9ded5!important;padding:12px 3px!important}
+.ui-account-list-row>div{min-width:0;flex:1}
+.ui-account-list-row strong.block{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ui-account-list-value{flex-shrink:0;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ui-account-edit{min-width:40px;min-height:40px;display:grid;place-items:center;color:var(--app-sub,#667570);border-radius:10px}
+.ui-account-add{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px;min-height:44px;color:var(--app-green,#28685f);font-weight:700;border:1px dashed #aebeb3;border-radius:12px}
+.ui-portfolio-accounts{border:1px solid var(--app-border,#d9ded5);border-radius:18px;background:var(--app-surface,#fff);overflow:hidden}
+.ui-portfolio-account+.ui-portfolio-account{border-top:1px solid var(--app-border,#d9ded5)}
+.ui-portfolio-account-toggle{min-height:64px}
+.ui-portfolio-account .pf-account-tray{border-top:1px solid var(--app-border,#d9ded5)}
+@media(max-width:359px){.ui-account-list-row{gap:7px;padding:9px}.ui-account-list-value{font-size:12px}.ui-portfolio-account-toggle{gap:8px}}
 </style>
 </head>
 <body>
@@ -682,7 +697,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-balanced-layout-v13";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-unified-accounts-v14";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -12607,7 +12622,7 @@ function allocationDateAfter(day, months) {
                 h("span",null,"Tap a holding for details")),
             needsFx&&h("p",{className:"pf-holdings-note"},fx?.value>0?"FX: 1 USD = "+fx.value.toLocaleString("en-US",{maximumFractionDigits:6})+" THB · "+fx.date+((Date.parse(today)-Date.parse(fx.date))/86400000>=ALLOCATION_STALE_DAYS?" · Stale FX":""):"FX required for cross-currency values"));
     }
-    function BudgetHome({ accounts, transactions, payments, incomeSources = [], income, expense, cashIn, onAccounts, onAdd }) {
+    function BudgetHome({ accounts, transactions, payments, incomeSources = [], income, expense, cashIn, onManageAccount, onAddAccount, onAdd }) {
         const usable = {};
         accounts.filter(isSpendableAccount).forEach(a => { const currency = accountCurrency(a); usable[currency] = (usable[currency] || 0) + (a.pocketEnabled ? accountPocketBalances(a,transactions,payments,incomeSources).personal : nativeAccountBalance(a,transactions,payments)); });
         const availableAccounts=accounts.filter(a=>!a.archived);
@@ -12619,11 +12634,11 @@ function allocationDateAfter(day, months) {
         const remainingAccounts=orderedAccounts(availableAccounts).filter(a=>a.id!==favorite?.id);
         const accountBanner=(account,isFavorite=false)=>{
             const balance=nativeAccountBalance(account,transactions,payments);
-            return React.createElement("button",{key:account.id,onClick:onAccounts,"aria-label":`เปิดบัญชี ${accountLabel(account,accounts)}`,className:"w-full text-left p-3 rounded-xl",style:{background:isFavorite?hex(T.green,.09):T.surf2,border:`1px solid ${isFavorite?hex(T.green,.34):T.border}`}},
+            return React.createElement("div",{key:account.id,className:"ui-account-list-row"+(isFavorite?" is-favorite":""),style:{background:isFavorite?hex(T.green,.09):T.surf2,border:`1px solid ${isFavorite?hex(T.green,.34):T.border}`}},
                 React.createElement("div",{className:"flex items-center gap-3"},
                     React.createElement("span",{className:"w-9 h-9 rounded-xl flex items-center justify-center shrink-0",style:{background:isFavorite?hex(T.green,.14):T.surf,color:isFavorite?T.green:T.muted}},React.createElement(Wallet,{size:17})),
                     React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},accountLabel(account,accounts)),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},accountCurrency(account)+(isFavorite?" · บัญชีโปรด":" · ยอดเงินรวม"))),
-                    React.createElement("strong",{className:"text-base tabular-nums shrink-0",style:{color:balance<0?T.red:isFavorite?T.green:T.text}},moneyIn(balance,accountCurrency(account))),React.createElement(ChevronRight,{size:16,style:{color:T.muted}})));
+                    React.createElement("strong",{className:"ui-account-list-value",style:{color:balance<0?T.red:isFavorite?T.green:T.text}},moneyIn(balance,accountCurrency(account))),React.createElement("button",{type:"button",onClick:()=>onManageAccount(account),"aria-label":"แก้ไขบัญชี "+accountLabel(account,accounts),className:"ui-account-edit"},React.createElement(Pencil,{size:16}))));
         };
         return React.createElement(React.Fragment,null,
             React.createElement("section", { className: "finance-panel p-4", style: { order: 1, background: `linear-gradient(135deg,${hex(T.green,.16)},${hex(T.purple,.08)} 58%,${T.surf})`, border: `1px solid ${hex(T.green,.26)}`, borderRadius: 22, boxShadow:"0 12px 30px rgba(40,65,58,.08)" } },
@@ -12637,8 +12652,8 @@ function allocationDateAfter(day, months) {
                     React.createElement("button",{type:"button",onClick:()=>setShowAllAccounts(value=>!value),"aria-expanded":showAllAccounts,className:"text-[10px] font-bold py-1 flex items-center gap-1",style:{color:T.purple}},showAllAccounts?"ย่อบัญชี":"บัญชีทั้งหมด",React.createElement(ChevronDown,{size:14,style:{transform:showAllAccounts?"rotate(180deg)":"none",transition:"transform .18s"}}))),
                 availableAccounts.length?React.createElement("select",{value:favorite?.id||"",onChange:e=>chooseFavorite(e.target.value),"aria-label":"เลือกบัญชีโปรด",className:"w-full mt-2 px-3 py-2.5 rounded-xl text-xs font-bold",style:{minWidth:0,background:T.surf2,color:T.text,border:`1px solid ${T.border}`}},React.createElement("option",{value:""},"เลือกบัญชีโปรด"),...availableAccounts.map(a=>React.createElement("option",{key:a.id,value:a.id},accountLabel(a,accounts)))):React.createElement("p",{className:"text-xs mt-2",style:{color:T.muted}},"ยังไม่มีบัญชี"),
                 favorite?React.createElement("div",{className:"mt-2"},accountBanner(favorite,true)):React.createElement("div",{className:"mt-2 p-3 rounded-xl text-xs",style:{background:T.surf2,color:T.muted,border:`1px solid ${T.border}`}},"เลือกบัญชีโปรดเพื่อแสดงยอดบัญชีที่ใช้บ่อย"),
-                showAllAccounts&&React.createElement("div",{className:"flex flex-col gap-2 mt-2 pt-2","data-testid":"all-accounts-inline",style:{borderTop:`1px solid ${T.border}`}},
-                    remainingAccounts.length?remainingAccounts.map(a=>accountBanner(a,false)):React.createElement("p",{className:"text-xs py-2 text-center",style:{color:T.muted}},"ไม่มีบัญชีอื่น"))),
+                showAllAccounts&&React.createElement("div",{className:"ui-account-list mt-2 pt-2","data-testid":"all-accounts-inline",style:{borderTop:`1px solid ${T.border}`}},
+                    remainingAccounts.length?remainingAccounts.map(a=>accountBanner(a,false)):React.createElement("p",{className:"text-xs py-2 text-center",style:{color:T.muted}},"ไม่มีบัญชีอื่น"),React.createElement("button",{type:"button",onClick:onAddAccount,className:"ui-account-add"},React.createElement(Plus,{size:16}),"เพิ่มบัญชี"))),
             React.createElement("button", { onClick: onAdd, className: "w-full py-3 rounded-xl text-sm font-bold", style: { order: 4, background: T.purple, color: "#fff" } }, "+ บันทึกรายการ"));
     }
 
@@ -13622,7 +13637,7 @@ function allocationDateAfter(day, months) {
                             onAddAccount:()=>setEditAcc({id:null,name:"",startBalance:0,accountType:"investment",currency:"THB",spendable:false}),onTransfer:()=>{setTxnKind("transfer");setTxnOpen(true);}})),
                     React.createElement("section",null,
                         React.createElement("div",{className:"flex items-center justify-between gap-2 mb-2"},React.createElement("h3",{className:"text-sm font-extrabold"},"Accounts"),React.createElement("span",{className:"text-[10px]",style:{color:T.muted}},"Cash balances")),
-                        portfolioAccounts.length?React.createElement("div",{className:"flex flex-col gap-2"},
+                        portfolioAccounts.length?React.createElement("div",{className:"ui-portfolio-accounts"},
                             ...portfolioAccounts.map(a=>{
                                 const currency=accountCurrency(a),balance=nativeAccountBalance(a,transactions,payments,null,today);
                                 const open=portfolioMenuAccountId===a.id;
@@ -13637,8 +13652,8 @@ function allocationDateAfter(day, months) {
                                     a.portfolioMode!=="summary"&&["sell","ขาย","บันทึกขาย",TrendingDown],
                                     ["other","รายการอื่น","เปิดรายการอื่น",LayersIcon]
                                 ].filter(Boolean);
-                                return React.createElement("section",{key:a.id,className:"finance-panel rounded-2xl overflow-hidden",style:{background:T.surf,border:`1px solid ${open?hex(T.green,.45):T.border}`}},
-                                    React.createElement("button",{type:"button",onClick:()=>setPortfolioMenuAccountId(open?"":a.id),"aria-expanded":open,className:"w-full p-3 text-left flex items-center gap-3"},
+                                return React.createElement("section",{key:a.id,className:"ui-portfolio-account",style:{background:open?hex(T.green,.05):"transparent"}},
+                                    React.createElement("button",{type:"button",onClick:()=>setPortfolioMenuAccountId(open?"":a.id),"aria-expanded":open,className:"w-full p-3 text-left flex items-center gap-3 ui-portfolio-account-toggle"},
                                         React.createElement("span",{className:"w-9 h-9 rounded-xl flex items-center justify-center shrink-0",style:{background:open?hex(T.green,.13):T.surf2,color:open?T.green:T.muted}},React.createElement(Wallet,{size:17})),
                                         React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},accountLabel(a,accounts)),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},currency+" · เงินสดในบัญชี")),
                                         React.createElement("strong",{className:"text-sm tabular-nums shrink-0",style:{color:balance<0?T.red:open?T.green:T.text}},moneyIn(balance,currency)),
@@ -13931,7 +13946,7 @@ function allocationDateAfter(day, months) {
                                 React.createElement("button", { onClick: () => setPayFc({ ...fc, remainingAmount: remaining }), className: "px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0", style: { background: hex(T.green, .16), color: T.green, border: `1px solid ${hex(T.green, .5)}` } }, "จ่าย")))))));
                 })())),
                 sub === "summary" && budgetView === "overview" && transactions.some(t => pendingIncomeValuation(t) && monthKey(t.date) === mk) && React.createElement("p", { style: { padding: 12, borderRadius: 12, fontSize: 12, lineHeight: 1.7, background: hex(T.blue,.08), color: T.sub } }, `มีรายรับต่างสกุล ${transactions.filter(t => pendingIncomeValuation(t) && monthKey(t.date) === mk).length} รายการที่ยังไม่ระบุเรท · ยอดเงินจริงเข้าบัญชีแล้ว แต่ยังไม่รวมในรายรับเงินบาท`),
-                rootMode === "accounts" && sub === "summary" && budgetView === "overview" && React.createElement(BudgetHome, { accounts, transactions, payments, incomeSources, income: workIncomeSum, expense: expenseSum, cashIn: cashInSum, month: mk, onAccounts: () => { setBudgetView("accounts"); setShowAccounts(true); }, onAdd: () => { setTxnKind("out"); setTxnOpen(true); } }),
+                rootMode === "accounts" && sub === "summary" && budgetView === "overview" && React.createElement(BudgetHome, { accounts, transactions, payments, incomeSources, income: workIncomeSum, expense: expenseSum, cashIn: cashInSum, month: mk, onManageAccount: setEditAcc, onAddAccount:()=>setEditAcc({id:null,name:"",startBalance:0}), onAdd: () => { setTxnKind("out"); setTxnOpen(true); } }),
                 rootMode === "accounts" && sub === "summary" && budgetView === "overview" && React.createElement(BudgetCategories, { key: mk, incomeRows: incomeCategoryRows, expenseRows: expenseCategoryRows, setExpenseTargets, month: mk }),
                 sub === "summary" && budgetView === "reports" && (() => {
                     const cfMonths = Array.from({ length: 6 }, (_, i) => addMonthKey(monthKey(TK), i - 5));
