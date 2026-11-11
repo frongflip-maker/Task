@@ -356,8 +356,10 @@ body.dnd-active *{user-select:none!important;-webkit-user-select:none!important;
 @media(min-width:600px){.text-\[9px\]{font-size:11px!important}.text-\[10px\]{font-size:12px!important}.text-\[11px\]{font-size:13px!important}}
 input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shadow:0 0 0 3px rgba(79,118,108,.16);outline:none}
 .txn-amount-input,.txn-amount-input:focus{border:0!important;box-shadow:none!important;outline:none!important;-webkit-appearance:none;appearance:none}
-[data-sheet-panel]{overscroll-behavior:contain;box-shadow:0 -18px 60px rgba(0,0,0,.42)}
-[data-sheet-header]{position:sticky;top:0;z-index:3;padding:18px 20px 12px;background:#FFFDF8;border-bottom:1px solid #D2C5B1}
+[data-sheet-backdrop]{overscroll-behavior:none;overflow:hidden}
+[data-sheet-panel]{display:flex;flex-direction:column;min-height:0;max-height:100%;overflow:hidden;box-shadow:0 -18px 60px rgba(0,0,0,.42)}
+[data-sheet-header]{flex:none;padding:18px 20px 12px;border-bottom:1px solid #D2C5B1}
+[data-sheet-body],[data-picker-scroll]{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 [data-sheet-body]{padding:16px 20px 28px}
 @media(min-width:700px){
   [data-sheet-backdrop]{align-items:center!important;padding:24px!important}
@@ -411,7 +413,20 @@ body,#boot,#err{background:#F5F4ED;color:#202F2E}.app-shell{font-variant-numeric
 .pf-account-tray{padding:10px 10px 12px;border-top:1px solid #d5dad0;background:linear-gradient(180deg,#f0f3ec 0%,#fffefa 100%);animation:pfTrayIn .2s ease-out both}.pf-account-tray-label{margin:0 2px 8px;color:#61716b;font-size:10px;font-weight:700}.pf-account-actions{display:grid;gap:8px}.pf-account-action{display:flex;min-width:0;min-height:74px;padding:9px 5px 8px;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px solid #d5dad0;border-radius:14px;background:#fffefa;color:#202f2e;text-align:center;box-shadow:0 4px 12px rgba(40,65,58,.04);transition:transform .16s ease,border-color .16s ease,background .16s ease}.pf-account-action:active{transform:scale(.96);border-color:#22645c;background:#edf4ef}.pf-account-action-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#e4eee8;color:#22645c}.pf-account-action strong{font-size:10px;line-height:1.25;overflow-wrap:anywhere}
 .pf-holdings{--hold-bg:#fffdf7;--hold-head:#e9e9da;--hold-line:#e7dbcc;--hold-fg:#202f2e;--hold-muted:#7a8075;--hold-green:#15996e;--hold-red:#d5584e;background:var(--hold-bg);color:var(--hold-fg);border:1px solid var(--hold-line);border-radius:18px;overflow:hidden;min-width:0}
 .pf-holdings-title{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 10px 6px}.pf-holdings-title h3{font-size:16px;font-weight:800;margin:0}.pf-holdings-title p{font-size:9px;color:var(--hold-muted);margin:3px 0 0}.pf-display-currency{display:flex;padding:3px;gap:2px;border:1px solid var(--hold-line);background:var(--hold-head);border-radius:9px;flex-shrink:0}.pf-display-currency button{padding:5px 7px;min-height:30px;font-size:10px;font-weight:750;border-radius:6px}.pf-display-currency button[aria-pressed=true]{background:#22645c;color:#fff}
-.pf-holdings-note{font-size:9px;line-height:1.5;color:var(--hold-muted);padding:3px 10px 8px;margin:0}.pf-holdings table{width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}.pf-holdings th{padding:9px 2px;background:var(--hold-head);font-size:clamp(6.5px,1.9vw,10px);white-space:nowrap;font-weight:750;text-align:right}.pf-holdings th:first-child,.pf-holdings td:first-child{text-align:left;padding-left:8px}.pf-holdings th:last-child,.pf-holdings td:last-child{padding-right:7px}.pf-holdings td{padding:12px 2px;border-bottom:1px solid var(--hold-line);text-align:right;vertical-align:middle;overflow:hidden}.pf-holdings tbody tr{cursor:pointer}.pf-holdings tbody tr:active{background:var(--hold-head)}.pf-holding-ticker{display:block;width:100%;min-height:36px;text-align:left}.pf-holding-ticker>strong{display:block;font-size:clamp(10px,2.9vw,14px);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pf-holding-badge{display:block;margin-top:4px;overflow:hidden;max-width:100%}.pf-holding-badge>span{height:16px!important;line-height:12px!important;font-size:8px!important;padding:0 3px!important;border-radius:5px!important}.pf-holdings-footer{display:flex;justify-content:space-between;gap:10px;padding:10px;font-size:8px;color:var(--hold-muted)}.pf-holdings .pf-holdings-empty{padding:24px 8px;text-align:center;font-size:12px;color:var(--hold-muted)}
+.pf-holdings-note{font-size:10px;line-height:1.5;color:var(--hold-muted);padding:3px 10px 8px;margin:0}
+.pf-holdings table{width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.pf-holdings th{padding:9px 4px;background:var(--hold-head);font-size:clamp(8px,2.45vw,11px);white-space:nowrap;font-weight:750;text-align:right}
+.pf-holdings td{padding:8px 4px;border-bottom:1px solid var(--hold-line);text-align:right;vertical-align:middle;overflow:hidden}
+.pf-holdings th:first-child,.pf-holdings td:first-child{text-align:left;padding-left:10px}
+.pf-holdings th:last-child,.pf-holdings td:last-child{padding-right:10px}
+.pf-holdings tbody tr{cursor:pointer}.pf-holdings tbody tr:active{background:var(--hold-head)}
+.pf-holding-line{height:18px;line-height:18px;overflow:hidden;white-space:nowrap}
+.pf-holding-secondary{color:var(--hold-muted);font-size:10px}
+.pf-holding-ticker{display:block;width:100%;min-height:36px;text-align:left}
+.pf-holding-ticker>strong,.pf-holding-ticker>span{display:block;text-overflow:ellipsis}
+.pf-holding-ticker>strong{font-size:14px}
+.pf-holdings-footer{display:flex;justify-content:space-between;gap:10px;padding:10px;font-size:9px;color:var(--hold-muted)}
+.pf-holdings .pf-holdings-empty{padding:24px 8px;text-align:center;font-size:12px;color:var(--hold-muted)}
 .pf-plan-compact{padding:10px 0 0;margin-top:10px;border-top:1px solid #d5dad0}.pf-funding-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:9px}.pf-funding-metrics small{display:block;font-size:9px;color:#61716b}.pf-funding-metrics strong{display:block;font-size:11px;line-height:1.5;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 @media(prefers-color-scheme:dark){.pf-holdings{--hold-bg:#202f2d;--hold-head:#30423e;--hold-line:#465c56;--hold-fg:#edf4f2;--hold-muted:#b5c8c2;--hold-green:#89d4a8;--hold-red:#ffada4}}
 @keyframes pfTrayIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:translateY(0)}}
@@ -558,7 +573,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-navigation-state-v8";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-holdings-sheets-v9";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -3575,7 +3590,7 @@ function allocationDateAfter(day, months) {
         };
         const fresh = () => ({ id: uid(), tradeMode:cryptoDefault ? "crypto" : "stock", rate:"", budget:"", symbol:"", units:"", unitPrice:"", amount:"", fee:"", feeUnit:"cash", tax:"" });
         const parkingOrder=initialOrder?.kind==="sgov", dcaSale=initialOrder?.kind==="dca-sell", dcaGold=initialOrder?.kind==="dca-gold";
-        const [tab,setTab] = useState(initialTab==="assets" || totalOnly ? "assets" : "profit"), [type,setType] = useState(initialOrder?.type|| (initialOrder ? "buy" : ""));
+        const [tab,setTab] = useState(initialTab==="assets" ? "assets" : "returns"), [type,setType] = useState(initialOrder?.type|| (initialOrder ? "buy" : ""));
         const accumulationOrder=initialOrder?.kind==="accumulation";
         const [rows,setRows] = useState(()=>initialOrder ? [{...fresh(),tradeMode:"stock",symbol:initialOrder.symbol||"",
             ...(parkingOrder?{strategy_id:initialOrder.strategy_id,sgovParking:["buy","sell"].includes(initialOrder.type)}:
@@ -3977,7 +3992,13 @@ function allocationDateAfter(day, months) {
                 isTrade(type) && !editing && !initialOrder && button(type==="sell" ? "+ เพิ่มรายการขาย" : "+ เพิ่มหุ้นหรือเหรียญอีกตัว",()=>setRows(list=>[...list,fresh()])),
                 error && h("p",{role:"alert",style:{color:T.red}},error),group(button("ย้อนกลับ",finish),button(rows.length>1 ? "บันทึกทั้งหมด" : "บันทึก",save,true)))
             : h("div",{className:"pf-stack"},
-                h("div",{className:"pf-tabs"},!totalOnly && button("กำไร/ขาดทุน",()=>setTab("profit"),tab==="profit"),button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),button("Statement พอร์ต",()=>setTab("history"),tab==="history"),button("กระทบยอด",()=>setTab("audit"),tab==="audit"),button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns"),setForeignTax && button("ภาษี",()=>setTab("tax"),tab==="tax")),
+                h("div",{className:"pf-tabs"},
+                    button("สรุปผลตอบแทน",()=>setTab("returns"),tab==="returns"),
+                    !totalOnly && button("กำไร/ขาดทุน",()=>setTab("profit"),tab==="profit"),
+                    button("สินทรัพย์",()=>setTab("assets"),tab==="assets"),
+                    button("Statement พอร์ต",()=>setTab("history"),tab==="history"),
+                    button("กระทบยอด",()=>setTab("audit"),tab==="audit"),
+                    setForeignTax && button("ภาษี",()=>setTab("tax"),tab==="tax")),
                 tab==="tax" ? h(ForeignTaxPanel,{accounts,transactions,payments,setAccounts,foreignTax,setForeignTax}) : tab==="profit" ? tradeProfitView() : (tab==="audit" || tab==="returns") ? h(BrokerReport,{key:tab,mode:tab,account,accounts,transactions,payments,setAccounts,onEdit:begin}) : tab==="assets" ? h(React.Fragment,null,
                     totalOnly ? h(React.Fragment,null,numbers(stat("มูลค่าล่าสุด",latest ? money(latest.amount) : "—"),stat("วันที่อัปเดต",latest?.date || "—")),
                     first && latest && first.id!==latest.id && text("ผลต่างจากยอดครั้งแรก หลังหักโอนสุทธิ "+money(latest.amount-first.amount-fundingSince))) :
@@ -9485,15 +9506,14 @@ function allocationDateAfter(day, months) {
         const trigger = React.useRef(null), search = React.useRef(null);
         const list = orderedAccounts(accounts).filter(a => a.id !== exclude && (!a.archived || (allowArchived && a.id === value)) && (allowForeign || accountCurrency(a) === "THB"));
         const selected = list.find(a => a.id === value);
-        const close = () => { setOpen(false); trigger.current?.focus(); };
+        const close = () => { setOpen(false); trigger.current?.focus({preventScroll:true}); };
+        useModalScrollLock(open);
         useEffect(() => {
             if (!open) return;
-            const previous = document.body.style.overflow;
-            document.body.style.overflow = "hidden";
-            search.current?.focus();
+            search.current?.focus({preventScroll:true});
             const keydown = e => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); close(); } };
             document.addEventListener("keydown", keydown, true);
-            return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", keydown, true); };
+            return () => document.removeEventListener("keydown", keydown, true);
         }, [open]);
         const parent = accountParent(selected, accounts);
         const badge = account => React.createElement("span", { className: "text-[10px] font-extrabold px-2 py-1 rounded-lg shrink-0", style: { background: accountCurrency(account) === "USD" ? hex(T.blue,.12) : T.surf2, color: accountCurrency(account) === "USD" ? T.blue : T.sub, letterSpacing: ".04em" } }, accountCurrency(account));
@@ -9512,12 +9532,12 @@ function allocationDateAfter(day, months) {
                 React.createElement(Wallet, { size: 18, style: { color: T.sub, flexShrink: 0 } }),
                 React.createElement("span", { className: "flex-1 min-w-0" }, selected ? React.createElement(AccountBadge, { account: selected, accounts }) : React.createElement("span", { className: "text-sm font-bold" }, list.length ? "เลือกบัญชี" : "ยังไม่มีบัญชีที่เลือกได้"), parent && React.createElement("span", { className: "text-[11px]", style: { display: "block", marginTop: 3, color: T.muted } }, parent.name)),
                 selected && badge(selected), React.createElement(ChevronDown, { size: 16, style: { color: T.muted, flexShrink: 0 } })),
-            open && ReactDOM.createPortal(React.createElement("div", { role: "presentation", onClick: close, style: { position: "fixed", inset: 0, zIndex: 120, background: "rgba(35,32,26,.48)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingTop: "max(24px, env(safe-area-inset-top))" } },
+            open && ReactDOM.createPortal(React.createElement("div", { role: "presentation", onClick: e => { e.stopPropagation(); close(); }, style: { position: "fixed", inset: 0, zIndex: 120, background: "rgba(35,32,26,.48)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingTop: "max(24px, env(safe-area-inset-top))", overflow:"hidden", overscrollBehavior:"none" } },
                 React.createElement("section", { role: "dialog", "aria-modal": true, "aria-label": label, onClick: e => e.stopPropagation(), style: { width: "min(100%, 460px)", maxHeight: "85dvh", display: "flex", flexDirection: "column", background: T.surf, color: T.text, borderRadius: "26px 26px 0 0", boxShadow: "0 -12px 48px rgba(35,32,26,.2)", paddingBottom: "max(12px, env(safe-area-inset-bottom))" } },
                     React.createElement("div", { style: { width: 38, height: 4, background: T.border, borderRadius: 5, margin: "10px auto 0", flexShrink: 0 } }),
                     React.createElement("div", { className: "flex items-center justify-between", style: { padding: "16px 20px 12px" } }, React.createElement("h3", { className: "text-lg font-extrabold" }, label || "เลือกบัญชี"), React.createElement("button", { type: "button", "aria-label": "ปิดตัวเลือกบัญชี", onClick: close, className: "w-10 h-10 rounded-full flex items-center justify-center", style: { background: T.surf2 } }, React.createElement(X, { size: 18 }))),
                     React.createElement("div", { style: { padding: "0 20px 12px" } }, React.createElement("input", { ref: search, type: "search", "aria-label": "ค้นหาบัญชี", placeholder: "ค้นหาชื่อบัญชี หรือสกุลเงิน", value: query, onChange: e => setQuery(e.target.value), className: "w-full px-4 py-3 rounded-xl outline-none", style: { fontSize: 16, background: T.surf2, color: T.text, border: `1px solid ${T.border}` } })),
-                    React.createElement("div", { style: { padding: "0 20px 16px", overflowY: "auto", overscrollBehavior: "contain" } },
+                    React.createElement("div", { "data-picker-scroll": true, tabIndex:0, style: { padding: "0 20px 16px" } },
                         visible.length === 0 && React.createElement("p", { className: "text-sm py-5 text-center", style: { color: T.muted } }, "ไม่พบบัญชีที่ค้นหา"),
                         visible.map(group => React.createElement("div", { key: group.root.id, className: "mb-4" },
                             React.createElement("div", { className: "text-xs font-bold px-1 pt-2 pb-2", style: { color: T.sub } }, group.root.name),
@@ -12270,7 +12290,7 @@ function allocationDateAfter(day, months) {
             return (b.value||0)-(a.value||0)||a.symbol.localeCompare(b.symbol,"en");
         });
     }
-    function PortfolioAssetDetail({row,accounts,onOpenAccount}) {
+    function PortfolioAssetDetail({row,accounts,targets,onOpenAccount}) {
         if(!row)return null;
         const price=row.quote?new Intl.NumberFormat("en-US",{maximumFractionDigits:8}).format(row.quote.value)+" "+row.quote.currency:"รอราคา";
         const qty=n=>Number(n).toLocaleString("en-US",{maximumFractionDigits:8});
@@ -12284,6 +12304,7 @@ function allocationDateAfter(day, months) {
                     pair("จำนวนรวม",qty(row.units)),pair("ราคาที่บันทึกล่าสุด",price),
                     row.quote&&pair("แหล่งราคา / วันที่",(row.quote.source==="manual"?"Manual":"Statement")+" · "+row.quote.date+((Date.now()-Date.parse(row.quote.date))/86400000>=ALLOCATION_STALE_DAYS?" · ราคาเก่า":"")),
                     pair("สัดส่วนในสินทรัพย์ทั้งหมด",row.weight==null?"—":row.weight.toLocaleString("th-TH",{maximumFractionDigits:2})+"%"),
+                    ...targets.map((target,index)=>React.createElement(React.Fragment,{key:index},pair(target.name+" target",target.weight.toLocaleString("en-US",{maximumFractionDigits:2})+"%"))),
                     pair("ต้นทุนที่ติดตามได้",row.cost==null?"—":moneyIn(row.cost,"THB")))),
             React.createElement("section",{className:"finance-panel p-3 rounded-2xl",style:{background:T.surf,border:`1px solid ${T.border}`}},
                 React.createElement("h4",{className:"text-sm font-bold mb-2"},"แยกตามบัญชี"),
@@ -12303,35 +12324,67 @@ function allocationDateAfter(day, months) {
         const last=quote?convert(quoteUnit,quote.currency):null;
         const cost=allocationSum(row.items.map(item=>convert(item.nativeCost,accountCurrency(item.account))));
         const value=allocationSum(row.items.map(item=>item.quote?convert(item.quotedValue,item.quote.currency):null));
-        return {last,average:row.units>0&&cost!=null?cost/row.units:null,value,
-            gain:cost>0&&value!=null?(value-cost)/cost*100:null};
+        const profit=value!=null&&cost!=null?value-cost:null;
+        return {last,average:row.units>0&&cost!=null?cost/row.units:null,value,profit,
+            gain:cost>0&&profit!=null?profit/cost*100:null};
     }
-    function PortfolioHoldingsTable({rows,accounts,fx,currency,onCurrency,onOpen,today}) {
+    function holdingPlanTargets(row,portfolio,settings,accounts) {
+        const targets=[];
+        const {symbol}=row;
+        const stockOnly=settings.dcaScope==="stocks";
+        const chosen=settings.dcaStocks.filter(ticker=>dcaStockChoice(ticker,portfolio,settings));
+        if (chosen.includes(symbol)) {
+            const weights=chosen.every(ticker=>settings.etfs[ticker]>0) ? chosen.map(ticker=>settings.etfs[ticker]) : chosen.map(()=>1);
+            const share=weights[chosen.indexOf(symbol)]/weights.reduce((sum,weight)=>sum+weight,0);
+            targets.push({label:"DCA",name:"Smart DCA",weight:share*(stockOnly?100:settings.rules.stock.target)});
+        } else if (!stockOnly && allocationIsBtc(symbol)) {
+            targets.push({label:"DCA",name:"Smart DCA",weight:settings.rules.btc.target});
+        } else if (!stockOnly && !chosen.length && settings.etfs[symbol]!=null && !sgovTicker(symbol)) {
+            const etf=settings.etfs[symbol];
+            const weight=settings.etfMode==="stock" ? etf*settings.rules.stock.target/100 : etf;
+            targets.push({label:"DCA",name:"Smart DCA",weight});
+        }
+        for (const account of row.accountList) {
+            const stock=accumulationPlan(account).stocks.find(item=>item.symbol===symbol && item.status!=="archived");
+            if (stock) targets.push({label:"Plan",name:accountLabel(account,accounts),weight:stock.target});
+        }
+        return targets;
+    }
+    function PortfolioHoldingsTable({rows,portfolio,accounts,settings,fx,currency,onCurrency,onOpen,today}) {
         const h=React.createElement;
-        const num=n=>n==null?"—":n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+        const num=n=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
         const quantity=n=>n.toLocaleString("en-US",{maximumFractionDigits:8});
-        const pct=n=>n==null?"—":n.toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1})+"%";
-        const cell=(value,color)=>h("td",{style:color?{color}:undefined,title:value},h(StatementMoney,{fontSize:11,inline:true},value));
+        const pct=n=>n.toLocaleString("en-US",{maximumFractionDigits:2})+"%";
+        const money=n=>n==null?"—":(currency==="USD"?"$":"฿")+num(n);
+        const sign=n=>n>0?"+":n<0?"−":"";
+        const line=(value,secondary=false,color)=>h("div",{className:"pf-holding-line"+(secondary?" pf-holding-secondary":""),style:{color},title:value},
+            h(StatementMoney,{fontSize:secondary?10:13,inline:true},value));
         const dates=rows.map(row=>row.quote?.date).filter(Boolean).sort();
         const needsFx=rows.some(row=>row.items.some(item=>accountCurrency(item.account)!==currency||item.quote&&item.quote.currency!==currency));
         return h("section",{className:"pf-holdings", "aria-label":"Holdings"},
             h("div",{className:"pf-holdings-title"},h("div",null,h("h3",null,"Holdings"),h("p",null,"All accounts · By value · Excludes cash")),
                 h("div",{className:"pf-display-currency",role:"group","aria-label":"Display currency"},...["THB","USD"].map(unit=>h("button",{key:unit,type:"button","aria-pressed":currency===unit,onClick:()=>onCurrency(unit)},unit)))),
-            h("div",{className:"pf-holdings-note"},"Last / Avg Cost / Value in "+currency+" · Unr. Gain % excludes FX"),
+            h("div",{className:"pf-holdings-note"},"Targets by strategy · Unrealized P&L excludes FX"),
             h("table",null,
-                h("colgroup",null,...[23,11,10,13,14,15,14].map((width,index)=>h("col",{key:index,style:{width:width+"%"}}))),
-                h("thead",null,h("tr",null,...["Ticker","Qty","Weight","Last","Avg Cost","Value","Unr. Gain %"].map(label=>h("th",{key:label,scope:"col"},label)))),
-                h("tbody",null,!rows.length&&h("tr",null,h("td",{colSpan:7,className:"pf-holdings-empty"},"No holdings yet")),
+                h("colgroup",null,...[21,24,22,33].map((width,index)=>h("col",{key:index,style:{width:width+"%"}}))),
+                h("thead",null,h("tr",null,...["Ticker / Qty","Weight / Target","Last / Avg Cost","Value / P&L"].map(label=>h("th",{key:label,scope:"col"},label)))),
+                h("tbody",null,!rows.length&&h("tr",null,h("td",{colSpan:4,className:"pf-holdings-empty"},"No holdings yet")),
                     ...rows.map(row=>{
                         const display=portfolioHoldingDisplay(row,fx,currency);
-                        const gain=display.gain==null?"—":(display.gain>0?"+":"")+display.gain.toFixed(2)+"%";
+                        const profit=display.profit;
+                        const gain=display.gain==null?"": " ("+sign(display.gain)+Math.abs(display.gain).toFixed(2)+"%)";
+                        const pnl=profit==null?"—":sign(profit)+money(Math.abs(profit))+gain;
+                        const pnlColor=profit<0?"var(--hold-red)":profit>0?"var(--hold-green)":undefined;
                         const stale=row.quote&&(Date.parse(today)-Date.parse(row.quote.date))/86400000>=ALLOCATION_STALE_DAYS;
-                        const badgeAccount=row.accountList.length===1?row.accountList[0]:{name:row.accountList.length+" accounts",backgroundColor:accountBackground(row.accountList[0])};
+                        const targets=holdingPlanTargets(row,portfolio,settings,accounts);
+                        const target=targets.length===1?targets[0].label+" "+pct(targets[0].weight):targets.length>1?"Multiple":"—";
                         return h("tr",{key:row.symbol,onClick:()=>onOpen(row.symbol)},
                             h("td",null,h("button",{type:"button",className:"pf-holding-ticker","aria-label":"View "+row.symbol,onClick:e=>{e.stopPropagation();onOpen(row.symbol);}},
-                                h("strong",null,row.symbol),h("span",{className:"pf-holding-badge",title:row.platforms},h(AccountBadge,{account:badgeAccount,accounts})))),
-                            cell(quantity(row.units)),cell(pct(row.weight)),cell(num(display.last),stale?"var(--hold-muted)":undefined),
-                            cell(num(display.average)),cell(num(display.value)),cell(gain,display.gain==null?undefined:display.gain<0?"var(--hold-red)":display.gain>0?"var(--hold-green)":undefined));
+                                h("strong",{className:"pf-holding-line"},row.symbol),
+                                h("span",{className:"pf-holding-line pf-holding-secondary",title:quantity(row.units)},quantity(row.units)))),
+                            h("td",{title:targets.map(item=>item.label+" "+pct(item.weight)).join(" · ")||undefined},line(row.weight==null?"—":pct(row.weight)),line(target,true)),
+                            h("td",null,line(money(display.last),false,stale?"var(--hold-muted)":undefined),line(money(display.average),true)),
+                            h("td",null,line(money(display.value)),line(pnl,true,pnlColor)));
                     }))),
             h("div",{className:"pf-holdings-footer"},
                 h("span",null,dates.length?"Recorded prices · "+(dates[0]===dates.at(-1)?dates[0]:dates[0]+" – "+dates.at(-1)):"Awaiting recorded prices"),
@@ -12865,7 +12918,7 @@ function allocationDateAfter(day, months) {
         const [portfolioOrder, setPortfolioOrder] = useState(null);
         const [portfolioInitialTab,setPortfolioInitialTab]=useState(null);
         const [portfolioAssetSymbol,setPortfolioAssetSymbol]=useState("");
-        const [holdingsCurrency,setHoldingsCurrency]=useState(()=>{try{return localStorage.getItem("taskroutine_holdings_currency")==="USD"?"USD":"THB";}catch{return "THB";}});
+        const [holdingsCurrency,setHoldingsCurrency]=useState(()=>{try{return localStorage.getItem("taskroutine_holdings_currency")==="THB"?"THB":"USD";}catch{return "USD";}});
         const portfolioReturnScroll=React.useRef(0);
         const [taxOpen, setTaxOpen] = useState(false);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId);
@@ -13374,7 +13427,7 @@ function allocationDateAfter(day, months) {
                                                     React.createElement("strong",null,label)))))
                                             :React.createElement("p",{className:"text-xs py-3 text-center",style:{color:T.muted}},"บัญชีนี้ยังไม่ได้เปิดใช้แผนลงทุน")));
                             })):React.createElement("button",{onClick:()=>props.goTab?.("budget"),className:"w-full py-3 rounded-xl text-xs font-bold",style:{background:T.surf2,color:T.green}},"เพิ่มบัญชีลงทุนจากหน้าบัญชี")),
-                    React.createElement(PortfolioHoldingsTable,{rows:assetRows,accounts,fx:data.fx,currency:holdingsCurrency,today,
+                    React.createElement(PortfolioHoldingsTable,{rows:assetRows,portfolio:data,accounts,settings:allocationSettings,fx:data.fx,currency:holdingsCurrency,today,
                         onCurrency:currency=>{setHoldingsCurrency(currency);try{localStorage.setItem("taskroutine_holdings_currency",currency);}catch{}},onOpen:setPortfolioAssetSymbol}),
                     entry("Investment Tax","Tax categories and recorded data",()=>setTaxOpen(true)));
             })(),
@@ -14049,7 +14102,7 @@ function allocationDateAfter(day, months) {
                 const data=allocationPortfolio(accounts,transactions,payments,allocationSettings,dkey(new Date()));
                 const row=portfolioHoldingRows(data,accounts).find(item=>item.symbol===portfolioAssetSymbol);
                 return row&&React.createElement(Sheet,{title:"รายละเอียดสินทรัพย์",onClose:()=>setPortfolioAssetSymbol("")},
-                    React.createElement(PortfolioAssetDetail,{row,accounts,onOpenAccount:id=>{setPortfolioAssetSymbol("");setPortfolioInitialTab("assets");setPortfolioId(id);}}));
+                    React.createElement(PortfolioAssetDetail,{row,accounts,targets:holdingPlanTargets(row,data,allocationSettings,accounts),onOpenAccount:id=>{setPortfolioAssetSymbol("");setPortfolioInitialTab("assets");setPortfolioId(id);}}));
             })(),
             selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id+"/"+(portfolioOrder?.id||""), account:selectedPortfolio, accounts, transactions, payments,
                 setAccounts, commitLinkedGold, foreignTax, setForeignTax, initialOrder:portfolioOrder, initialTab:portfolioInitialTab, onClose:()=>{setPortfolioId(null);setPortfolioOrder(null);setPortfolioInitialTab(null);} }),
@@ -16420,14 +16473,43 @@ function allocationDateAfter(day, months) {
             durationMode && React.createElement("div", { className: "text-[10px] mt-1.5 px-1", style: { color: T.muted } }, `ระบบคำนวณเวลาจบให้อัตโนมัติ: ${addDurationToTime(startTime, duration)}`));
     }
     const SaveBtn = ({ disabled, onClick, children }) => (React.createElement("button", { disabled: disabled, onClick: onClick, className: "w-full py-3.5 rounded-xl font-bold active:scale-[.98] transition", style: { background: disabled ? T.border : T.green, color: disabled ? T.muted : "#000" } }, children));
+    let modalScrollLocks = 0;
+    let restorePageScroll;
+    function useModalScrollLock(open) {
+        React.useLayoutEffect(() => {
+            if (!open) return;
+            if (modalScrollLocks++ === 0) {
+                const {scrollX, scrollY} = window;
+                const root = document.documentElement.style;
+                const body = document.body.style;
+                const lockedStyles = {position:"fixed", top:`${-scrollY}px`, left:`${-scrollX}px`, width:"100%", height:"auto", overflowY:"hidden"};
+                const previousBody = Object.fromEntries(Object.keys(lockedStyles).map(key => [key, body[key]]));
+                const previousRootOverflow = root.overflowY;
+                Object.assign(body, lockedStyles);
+                root.overflowY = "hidden";
+                restorePageScroll = () => {
+                    Object.assign(body, previousBody);
+                    root.overflowY = previousRootOverflow;
+                    window.scrollTo(scrollX, scrollY);
+                };
+            }
+            return () => {
+                if (--modalScrollLocks === 0) {
+                    restorePageScroll();
+                    restorePageScroll = undefined;
+                }
+            };
+        }, [open]);
+    }
     function Sheet({ title, onClose, children }) {
-        return (React.createElement("div", { "data-sheet-backdrop": true, className: "fixed inset-0 z-40 flex items-end justify-center", style: { background: "rgba(0,0,0,.72)", padding: "calc(env(safe-area-inset-top) + 14px) 12px max(8px, env(safe-area-inset-bottom))" }, onClick: onClose },
-            React.createElement("div", { "data-sheet-panel": true, className: "rounded-t-3xl max-h-[88vh] overflow-y-auto", style: { width: "min(100%, 432px)", maxWidth: "100%", background: T.surf, border: `1px solid ${T.border}`, overflowX: "hidden" }, onClick: e => e.stopPropagation() },
-                React.createElement("div", { "data-sheet-header": true, className: "flex items-center justify-between" },
+        useModalScrollLock(true);
+        return ReactDOM.createPortal(React.createElement("div", { "data-sheet-backdrop": true, className: "fixed inset-0 z-40 flex items-end justify-center", style: { background: "rgba(0,0,0,.72)", padding: "calc(env(safe-area-inset-top) + 14px) 12px max(8px, env(safe-area-inset-bottom))" }, onClick: e => { e.stopPropagation(); onClose(); } },
+            React.createElement("section", { "data-sheet-panel": true, role:"dialog", "aria-modal":true, "aria-label":title, className: "rounded-t-3xl", style: { width: "min(100%, 432px)", maxWidth: "100%", background: T.surf, border: `1px solid ${T.border}` }, onClick: e => e.stopPropagation() },
+                React.createElement("div", { "data-sheet-header": true, className: "flex items-center justify-between", style:{background:T.surf} },
                     React.createElement("h3", { className: "font-bold text-lg" }, title),
-                    React.createElement("button", { onClick: onClose, className: "w-9 h-9 rounded-full flex items-center justify-center", style: { background: T.surf2 } },
+                    React.createElement("button", { type:"button", "aria-label":"ปิด", onClick: onClose, className: "w-9 h-9 rounded-full flex items-center justify-center", style: { background: T.surf2 } },
                         React.createElement(X, { size: 18 }))),
-                React.createElement("div", { "data-sheet-body": true }, children))));
+                React.createElement("div", { "data-sheet-body": true, tabIndex:0 }, children))), document.body);
     }
     function runCoreSelfTests() {
         const results = [];
