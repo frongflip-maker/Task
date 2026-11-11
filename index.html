@@ -688,8 +688,42 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 .ui-portfolio-accounts{border:1px solid var(--app-border,#d9ded5);border-radius:18px;background:var(--app-surface,#fff);overflow:hidden}
 .ui-portfolio-account+.ui-portfolio-account{border-top:1px solid var(--app-border,#d9ded5)}
 .ui-portfolio-account-toggle{min-height:64px}
+.ui-account-list .ui-account-list-row.is-child,.ui-portfolio-account.is-child .ui-portfolio-account-toggle{padding-left:29px!important;position:relative}
+.ui-account-list-row.is-child::before,.ui-portfolio-account.is-child .ui-portfolio-account-toggle::before{content:"";position:absolute;left:12px;top:0;height:50%;width:12px;border-left:1.5px solid #9aaea3;border-bottom:1.5px solid #9aaea3;border-bottom-left-radius:8px;pointer-events:none}
+.ui-account-list-row.is-child,.ui-portfolio-account.is-child{position:relative}
+.ui-portfolio-account.is-child .pf-account-tray{margin-left:20px}
+
 .ui-portfolio-account .pf-account-tray{border-top:1px solid var(--app-border,#d9ded5)}
 @media(max-width:359px){.ui-account-list-row{gap:7px;padding:9px}.ui-account-list-value{font-size:12px}.ui-portfolio-account-toggle{gap:8px}}
+.pf-account-tray{padding:10px 12px 12px}
+.pf-account-tray-label{margin:2px 0 6px;font-size:11px}
+.pf-account-actions{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px}
+.pf-account-action{height:56px;min-height:56px;max-height:56px;padding:5px 3px;gap:3px;border-radius:11px;box-shadow:none}
+.pf-account-action-icon{width:23px;height:23px;border-radius:7px}
+.pf-account-action-icon svg{width:14px;height:14px}
+.pf-account-action strong{font-size:11px;line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pa-root{gap:10px}
+.pa-root>.pa-card{padding:13px;gap:9px}
+.pa-target-card .pa-target-row{display:grid;grid-template-columns:minmax(0,1fr) 78px 76px;gap:8px;align-items:center;min-height:42px;border-bottom:1px solid var(--pa-border);font-variant-numeric:tabular-nums}
+.pa-target-card .pa-target-heading{min-height:24px;color:var(--pa-sub);font-size:11px;font-weight:700}
+.pa-target-row>span:first-child{min-width:0;overflow-wrap:anywhere;font-weight:650}
+.pa-target-row>label{position:relative;display:flex;align-items:center;border:1px solid var(--pa-border);border-radius:9px;background:var(--pa-bg);min-width:0}
+.pa-target-row input{width:100%;min-width:0;height:36px;padding:4px 17px 4px 4px;text-align:right;font-size:16px;border:0;background:transparent;color:var(--pa-fg);font-variant-numeric:tabular-nums}
+.pa-target-row label span{position:absolute;right:5px;pointer-events:none;color:var(--pa-sub);font-size:11px}
+.pa-target-row>strong{text-align:right;white-space:nowrap;font-size:13px}
+.pa-target-heading>span:not(:first-child){text-align:right}
+.pa-target-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:3px}
+.pa-target-foot button{min-height:38px;padding:5px 12px}
+.pa-calculator{gap:9px!important;padding:13px!important}
+.pa-calc-budget{grid-template-columns:1fr!important;gap:6px!important;padding-top:9px!important}
+.pa-calc-budget>.pa-calc-side{text-align:left}
+.pa-calc-budget .pa-calc-equivalent{text-align:left}
+.pa-calculator>.pa-calc-section{gap:7px}
+.pa-calculator .pa-fx-note{font-size:11px;line-height:1.35}
+.pa-calculator>.pa-calc-section>h3{font-size:15px}
+.pa-root>details.pa-card{padding:4px 12px;gap:0}
+.pa-root>details.pa-card>summary{min-height:42px;padding:8px 0;font-size:13px}
+@media(max-width:360px){.pa-target-card .pa-target-row{grid-template-columns:minmax(0,1fr) 68px 67px;gap:5px}.pa-target-row>strong{font-size:12px}.pa-target-row>span:first-child{font-size:12px}}
 </style>
 </head>
 <body>
@@ -697,7 +731,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-unified-accounts-v14";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-hierarchy-v15";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -1914,23 +1948,21 @@ function allocationDateAfter(day, months) {
                         h("div",{style:{width:(value||0)+"%",background:colors[key]}})));
             });
             const quickTotal=ALLOCATION_KEYS.reduce((sum,key)=>sum+(Number(quickTargets[key])||0),0);
-            const quickRows=ALLOCATION_KEYS.map(key=>h("div",{key,className:"pa-calc-chart"},
-                h("div",{className:"pa-line"},
-                    h("span",null,calculatorTitle(key)),
-                    h("div",{style:{display:"flex",alignItems:"center",gap:8}},
-                        h("input",{type:"number",min:0,max:100,step:"any",inputMode:"decimal","aria-label":"Target "+calculatorTitle(key),value:quickTargets[key],onChange:e=>setQuickTargets(values=>({...values,[key]:e.target.value})),style:{maxWidth:82,textAlign:"right"}}),
-                        h("strong",{style:{minWidth:52,textAlign:"right",color:T.green}},pct(total>0?allocationPct(brokerModel.buckets[key],total):null))))));
+            const quickRows=ALLOCATION_KEYS.map(key=>h("div",{key,className:"pa-target-row"},
+                h("span",null,calculatorTitle(key)),
+                h("label",null,h("span",{className:"sr-only"},"Target "+calculatorTitle(key)),
+                    h("input",{type:"number",min:0,max:100,step:"any",inputMode:"decimal","aria-label":"Target "+calculatorTitle(key),value:quickTargets[key],onChange:e=>setQuickTargets(values=>({...values,[key]:e.target.value}))}),h("span",null,"%")),
+                h("strong",{className:"pa-good"},pct(total>0?allocationPct(brokerModel.buckets[key],total):null))));
             return h(React.Fragment,null,
-                singleSmartDca&&card("สรุป Smart DCA",line("ทุนพร้อมใช้ · ตามสกุลบัญชี",readyCash),
+                singleSmartDca&&card("Smart DCA",line("ทุนพร้อมใช้",readyCash),
                     line("มูลค่าสินทรัพย์ในแผน",money(total)),line("ค่าธรรมเนียมประมาณ",valid?budgetMoney(d.fees):"—")),
-                card("Target Allocation",
-                    h("div",{className:"pa-line"},h("span",null,"สินทรัพย์"),h("span",null,"Target % / Actual")),
+                h("section",{className:"pa-card pa-target-card"},h("h3",null,"Target Allocation"),
+                    h("div",{className:"pa-target-row pa-target-heading"},h("span",null,"Asset"),h("span",null,"Target"),h("span",null,"Actual")),
                     ...quickRows,
-                    line("Target รวม",pct(quickTotal),Math.abs(quickTotal-100)<.000001?"pa-good":"pa-bad"),
-                    action("บันทึก Target · รวม "+pct(quickTotal),saveQuickTargets,true,Math.abs(quickTotal-100)>.000001)),
+                    h("div",{className:"pa-target-foot"},h("span",null,"Total ",h("strong",{className:Math.abs(quickTotal-100)<.000001?"pa-good":"pa-bad"},pct(quickTotal))),
+                        action("Save Target",saveQuickTargets,true,Math.abs(quickTotal-100)>.000001))),
                 h("section",{className:"pa-card pa-calculator"},
-                    h("header",null,h("h3",null,"แผนซื้อรอบนี้"),
-                        note("ใช้ทุน Smart DCA ที่พร้อมใช้และข้อมูลจากพอร์ตจริง")),
+                    h("header",null,h("h3",null,"แผนซื้อรอบนี้")),
                     !singleSmartDca&&walletControls(),
                     dcaTradeAccount(brokerModel.destinations.gold.account) && accountCurrency(brokerModel.destinations.gold.account)==="USD" &&
                         action("บันทึกซื้อทองพร้อมแลก THB",()=>onTrade(brokerModel.destinations.gold.accountId,
@@ -1953,8 +1985,8 @@ function allocationDateAfter(day, months) {
                                 },"สกุลเงินงบ DCA")),
                             fxRate>0&&budgetReady&&equivalent(budgetDisplay==="USD"?budgetTHB:budgetTHB/fxRate,budgetDisplay==="USD"?"THB":"USD",
                                 budgetDisplay==="USD"?"เทียบเป็นบาท":"เทียบเป็นดอลลาร์"))),
-                    fxRate>0&&note("1 USD = "+num.format(fxRate)+" THB · "+day(p.fx.date)+" · "+quoteName(p.fx)+
-                        (p.fx.updatedAt?" · "+new Date(p.fx.updatedAt).toLocaleString("en-GB"):"")+(p.isStale(p.fx)?" · เรทค้าง ยอดซื้อ USD รออัปเดต":"")),
+                    fxRate>0&&h("p",{className:"pa-note pa-fx-note"},"1 USD = "+num.format(fxRate)+" THB · "+day(p.fx.date)+" · "+quoteName(p.fx)+
+                        (p.isStale(p.fx)?" · เรทค้าง ยอดซื้อ USD รออัปเดต":"")),
                     !(fxRate>0)&&(needsRate||brokerModel.rows.some(row=>row.needsRate))&&h("div",{className:"pa-alert"},
                         note("ต้องมีเรท USD/THB เพื่อคำนวณงบ USD หรือมูลค่าข้ามสกุล"),
                         singleSmartDca? h("a",{href:"#dca-prices",onClick:()=>{editQuote("FX");document.getElementById("dca-prices").open=true;}},"กรอกเรท USD/THB"):
@@ -4464,7 +4496,7 @@ function allocationDateAfter(day, months) {
             React.createElement("div",{className:"ui-account-line"},
                 React.createElement("span",{className:"ui-account-icon",style:{background:hex(T.green,.13),color:T.green}},React.createElement(Wallet,{size:19})),
                 React.createElement("span",{className:"ui-account-name"},
-                    React.createElement("strong",{className:"block text-sm truncate"},accountLabel(account,accounts)),
+                    React.createElement("strong",{className:"block text-sm truncate"},account.name),
                     React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},currency+" · บัญชีที่เลือก")),
                 React.createElement("strong",{className:"ui-account-balance",style:{color:balance<0?T.red:T.green}},moneyIn(balance,currency))));
     }
@@ -4784,6 +4816,10 @@ function allocationDateAfter(day, months) {
         const [draft,setDraft]=useState(null), [error,setError]=useState(""), [message,setMessage]=useState("");
         const [removing,setRemoving]=useState(null);
         const [detailId,setDetailId]=useState("");
+        const detailReturnScroll=React.useRef(null);
+        const openDetail=id=>{detailReturnScroll.current=window.scrollY;setDetailId(id);requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"instant"}));};
+        const closeDetail=()=>{setDetailId("");const top=detailReturnScroll.current;detailReturnScroll.current=null;
+            if(top!=null)requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top,behavior:"instant"})));};
         const [targetDrafts,setTargetDrafts]=useState({});
         const [editingTargets,setEditingTargets]=useState(false);
         useEffect(()=>setEditingTargets(false),[selected]);
@@ -5012,7 +5048,7 @@ function allocationDateAfter(day, months) {
             error && !draft && !removing && alert(error),
             detailItem ? h(React.Fragment,null,
                 h("div",{className:"flex items-center justify-between gap-2"},
-                    h("button",{type:"button",onClick:()=>setDetailId(""),className:"pf-context-back","aria-label":"กลับไปหุ้นในแผน"},h(ChevronLeft,{size:17}),"หุ้นในแผน"),
+                    h("button",{type:"button",onClick:closeDetail,className:"pf-context-back","aria-label":"กลับไปหุ้นในแผน"},h(ChevronLeft,{size:17}),"หุ้นในแผน"),
                     h("div",{className:"text-right min-w-0"},h("h3",{className:"text-xl font-extrabold"},detailItem.stock.symbol),
                         h("p",{className:"text-xs",style:{color:T.muted}},(detailItem.stock.name||"หุ้นในแผน")+" · "+ACCUMULATION_STATUSES[detailItem.stock.status]))),
                 card(h("div",{className:"ui-metrics"},
@@ -5042,8 +5078,8 @@ function allocationDateAfter(day, months) {
                         !data.stocks.length&&note("เพิ่มหุ้นและตั้ง Target % ได้ก่อนซื้อจริง"),
                         data.stocks.length>0&&h("div",{className:"sa-watchlist",role:"table","aria-label":"หุ้นในแผน"},
                             h("div",{className:"sa-stock-grid sa-table-head",role:"row"},...['Stock','Target','Actual','Progress',''].map((label,i)=>h("span",{key:i,role:"columnheader"},label))),
-                            ...data.stocks.map(item=>h("div",{key:item.stock.id,className:"sa-stock-grid sa-stock-row",role:"row",onClick:e=>{if(!e.target.closest("input,button,label"))setDetailId(item.stock.id);}},
-                                h("div",{role:"cell"},h("button",{type:"button",onClick:()=>setDetailId(item.stock.id),className:"sa-stock-name","aria-label":"ดูหุ้น "+item.stock.symbol},
+                            ...data.stocks.map(item=>h("div",{key:item.stock.id,className:"sa-stock-grid sa-stock-row",role:"row",onClick:e=>{if(!e.target.closest("input,button,label"))openDetail(item.stock.id);}},
+                                h("div",{role:"cell"},h("button",{type:"button",onClick:()=>openDetail(item.stock.id),className:"sa-stock-name","aria-label":"ดูหุ้น "+item.stock.symbol},
                                     h("strong",null,item.stock.symbol),item.stock.name&&h("small",{title:item.stock.name},item.stock.name))),
                                 h("div",{role:"cell"},editingTargets?h("label",{className:"sa-target-input"},
                                     h("input",{type:"number",disabled:!writable,min:0,max:item.stock.maximum,step:"any",inputMode:"decimal",value:targetDrafts[item.stock.id]??item.stock.target,
@@ -5055,7 +5091,7 @@ function allocationDateAfter(day, months) {
                                     h("div",{className:"sa-progress-track",role:item.progress==null?undefined:"progressbar","aria-label":"Accumulation progress "+item.stock.symbol,
                                         "aria-valuemin":0,"aria-valuemax":100,"aria-valuenow":item.progress==null?undefined:Math.min(100,Math.max(0,item.progress)),"aria-valuetext":item.progress==null?"ยังไม่มีงบเป้าหมาย":pct(item.progress)},
                                         h("span",{style:{width:Math.min(100,Math.max(0,item.progress||0))+"%"}}))),
-                                h("div",{role:"cell"},h("button",{type:"button",className:"sa-row-open","aria-label":"ดูรายละเอียด "+item.stock.symbol,onClick:()=>setDetailId(item.stock.id)},h(ChevronRight,{size:17})))))),
+                                h("div",{role:"cell"},h("button",{type:"button",className:"sa-row-open","aria-label":"ดูรายละเอียด "+item.stock.symbol,onClick:()=>openDetail(item.stock.id)},h(ChevronRight,{size:17})))))),
                         editingTargets&&targetDirty&&h("div",{className:"sa-target-save"},
                             button("บันทึก Target · รวม "+pct(targetDraftTotal),saveTargets,true,{disabled:!writable||targetInvalid}),
                             targetInvalid&&h("p",{role:"alert",className:"sw-note"},"กรอก Target ไม่เกิน Maximum ของแต่ละหุ้น และรวมไม่เกิน 100%"))),
@@ -12634,10 +12670,10 @@ function allocationDateAfter(day, months) {
         const remainingAccounts=orderedAccounts(availableAccounts).filter(a=>a.id!==favorite?.id);
         const accountBanner=(account,isFavorite=false)=>{
             const balance=nativeAccountBalance(account,transactions,payments);
-            return React.createElement("div",{key:account.id,className:"ui-account-list-row"+(isFavorite?" is-favorite":""),style:{background:isFavorite?hex(T.green,.09):T.surf2,border:`1px solid ${isFavorite?hex(T.green,.34):T.border}`}},
+            return React.createElement("div",{key:account.id,className:"ui-account-list-row"+(isFavorite?" is-favorite":"")+(accountParent(account,accounts)&&!isFavorite?" is-child":""),style:{background:isFavorite?hex(T.green,.09):T.surf2,border:`1px solid ${isFavorite?hex(T.green,.34):T.border}`}},
                 React.createElement("div",{className:"flex items-center gap-3"},
                     React.createElement("span",{className:"w-9 h-9 rounded-xl flex items-center justify-center shrink-0",style:{background:isFavorite?hex(T.green,.14):T.surf,color:isFavorite?T.green:T.muted}},React.createElement(Wallet,{size:17})),
-                    React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},accountLabel(account,accounts)),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},accountCurrency(account)+(isFavorite?" · บัญชีโปรด":" · ยอดเงินรวม"))),
+                    React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},account.name),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},accountCurrency(account)+(isFavorite?" · บัญชีโปรด":" · ยอดเงินรวม"))),
                     React.createElement("strong",{className:"ui-account-list-value",style:{color:balance<0?T.red:isFavorite?T.green:T.text}},moneyIn(balance,accountCurrency(account))),React.createElement("button",{type:"button",onClick:()=>onManageAccount(account),"aria-label":"แก้ไขบัญชี "+accountLabel(account,accounts),className:"ui-account-edit"},React.createElement(Pencil,{size:16}))));
         };
         return React.createElement(React.Fragment,null,
@@ -13151,6 +13187,14 @@ function allocationDateAfter(day, months) {
         const [portfolioAssetSymbol,setPortfolioAssetSymbol]=useState("");
         const [holdingsCurrency,setHoldingsCurrency]=useState(()=>{try{return localStorage.getItem("taskroutine_holdings_currency")==="THB"?"THB":"USD";}catch{return "USD";}});
         const portfolioReturnScroll=React.useRef(0);
+        const portfolioRestoreScroll=React.useRef(null);
+        React.useLayoutEffect(()=>{
+            if(rootMode!=="portfolio"||budgetView!=="investment"||portfolioRestoreScroll.current==null)return;
+            const top=portfolioRestoreScroll.current;
+            portfolioRestoreScroll.current=null;
+            window.scrollTo({top,behavior:"instant"});
+            requestAnimationFrame(()=>window.scrollTo({top,behavior:"instant"}));
+        },[rootMode,budgetView]);
         const [taxOpen, setTaxOpen] = useState(false);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId);
         useEffect(()=>{
@@ -13555,8 +13599,8 @@ function allocationDateAfter(day, months) {
         const portfolioFeatureLabel={strategy:"Investment Strategy Wallet",accumulation:"Stock Accumulation",sgov:"SGOV Cash Parking"}[budgetView]||"Portfolio";
         const returnPortfolioHome=()=>{
             const top=portfolioReturnScroll.current||0;
+            portfolioRestoreScroll.current=top;
             setBudgetView("investment");
-            requestAnimationFrame(()=>window.scrollTo({top,behavior:"auto"}));
         };
         return (React.createElement("div", { className: "px-4 pt-5 pb-8 flex flex-col", style: { gap: 18 } },
             React.createElement("h1",{className:"text-2xl font-extrabold",style:{order:-4}},rootMode==="portfolio"?"Portfolio":"บัญชี"),
@@ -13638,7 +13682,7 @@ function allocationDateAfter(day, months) {
                     React.createElement("section",null,
                         React.createElement("div",{className:"flex items-center justify-between gap-2 mb-2"},React.createElement("h3",{className:"text-sm font-extrabold"},"Accounts"),React.createElement("span",{className:"text-[10px]",style:{color:T.muted}},"Cash balances")),
                         portfolioAccounts.length?React.createElement("div",{className:"ui-portfolio-accounts"},
-                            ...portfolioAccounts.map(a=>{
+                            ...orderedAccounts(portfolioAccounts).map(a=>{
                                 const currency=accountCurrency(a),balance=nativeAccountBalance(a,transactions,payments,null,today);
                                 const open=portfolioMenuAccountId===a.id;
                                 const links=[
@@ -13652,10 +13696,10 @@ function allocationDateAfter(day, months) {
                                     a.portfolioMode!=="summary"&&["sell","ขาย","บันทึกขาย",TrendingDown],
                                     ["other","รายการอื่น","เปิดรายการอื่น",LayersIcon]
                                 ].filter(Boolean);
-                                return React.createElement("section",{key:a.id,className:"ui-portfolio-account",style:{background:open?hex(T.green,.05):"transparent"}},
+                                return React.createElement("section",{key:a.id,className:"ui-portfolio-account"+(accountParent(a,accounts)&&portfolioAccounts.some(p=>p.id===a.parentAccountId)?" is-child":""),style:{background:open?hex(T.green,.05):"transparent"}},
                                     React.createElement("button",{type:"button",onClick:()=>setPortfolioMenuAccountId(open?"":a.id),"aria-expanded":open,className:"w-full p-3 text-left flex items-center gap-3 ui-portfolio-account-toggle"},
                                         React.createElement("span",{className:"w-9 h-9 rounded-xl flex items-center justify-center shrink-0",style:{background:open?hex(T.green,.13):T.surf2,color:open?T.green:T.muted}},React.createElement(Wallet,{size:17})),
-                                        React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},accountLabel(a,accounts)),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},currency+" · เงินสดในบัญชี")),
+                                        React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-sm truncate"},a.name),React.createElement("small",{className:"block text-[10px] mt-0.5",style:{color:T.muted}},currency+" · เงินสดในบัญชี")),
                                         React.createElement("strong",{className:"text-sm tabular-nums shrink-0",style:{color:balance<0?T.red:open?T.green:T.text}},moneyIn(balance,currency)),
                                         React.createElement(ChevronDown,{size:16,style:{color:T.muted,transform:open?"rotate(180deg)":"none",transition:"transform .18s"}})),
                                     open&&React.createElement("div",{className:"pf-account-tray"},
@@ -16720,10 +16764,12 @@ function allocationDateAfter(day, months) {
     const SaveBtn = ({ disabled, onClick, children }) => (React.createElement("button", { disabled: disabled, onClick: onClick, className: "w-full py-3.5 rounded-xl font-bold active:scale-[.98] transition", style: { background: disabled ? T.border : T.green, color: disabled ? T.muted : "#000" } }, children));
     let modalScrollLocks = 0;
     let restorePageScroll;
+    let modalScrollRestoreToken = 0;
     function useModalScrollLock(open) {
         React.useLayoutEffect(() => {
             if (!open) return;
             if (modalScrollLocks++ === 0) {
+                ++modalScrollRestoreToken;
                 const {scrollX, scrollY} = window;
                 const root = document.documentElement.style;
                 const body = document.body.style;
@@ -16736,6 +16782,11 @@ function allocationDateAfter(day, months) {
                     Object.assign(body, previousBody);
                     root.overflowY = previousRootOverflow;
                     window.scrollTo(scrollX, scrollY);
+                    const token=++modalScrollRestoreToken;
+                    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                        if(token===modalScrollRestoreToken && modalScrollLocks===0)
+                            window.scrollTo(scrollX,scrollY);
+                    }));
                 };
             }
             return () => {
