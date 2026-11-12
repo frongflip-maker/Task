@@ -12659,9 +12659,16 @@ function allocationDateAfter(day, months) {
                 h("span",null,"Tap a holding for details")),
             needsFx&&h("p",{className:"pf-holdings-note"},fx?.value>0?"FX: 1 USD = "+fx.value.toLocaleString("en-US",{maximumFractionDigits:6})+" THB · "+fx.date+((Date.parse(today)-Date.parse(fx.date))/86400000>=ALLOCATION_STALE_DAYS?" · Stale FX":""):"FX required for cross-currency values"));
     }
+    function spendableAccountTotals(accounts,transactions,payments) {
+        const totals={};
+        accounts.filter(isSpendableAccount).forEach(account=>{
+            const currency=accountCurrency(account);
+            totals[currency]=(totals[currency]||0)+nativeAccountBalance(account,transactions,payments);
+        });
+        return totals;
+    }
     function BudgetHome({ accounts, transactions, payments, incomeSources = [], income, expense, cashIn, onManageAccount, onAddAccount, onAdd }) {
-        const usable = {};
-        accounts.filter(isSpendableAccount).forEach(a => { const currency = accountCurrency(a); usable[currency] = (usable[currency] || 0) + (a.pocketEnabled ? accountPocketBalances(a,transactions,payments,incomeSources).personal : nativeAccountBalance(a,transactions,payments)); });
+        const usable = spendableAccountTotals(accounts,transactions,payments);
         const availableAccounts=accounts.filter(a=>!a.archived);
         const [favoriteId,setFavoriteId]=useState(()=>{try{return localStorage.getItem("taskroutine_favorite_account")||"";}catch{return "";}});
         const [showAllAccounts,setShowAllAccounts]=useState(false);
@@ -12679,9 +12686,9 @@ function allocationDateAfter(day, months) {
         };
         return React.createElement(React.Fragment,null,
             React.createElement("section", { className: "finance-panel p-4", style: { order: 1, background: `linear-gradient(135deg,${hex(T.green,.16)},${hex(T.purple,.08)} 58%,${T.surf})`, border: `1px solid ${hex(T.green,.26)}`, borderRadius: 22, boxShadow:"0 12px 30px rgba(40,65,58,.08)" } },
-                React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "เงินใช้ได้ปัจจุบัน"),
+                React.createElement("span", { className: "text-xs font-semibold", style: { color: T.sub } }, "ยอดเงินรวมในบัญชี"),
                 (Object.entries(usable).length ? Object.entries(usable) : [["THB",0]]).map(([currency,value]) => React.createElement("div", { key: currency, className: "font-extrabold tabular-nums", style: { fontSize: currency === "THB" ? 32 : 22, lineHeight: 1.35, letterSpacing: "-.04em", color: value < 0 ? T.red : T.text } }, moneyIn(value,currency))),
-                React.createElement("p", { className: "text-[11px] mt-1", style: { color: T.muted } }, "ยอดรวมบัญชีใช้จ่าย · บัญชีที่แยกกระเป๋านับเฉพาะส่วนตัว"),
+                React.createElement("p", { className: "text-[11px] mt-1", style: { color: T.muted } }, "รวมเงินส่วนตัวและเงินห้องซ้อมในบัญชีที่เปิดแยกกระเป๋า · แยกยอดห้องซ้อมไว้ดูรายละเอียด"),
                 React.createElement("div", { className: "grid grid-cols-3 gap-2 mt-4 pt-4", style: { borderTop: `1px solid ${hex(T.green,.22)}` } }, [["รายได้",income,T.green],["รายจ่าย",expense,T.orange],["เงินสุทธิ",income-expense,income-expense>=0?T.green:T.red]].map(([label,value,color]) => React.createElement("div", { key: label,className:"min-w-0 p-2.5 rounded-xl",style:{background:hex(T.surf,.76),border:`1px solid ${T.border}`}}, React.createElement("div", { className: "text-[10px] truncate", style: { color: T.sub } }, label), React.createElement("div", { className: "font-extrabold text-sm mt-1 tabular-nums truncate", style: { color } }, fmtBaht(value)))))),
             React.createElement("section", { className: "finance-panel p-3 rounded-2xl", style: { order:2,minWidth:0,background:T.surf,border:`1px solid ${T.border}` } },
                 React.createElement("div",{className:"flex items-center justify-between gap-2"},
@@ -17087,6 +17094,8 @@ function allocationDateAfter(day, months) {
         const sharedBill={id:"electricity",kind:"out",accountId:"shared-bank",date:TK,amount:2400,studioExpense:true,pocketSplit:{studio:600,personal:1800}};
         check("กระเป๋า: ตั้งยอดห้องซ้อมไม่เพิ่มยอดธนาคาร",accountPocketBalances(pocketBank,[],[],[]).total,12000);
         check("กระเป๋า: ส่วนตัวตั้งต้นเท่ากับยอดที่เหลือ",accountPocketBalances(pocketBank,[],[],[]).personal,8000);
+        check("ภาพรวมบัญชี: เงินห้องซ้อมรวมในยอดบัญชีหลัก",spendableAccountTotals([{...pocketBank,spendable:true}],[],[]).THB,12000);
+        check("ภาพรวมบัญชี: บัญชีทั่วไปบวกครั้งเดียว",spendableAccountTotals([{...pocketBank,spendable:true},{id:"cash-other",currency:"THB",startBalance:500,spendable:true}],[],[]).THB,12500);
         check("กระเป๋า: บิลรวมถูกหักจากธนาคารครั้งเดียว",accountPocketBalances(pocketBank,[sharedBill],[],[]).total,9600);
         check("กระเป๋า: ห้องซ้อมรับผิดชอบเฉพาะ 600",accountPocketBalances(pocketBank,[sharedBill],[],[]).studio,3400);
         check("กระเป๋า: ส่วนตัวเหลือ 6200",accountPocketBalances(pocketBank,[sharedBill],[],[]).personal,6200);
