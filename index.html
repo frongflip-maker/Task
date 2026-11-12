@@ -415,10 +415,12 @@ body,#boot,#err{background:#F5F4ED;color:#202F2E}.app-shell{font-variant-numeric
 .pf-holdings{--hold-bg:#fffdf7;--hold-head:#e9e9da;--hold-line:#e7dbcc;--hold-fg:#202f2e;--hold-muted:#7a8075;--hold-green:#15996e;--hold-red:#d5584e;background:var(--hold-bg);color:var(--hold-fg);border:1px solid var(--hold-line);border-radius:18px;overflow:hidden;min-width:0}
 .pf-holdings-title{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 10px 6px}.pf-holdings-title h3{font-size:16px;font-weight:800;margin:0}.pf-holdings-title p{font-size:9px;color:var(--hold-muted);margin:3px 0 0}.pf-display-currency{display:flex;padding:3px;gap:2px;border:1px solid var(--hold-line);background:var(--hold-head);border-radius:9px;flex-shrink:0}.pf-display-currency button{padding:5px 7px;min-height:30px;font-size:10px;font-weight:750;border-radius:6px}.pf-display-currency button[aria-pressed=true]{background:#22645c;color:#fff}
 .pf-holdings-note{font-size:10px;line-height:1.5;color:var(--hold-muted);padding:3px 10px 8px;margin:0}
+.pf-holdings-filter{display:block;width:calc(100% - 20px);min-height:44px;margin:4px 10px 6px;padding:6px 10px;border:1px solid var(--hold-line);border-radius:9px;background:var(--hold-head);color:var(--hold-fg);font-size:16px;font-weight:650}
 .pf-holdings table{width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .pf-holdings th{padding:9px 4px;background:var(--hold-head);font-size:clamp(8px,2.45vw,11px);white-space:nowrap;font-weight:750;text-align:right}
 .pf-holdings td{padding:8px 4px;border-bottom:1px solid var(--hold-line);text-align:right;vertical-align:middle;overflow:hidden}
 .pf-holdings th:first-child,.pf-holdings td:first-child{text-align:left;padding-left:10px}
+.pf-holdings th:nth-child(2),.pf-holdings td:nth-child(2){text-align:center}
 .pf-holdings th:last-child,.pf-holdings td:last-child{padding-right:10px}
 .pf-holdings tbody tr{cursor:pointer}.pf-holdings tbody tr:active{background:var(--hold-head)}
 .pf-holding-line{height:18px;line-height:18px;overflow:hidden;white-space:nowrap}
@@ -731,7 +733,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-hierarchy-v16";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-hierarchy-v17";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -5479,7 +5481,8 @@ function allocationDateAfter(day, months) {
             const owned=Math.min(row.units,(row.strategyUnits?.dca||0)+(legacy?(row.strategyUnits?.free||0):0));
             if (!(owned>0)) return [];
             const scale=value=>value==null?null:value*owned/row.units;
-            return [{...row,units:owned,value:scale(row.value),quotedValue:scale(row.quotedValue)}];
+            return [{...row,units:owned,value:scale(row.value),quotedValue:scale(row.quotedValue),
+                cost:scale(row.cost),nativeCost:scale(row.nativeCost),pricePL:scale(row.pricePL),fxPL:scale(row.fxPL)}];
         });
         const stockSymbols=new globalThis.Map();
         for (const row of holdings) if (row.bucket==="stock") stockSymbols.set(row.symbol,[...(stockSymbols.get(row.symbol)||[]),row]);
@@ -12469,9 +12472,18 @@ function allocationDateAfter(day, months) {
         const incomplete=data.issues.some(issue=>issue.includes("Snapshot")||issue.includes("ขายเกิน"));
         return incomplete?null:allocationSum([data.value,data.cashTHB,data.pendingTHB]);
     }
-    function portfolioHoldingRows(data,accounts) {
+    function holdingBroker(account,accounts) {
+        const parent=accountParent(account,accounts);
+        const platform=String(account.platform||"").trim()||String(parent?.platform||"").trim();
+        return platform ? {key:"platform:"+platform.toLowerCase(),label:platform} :
+            {key:"account:"+(parent||account).id,label:(parent||account).name};
+    }
+    function portfolioHoldingRows(portfolio,accounts,settings,scope="all") {
+        const holdings=scope==="all" ? portfolio.holdings : scope==="dca" ? dcaScopedPortfolio(portfolio,settings).holdings :
+            portfolio.holdings.filter(item=>holdingBroker(item.account,accounts).key===scope);
+        const total=allocationSum(holdings.map(item=>item.value));
         const grouped=new globalThis.Map();
-        for(const holding of data.holdings){
+        for(const holding of holdings){
             const current=grouped.get(holding.symbol)||{symbol:holding.symbol,items:[],units:0,values:[],costs:[],accounts:new globalThis.Map(),quote:holding.quote||null};
             current.items.push(holding);current.units+=Number(holding.units)||0;current.values.push(holding.value);current.costs.push(holding.cost);
             current.accounts.set(holding.account.id,holding.account);if(!current.quote&&holding.quote)current.quote=holding.quote;
@@ -12479,14 +12491,14 @@ function allocationDateAfter(day, months) {
         }
         return [...grouped.values()].map(row=>{
             const value=allocationSum(row.values), cost=allocationSum(row.costs);
-            return {...row,value,cost,weight:value!=null&&data.value>0?value/data.value*100:null,
+            return {...row,value,cost,weight:value!=null&&total>0?value/total*100:null,
                 accountList:[...row.accounts.values()],platforms:[...row.accounts.values()].map(a=>accountLabel(a,accounts)).join(" + ")};
         }).sort((a,b)=>{
             if(a.value==null&&b.value!=null)return 1;if(a.value!=null&&b.value==null)return -1;
             return (b.value||0)-(a.value||0)||a.symbol.localeCompare(b.symbol,"en");
         });
     }
-    function PortfolioAssetDetail({row,accounts,targets,onOpenAccount}) {
+    function PortfolioAssetDetail({row,accounts,targets,onOpenAccount,scope}) {
         if(!row)return null;
         const price=row.quote?new Intl.NumberFormat("en-US",{maximumFractionDigits:8}).format(row.quote.value)+" "+row.quote.currency:"รอราคา";
         const qty=n=>Number(n).toLocaleString("en-US",{maximumFractionDigits:8});
@@ -12499,7 +12511,7 @@ function allocationDateAfter(day, months) {
                 React.createElement("div",{className:"mt-3 pt-3",style:{borderTop:`1px solid ${T.border}`}},
                     pair("จำนวนรวม",qty(row.units)),pair("ราคาที่บันทึกล่าสุด",price),
                     row.quote&&pair("แหล่งราคา / วันที่",(row.quote.source==="api"?"Market API":row.quote.source==="manual"?"Manual":"Statement")+" · "+row.quote.date+((Date.now()-Date.parse(row.quote.date))/86400000>=ALLOCATION_STALE_DAYS?" · ราคาเก่า":"")),
-                    pair("สัดส่วนในสินทรัพย์ทั้งหมด",row.weight==null?"—":row.weight.toLocaleString("th-TH",{maximumFractionDigits:2})+"%"),
+                    pair(scope==="all"?"สัดส่วนในสินทรัพย์ทั้งหมด":"สัดส่วนในกลุ่มที่เลือก",row.weight==null?"—":row.weight.toLocaleString("th-TH",{maximumFractionDigits:2})+"%"),
                     ...targets.map((target,index)=>React.createElement(React.Fragment,{key:index},pair(target.name+" target",target.weight.toLocaleString("en-US",{maximumFractionDigits:2})+"%"))),
                     pair("ต้นทุนที่ติดตามได้",row.cost==null?"—":moneyIn(row.cost,"THB")))),
             React.createElement("section",{className:"finance-panel p-3 rounded-2xl",style:{background:T.surf,border:`1px solid ${T.border}`}},
@@ -12524,7 +12536,7 @@ function allocationDateAfter(day, months) {
         return {last,average:row.units>0&&cost!=null?cost/row.units:null,value,profit,
             gain:cost>0&&profit!=null?profit/cost*100:null};
     }
-    function holdingPlanTargets(row,portfolio,settings,accounts) {
+    function holdingPlanTargets(row,portfolio,settings,accounts,scope="all") {
         const targets=[];
         const {symbol}=row;
         const stockOnly=settings.dcaScope==="stocks";
@@ -12540,6 +12552,7 @@ function allocationDateAfter(day, months) {
             const weight=settings.etfMode==="stock" ? etf*settings.rules.stock.target/100 : etf;
             targets.push({label:"DCA",name:"Smart DCA",weight});
         }
+        if(scope==="dca")return targets;
         for (const account of row.accountList) {
             const stock=accumulationPlan(account).stocks.find(item=>item.symbol===symbol && item.status!=="archived");
             if (stock) targets.push({label:"Plan",name:accountLabel(account,accounts),weight:stock.target});
@@ -12627,25 +12640,36 @@ function allocationDateAfter(day, months) {
                 h("button",{type:"button",disabled:busy||!symbols.length,onClick:()=>sync(true),className:"shrink-0 px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-1.5",style:{background:hex(T.green,.12),color:T.green,opacity:(busy||!symbols.length)?0.55:1}},
                     h(RefreshCw,{size:13,style:{animation:state.status==="loading"?"spin 1s linear infinite":"none"}}),busy?"Updating":"Refresh")));
     }
-    function PortfolioHoldingsTable({rows,portfolio,accounts,settings,fx,currency,onCurrency,onOpen,today}) {
+    function PortfolioHoldingsTable({portfolio,accounts,settings,fx,currency,onCurrency,onOpen,today}) {
         const h=React.createElement;
+        const [selectedScope,setSelectedScope]=useState("all");
+        const brokers=new globalThis.Map();
+        for(const {account} of portfolio.holdings){
+            const {key,label}=holdingBroker(account,accounts);
+            if(!brokers.has(key))brokers.set(key,label);
+        }
+        const scope=selectedScope==="dca"||brokers.has(selectedScope)?selectedScope:"all";
+        const rows=portfolioHoldingRows(portfolio,accounts,settings,scope);
         const num=n=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
         const quantity=n=>n.toLocaleString("en-US",{maximumFractionDigits:8});
         const pct=n=>n.toLocaleString("en-US",{maximumFractionDigits:2})+"%";
         const money=n=>n==null?"—":(currency==="USD"?"$":"฿")+num(n);
         const sign=n=>n>0?"+":n<0?"−":"";
-        const line=(value,secondary=false,color)=>h("div",{className:"pf-holding-line"+(secondary?" pf-holding-secondary":""),style:{color},title:value},
-            h(StatementMoney,{fontSize:secondary?10:13,inline:true},value));
+        const line=(value,secondary=false,color,textAlign,title=value)=>h("div",{className:"pf-holding-line"+(secondary?" pf-holding-secondary":""),style:{color},title},
+            h(StatementMoney,{fontSize:secondary?10:13,inline:true,textAlign},value));
         const dates=rows.map(row=>row.quote?.date).filter(Boolean).sort();
         const needsFx=rows.some(row=>row.items.some(item=>accountCurrency(item.account)!==currency||item.quote&&item.quote.currency!==currency));
         return h("section",{className:"pf-holdings", "aria-label":"Holdings"},
-            h("div",{className:"pf-holdings-title"},h("div",null,h("h3",null,"Holdings"),h("p",null,"All accounts · By value · Excludes cash")),
+            h("div",{className:"pf-holdings-title"},h("div",null,h("h3",null,"Holdings"),h("p",null,"By value · Excludes cash")),
                 h("div",{className:"pf-display-currency",role:"group","aria-label":"Display currency"},...["THB","USD"].map(unit=>h("button",{key:unit,type:"button","aria-pressed":currency===unit,onClick:()=>onCurrency(unit)},unit)))),
+            h("select",{className:"pf-holdings-filter",value:scope,"aria-label":"กรองรายการถือครอง",onChange:e=>setSelectedScope(e.target.value)},
+                h("option",{value:"all"},"ทั้งหมด"),h("option",{value:"dca"},"เฉพาะ Smart DCA"),
+                brokers.size>0&&h("optgroup",{label:"เฉพาะโบรกเกอร์"},...[...brokers].sort((a,b)=>a[1].localeCompare(b[1],"th")).map(([key,label])=>h("option",{key,value:key},label)))),
             h("div",{className:"pf-holdings-note"},"Targets by strategy · Unrealized P&L excludes FX"),
             h("table",null,
                 h("colgroup",null,...[21,24,22,33].map((width,index)=>h("col",{key:index,style:{width:width+"%"}}))),
                 h("thead",null,h("tr",null,...["Ticker / Qty","Weight / Target","Last / Avg Cost","Value / P&L"].map(label=>h("th",{key:label,scope:"col"},label)))),
-                h("tbody",null,!rows.length&&h("tr",null,h("td",{colSpan:4,className:"pf-holdings-empty"},"No holdings yet")),
+                h("tbody",null,!rows.length&&h("tr",null,h("td",{colSpan:4,className:"pf-holdings-empty"},scope==="dca"?"ยังไม่มีรายการถือครองใน Smart DCA":"No holdings yet")),
                     ...rows.map(row=>{
                         const display=portfolioHoldingDisplay(row,fx,currency);
                         const profit=display.profit;
@@ -12653,14 +12677,18 @@ function allocationDateAfter(day, months) {
                         const pnl=profit==null?"—":sign(profit)+money(Math.abs(profit))+gain;
                         const pnlColor=profit<0?"var(--hold-red)":profit>0?"var(--hold-green)":undefined;
                         const stale=row.quote&&(Date.parse(today)-Date.parse(row.quote.date))/86400000>=ALLOCATION_STALE_DAYS;
-                        const targets=holdingPlanTargets(row,portfolio,settings,accounts);
+                        const priceDiff=display.last!=null&&display.average!=null&&num(display.last)!==num(display.average)?display.last-display.average:0;
+                        const lastColor=priceDiff>0?"var(--hold-green)":priceDiff<0?"var(--hold-red)":stale?"var(--hold-muted)":undefined;
+                        const targets=holdingPlanTargets(row,portfolio,settings,accounts,scope);
                         const target=targets.length===1?targets[0].label+" "+pct(targets[0].weight):targets.length>1?"Multiple":"—";
-                        return h("tr",{key:row.symbol,onClick:()=>onOpen(row.symbol)},
-                            h("td",null,h("button",{type:"button",className:"pf-holding-ticker","aria-label":"View "+row.symbol,onClick:e=>{e.stopPropagation();onOpen(row.symbol);}},
+                        const open=()=>onOpen({symbol:row.symbol,scope});
+                        return h("tr",{key:row.symbol,onClick:open},
+                            h("td",null,h("button",{type:"button",className:"pf-holding-ticker","aria-label":"View "+row.symbol,onClick:e=>{e.stopPropagation();open();}},
                                 h("strong",{className:"pf-holding-line"},row.symbol),
                                 h("span",{className:"pf-holding-line pf-holding-secondary",title:quantity(row.units)},quantity(row.units)))),
-                            h("td",{title:targets.map(item=>item.label+" "+pct(item.weight)).join(" · ")||undefined},line(row.weight==null?"—":pct(row.weight)),line(target,true)),
-                            h("td",null,line(money(display.last),false,stale?"var(--hold-muted)":undefined),line(money(display.average),true)),
+                            h("td",{title:targets.map(item=>item.label+" "+pct(item.weight)).join(" · ")||undefined},
+                                line(row.weight==null?"—":pct(row.weight),false,undefined,"center"),line(target,true,undefined,"center")),
+                            h("td",null,line(money(display.last),false,lastColor,undefined,stale?money(display.last)+" · Stale price":undefined),line(money(display.average),true)),
                             h("td",null,line(money(display.value)),line(pnl,true,pnlColor)));
                     }))),
             h("div",{className:"pf-holdings-footer"},
@@ -12749,7 +12777,7 @@ function allocationDateAfter(day, months) {
         return result;
     }
     const ledgerMoney = (value,currency) => `${new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0)} ${currency}`;
-    function StatementMoney({ children, inline = false, fontSize = 16 }) {
+    function StatementMoney({ children, inline = false, fontSize = 16, textAlign = "right" }) {
         const box = React.useRef(null), content = React.useRef(null);
         useEffect(() => {
             let disposed = false;
@@ -12772,7 +12800,7 @@ function allocationDateAfter(day, months) {
             if (box.current) observer.observe(box.current);
             return () => { disposed = true; observer.disconnect(); };
         }, [children, fontSize]);
-        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "1 1 0" : undefined, maxWidth: "100%", minWidth: 0, textAlign: "right", whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
+        return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "1 1 0" : undefined, maxWidth: "100%", minWidth: 0, textAlign, whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
             React.createElement("span", { ref: content, style: { display: "inline-flex", width: "max-content", alignItems: "baseline", gap: 5, fontSize, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.4 } }, children));
     }
     function statementCategoryText(row,currency) {
@@ -13208,7 +13236,7 @@ function allocationDateAfter(day, months) {
         const [portfolioId, setPortfolioId] = useState(null);
         const [portfolioOrder, setPortfolioOrder] = useState(null);
         const [portfolioInitialTab,setPortfolioInitialTab]=useState(null);
-        const [portfolioAssetSymbol,setPortfolioAssetSymbol]=useState("");
+        const [portfolioAsset,setPortfolioAsset]=useState(null);
         const [holdingsCurrency,setHoldingsCurrency]=useState(()=>{try{return localStorage.getItem("taskroutine_holdings_currency")==="THB"?"THB":"USD";}catch{return "USD";}});
         const portfolioReturnScroll=React.useRef(0);
         const portfolioRestoreScroll=React.useRef(null);
@@ -13679,7 +13707,6 @@ function allocationDateAfter(day, months) {
                 const today=dkey(new Date());
                 const data=allocationPortfolio(accounts,transactions,payments,allocationSettings,today);
                 const portfolioAccounts=accounts.filter(a=>a.portfolioEnabled||(a.portfolioEntries||[]).length||["broker","investment"].includes(a.accountType));
-                const assetRows=portfolioHoldingRows(data,accounts);
                 const entry=(title,subtitle,click)=>React.createElement("button",{onClick:click,className:"finance-panel w-full p-3 rounded-xl text-left flex items-center gap-3",style:{background:T.surf,border:`1px solid ${T.border}`}},
                     React.createElement("span",{className:"min-w-0 flex-1"},React.createElement("strong",{className:"block text-xs"},title),React.createElement("span",{className:"block text-[10px] mt-1",style:{color:T.muted}},subtitle)),React.createElement(ChevronRight,{size:16,style:{color:T.muted}}));
                 const openAccountAssets=id=>{setPortfolioInitialTab("assets");setPortfolioId(id);};
@@ -13740,8 +13767,8 @@ function allocationDateAfter(day, months) {
                                                     React.createElement("strong",null,label)))))
                                             :React.createElement("p",{className:"text-xs py-3 text-center",style:{color:T.muted}},"บัญชีนี้ยังไม่ได้เปิดใช้แผนลงทุน")));
                             })):React.createElement("button",{onClick:()=>props.goTab?.("budget"),className:"w-full py-3 rounded-xl text-xs font-bold",style:{background:T.surf2,color:T.green}},"เพิ่มบัญชีลงทุนจากหน้าบัญชี")),
-                    React.createElement(PortfolioHoldingsTable,{rows:assetRows,portfolio:data,accounts,settings:allocationSettings,fx:data.fx,currency:holdingsCurrency,today,
-                        onCurrency:currency=>{setHoldingsCurrency(currency);try{localStorage.setItem("taskroutine_holdings_currency",currency);}catch{}},onOpen:setPortfolioAssetSymbol}),
+                    React.createElement(PortfolioHoldingsTable,{portfolio:data,accounts,settings:allocationSettings,fx:data.fx,currency:holdingsCurrency,today,
+                        onCurrency:currency=>{setHoldingsCurrency(currency);try{localStorage.setItem("taskroutine_holdings_currency",currency);}catch{}},onOpen:setPortfolioAsset}),
                     entry("Investment Tax","Tax categories and recorded data",()=>setTaxOpen(true)));
             })(),
             sub === "due" && React.createElement("div", { className: "flex items-center gap-2" }, React.createElement(FinanceSelect, { label: "ช่วงเวลาค้างรับ", value: mode, options: { total: "ทุกช่วงเวลา", month: "เดือนที่เลือก" }, onChange: setMode }), mode === "month" && React.createElement("input", { "aria-label": "เดือนค้างรับ", type: "month", value: mk, onInput: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, onChange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) setMk(e.target.value); }, style: { padding: 10, borderRadius: 12, background: T.surf, color: T.text, minWidth: 0, maxWidth: "50%" } })),
@@ -14411,11 +14438,14 @@ function allocationDateAfter(day, months) {
                     setFixedCosts(fs => fs.map(x => x.id === payFc.id ? { ...x, lastAccountId: accId, fixedCostTrackingVersion: 2 } : x));
                     setPayFc(null);
                 } }),
-            portfolioAssetSymbol && (()=>{
+            portfolioAsset && (()=>{
                 const data=allocationPortfolio(accounts,transactions,payments,allocationSettings,dkey(new Date()));
-                const row=portfolioHoldingRows(data,accounts).find(item=>item.symbol===portfolioAssetSymbol);
-                return row&&React.createElement(Sheet,{title:"รายละเอียดสินทรัพย์",onClose:()=>setPortfolioAssetSymbol("")},
-                    React.createElement(PortfolioAssetDetail,{row,accounts,targets:holdingPlanTargets(row,data,allocationSettings,accounts),onOpenAccount:id=>{setPortfolioAssetSymbol("");setPortfolioInitialTab("assets");setPortfolioId(id);}}));
+                const {symbol,scope}=portfolioAsset;
+                const row=portfolioHoldingRows(data,accounts,allocationSettings,scope).find(item=>item.symbol===symbol);
+                if(!row)return null;
+                const targets=holdingPlanTargets(row,data,allocationSettings,accounts,scope);
+                return React.createElement(Sheet,{title:"รายละเอียดสินทรัพย์",onClose:()=>setPortfolioAsset(null)},
+                    React.createElement(PortfolioAssetDetail,{row,accounts,targets,scope,onOpenAccount:id=>{setPortfolioAsset(null);setPortfolioInitialTab("assets");setPortfolioId(id);}}));
             })(),
             selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id+"/"+(portfolioOrder?.id||""), account:selectedPortfolio, accounts, transactions, payments,
                 setAccounts, commitLinkedGold, foreignTax, setForeignTax, initialOrder:portfolioOrder, initialTab:portfolioInitialTab, onClose:()=>{setPortfolioId(null);setPortfolioOrder(null);setPortfolioInitialTab(null);} }),
