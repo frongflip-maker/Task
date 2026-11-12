@@ -9794,6 +9794,7 @@ function allocationDateAfter(day, months) {
         const [activeSuggestion, setActiveSuggestion] = useState(-1);
         const picker = React.useRef(null);
         const listId = React.useId();
+        const inputRef=useNativeTextCommit(value,next=>onPick(next,true));
         useEffect(() => {
             const outside = e => { if (picker.current && !picker.current.contains(e.target)) { setFocused(false); setActiveSuggestion(-1); } };
             document.addEventListener("pointerdown", outside, true);
@@ -9806,7 +9807,7 @@ function allocationDateAfter(day, months) {
         const choose = name => { onPick(name); setFocused(false); setActiveSuggestion(-1); };
         return React.createElement("div", { ref: picker, onBlur: e => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) { setFocused(false); setActiveSuggestion(-1); } }, style: { marginBottom: 14 } },
             React.createElement(Label, null, "ชื่อรายการ"),
-            React.createElement("input", { "aria-label": "ชื่อรายการ", role: "combobox", "aria-autocomplete": "list", "aria-expanded": focused && suggestions.length > 0, "aria-controls": listId, "aria-activedescendant": focused && activeSuggestion >= 0 && suggestions[activeSuggestion] ? `${listId}-${activeSuggestion}` : undefined,
+            React.createElement("input", { ref:inputRef, "aria-label": "ชื่อรายการ", role: "combobox", "aria-autocomplete": "list", "aria-expanded": focused && suggestions.length > 0, "aria-controls": listId, "aria-activedescendant": focused && activeSuggestion >= 0 && suggestions[activeSuggestion] ? `${listId}-${activeSuggestion}` : undefined,
                 value, onFocus: () => setFocused(true), onChange: e => { onPick(e.target.value, true); setFocused(true); setActiveSuggestion(-1); },
                 onKeyDown: e => {
                     if (e.key === "Escape") { setFocused(false); setActiveSuggestion(-1); }
@@ -16710,14 +16711,43 @@ function allocationDateAfter(day, months) {
     const Empty = ({ text }) => (React.createElement(Glass, { className: "py-8 flex items-center justify-center" },
         React.createElement("span", { className: "text-xs", style: { color: T.muted } }, text)));
     const Label = ({ children }) => React.createElement("div", { className: "text-[11px] font-semibold mb-1", style: { color: T.sub } }, children);
+    // iOS keyboard replacements can change the DOM value without React's
+    // synthetic onChange firing. Listen on the input itself as well, and read
+    // its final value when composition/autocorrect commits.
+    function useNativeTextCommit(value, commit) {
+        const ref=React.useRef(null);
+        const latest=React.useRef({value,commit});
+        latest.current={value,commit};
+        React.useEffect(()=>{
+            const input=ref.current;
+            if(!input)return;
+            const sync=()=>{
+                const next=input.value;
+                if(next!==String(latest.current.value??""))latest.current.commit(next);
+            };
+            input.addEventListener("input",sync);
+            input.addEventListener("change",sync);
+            input.addEventListener("compositionend",sync);
+            input.addEventListener("blur",sync);
+            return()=>{
+                input.removeEventListener("input",sync);
+                input.removeEventListener("change",sync);
+                input.removeEventListener("compositionend",sync);
+                input.removeEventListener("blur",sync);
+            };
+        },[]);
+        return ref;
+    }
     function Input({ label, value, onChange, placeholder, type = "text" }) {
+        const inputRef=useNativeTextCommit(value,onChange);
         return React.createElement("div", { className: "mb-3 ui-input-field" },
             React.createElement(Label, null, label),
-            React.createElement("input", { type: type, "aria-label": label, value: value, onChange: e => onChange(e.target.value), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }));
+            React.createElement("input", { ref:inputRef,type: type, "aria-label": label, value: value, onChange: e => onChange(e.target.value), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }));
     }
     /* Same look as Input, plus suggestions from whatever the user typed before.
        The list button shows every past entry; typing narrows it down. */
     function SuggestInput({ label, value, onChange, placeholder, options = [], listLabel = "เลือกจากรายการเดิม" }) {
+        const inputRef=useNativeTextCommit(value,onChange);
         const [open, setOpen] = useState(false);
         const [showAll, setShowAll] = useState(false);
         const pool = useMemo(() => [...new Set((options || []).map(o => String(o || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")), [options]);
@@ -16728,7 +16758,7 @@ function allocationDateAfter(day, months) {
             React.createElement("div", { className: "flex items-center justify-between" },
                 React.createElement(Label, null, label),
                 pool.length > 0 && React.createElement("button", { type: "button", onClick: () => { setShowAll(current => !(current && open)); setOpen(current => !(current && showAll)); }, className: "text-[10px] font-bold", style: { color: T.blue, marginBottom: 4 } }, `${listLabel} (${pool.length})`)),
-            React.createElement("input", { value: value, onChange: e => { onChange(e.target.value); setShowAll(false); setOpen(true); }, onFocus: () => setOpen(true), onBlur: () => setTimeout(() => { setOpen(false); setShowAll(false); }, 150), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+            React.createElement("input", { ref:inputRef,value: value, onChange: e => { onChange(e.target.value); setShowAll(false); setOpen(true); }, onFocus: () => setOpen(true), onBlur: () => setTimeout(() => { setOpen(false); setShowAll(false); }, 150), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
             open && matches.length > 0 && React.createElement("div", { className: "rounded-xl overflow-hidden", style: { position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 30, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 12px 30px rgba(83,67,43,.16)", maxHeight: 216, overflowY: "auto" } },
                 matches.slice(0, 40).map((option, index) => React.createElement("button", { key: option, type: "button", onMouseDown: e => e.preventDefault(), onClick: () => pick(option), className: "w-full px-3 py-2.5 text-left text-sm active:scale-[.99]", style: { borderTop: index ? `1px solid ${T.border}` : "none" } }, option))));
     }
@@ -16764,29 +16794,25 @@ function allocationDateAfter(day, months) {
     const SaveBtn = ({ disabled, onClick, children }) => (React.createElement("button", { disabled: disabled, onClick: onClick, className: "w-full py-3.5 rounded-xl font-bold active:scale-[.98] transition", style: { background: disabled ? T.border : T.green, color: disabled ? T.muted : "#000" } }, children));
     let modalScrollLocks = 0;
     let restorePageScroll;
-    let modalScrollRestoreToken = 0;
     function useModalScrollLock(open) {
         React.useLayoutEffect(() => {
             if (!open) return;
             if (modalScrollLocks++ === 0) {
-                ++modalScrollRestoreToken;
                 const {scrollX, scrollY} = window;
                 const root = document.documentElement.style;
                 const body = document.body.style;
-                const lockedStyles = {position:"fixed", top:`${-scrollY}px`, left:`${-scrollX}px`, width:"100%", height:"auto", overflowY:"hidden"};
-                const previousBody = Object.fromEntries(Object.keys(lockedStyles).map(key => [key, body[key]]));
+                const previousBodyOverflow = body.overflowY;
                 const previousRootOverflow = root.overflowY;
-                Object.assign(body, lockedStyles);
+                body.overflowY = "hidden";
                 root.overflowY = "hidden";
                 restorePageScroll = () => {
-                    Object.assign(body, previousBody);
+                    body.overflowY = previousBodyOverflow;
                     root.overflowY = previousRootOverflow;
-                    window.scrollTo(scrollX, scrollY);
-                    const token=++modalScrollRestoreToken;
-                    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-                        if(token===modalScrollRestoreToken && modalScrollLocks===0)
-                            window.scrollTo(scrollX,scrollY);
-                    }));
+                    // Keep the page in normal flow so Safari never collapses its
+                    // height while a sheet is open.  Reposition only if the
+                    // browser actually moved it (for example on keyboard close).
+                    if (Math.abs(window.scrollY-scrollY)>1 || Math.abs(window.scrollX-scrollX)>1)
+                        window.scrollTo(scrollX,scrollY);
                 };
             }
             return () => {
