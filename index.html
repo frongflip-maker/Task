@@ -5784,10 +5784,13 @@ function allocationDateAfter(day, months) {
         transactions.filter(t=>t.kind==="in"&&t.accountId===account.id).forEach(t=> { held += (t.recipientSplits||[]).filter(a=>!a.settled).reduce((n,a)=>n+(Number(a.amount)||0),0); });
         return {total,studio:Math.round(studio*100)/100,held:Math.round(held*100)/100,personal:Math.round((total-studio-held)*100)/100};
     }
-    function setupAccountPockets(account,target,transactions,payments,sources) {
-        const value=Number(target), balances=accountPocketBalances(account,transactions,payments,sources);
-        if (accountCurrency(account)!=="THB" || isInvestmentAccount(account) || !Number.isFinite(value) || value<0 || value>balances.total-balances.held+.009) return null;
-        return {...account,pocketEnabled:true,studioPocketAdjustment:Math.round((value-studioPocketFlow(account.id,transactions,payments,sources))*100)/100};
+    function setupAccountPockets(account,target,transactions,payments,sources,openingAddition=0) {
+        const value=Number(target), addition=Number(openingAddition);
+        if (!Number.isFinite(addition) || addition<0 || addition>value+.009) return null;
+        const adjusted=addition>0?{...account,startBalance:Math.round(((Number(account.startBalance)||0)+addition)*100)/100,studioPocketOpeningIncluded:Math.round(addition*100)/100}:account;
+        const balances=accountPocketBalances(adjusted,transactions,payments,sources);
+        if (accountCurrency(adjusted)!=="THB" || isInvestmentAccount(adjusted) || !Number.isFinite(value) || value<0 || value>balances.total-balances.held+.009) return null;
+        return {...adjusted,pocketEnabled:true,studioPocketAdjustment:Math.round((value-studioPocketFlow(adjusted.id,transactions,payments,sources))*100)/100};
     }
     function PocketSummary({accounts,transactions,payments,sources=[],studioOnly=false}) {
         const list=accounts.filter(a=>a.pocketEnabled&&accountCurrency(a)==="THB");
@@ -14419,20 +14422,22 @@ function allocationDateAfter(day, months) {
                 React.createElement("p", { className: "text-[10px] mb-3", style: { color: T.muted } }, "บัญชี USD รองรับโอนและรายรับเข้าบัญชี เช่น ดอกเบี้ย โดยเก็บยอด USD และมูลค่าเงินบาทตามเรทที่กรอก · รายจ่ายทั่วไปยังใช้บัญชี THB"),
                 React.createElement(Input, { label: `ยอดเริ่มต้น (${accountCurrency(editAcc)})`, value: String(editAcc.startBalance ?? 0), onChange: v => setEditAcc({ ...editAcc, startBalance: v }), placeholder: "0", type: "number" }),
                 accountCurrency(editAcc)==="THB" && !isInvestmentAccount(editAcc) && React.createElement("div",{className:"p-3 rounded-xl mb-3",style:{background:T.surf2,border:`1px solid ${T.border}`}},
-                    React.createElement("label",{className:"flex items-center gap-3 text-sm font-bold"},React.createElement("input",{type:"checkbox",checked:!!editAcc.pocketEnabled,onChange:e=>{const enabled=e.target.checked;const row=accountPocketBalances(editAcc,transactions,payments,incomeSources);setEditAcc({...editAcc,pocketEnabled:enabled,_studioPocketTarget:enabled?String(Math.max(0,Math.min(row.total-row.held,row.studio))):undefined});}}),"แยกกระเป๋าส่วนตัว / ห้องซ้อม"),
+                    React.createElement("label",{className:"flex items-center gap-3 text-sm font-bold"},React.createElement("input",{type:"checkbox",checked:!!editAcc.pocketEnabled,onChange:e=>{const enabled=e.target.checked;const row=accountPocketBalances(editAcc,transactions,payments,incomeSources);setEditAcc({...editAcc,pocketEnabled:enabled,_studioPocketTarget:enabled?String(Math.max(0,row.studio)):undefined,_addStudioToOpening:enabled&&!editAcc.id});}}),"แยกกระเป๋าส่วนตัว / ห้องซ้อม"),
                     editAcc.pocketEnabled&&React.createElement(React.Fragment,null,
-                        React.createElement("p",{className:"text-xs my-3 leading-relaxed",style:{color:T.sub}},"กรอกเงินห้องซ้อมที่มีอยู่ตอนนี้ ระบบแบ่งส่วนตัวจากยอดที่เหลือ การตั้งค่านี้ไม่สร้างรายการรับเงินหรือโอนเพิ่ม"),
+                        React.createElement("p",{className:"text-xs my-3 leading-relaxed",style:{color:T.sub}},"ระบุยอดห้องซ้อมที่อยู่ในบัญชีนี้ หากยอดตั้งต้นรวมไว้แล้ว ระบบจะแค่แยกสัดส่วนโดยไม่บวกซ้ำ"),
                         React.createElement(Input,{label:"เงินห้องซ้อมปัจจุบันในบัญชีนี้ (บาท)",type:"number",value:editAcc._studioPocketTarget??String(accountPocketBalances(editAcc,transactions,payments,incomeSources).studio),onChange:v=>setEditAcc({...editAcc,_studioPocketTarget:v}),placeholder:"เช่น 4000"}),
-                        React.createElement("p",{className:"text-xs leading-relaxed",style:{color:T.muted}},`ยอดบัญชี ${moneyIn(nativeAccountBalance(editAcc,transactions,payments))} · ส่วนตัวหลังแบ่ง ${moneyIn(nativeAccountBalance(editAcc,transactions,payments)-accountPocketBalances(editAcc,transactions,payments,incomeSources).held-Number(editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio))}`))),
+                        !editAcc.studioPocketOpeningIncluded&&React.createElement("label",{className:"flex items-start gap-2 text-xs my-3 leading-relaxed",style:{color:T.sub}},React.createElement("input",{type:"checkbox",checked:!!editAcc._addStudioToOpening,onChange:e=>setEditAcc({...editAcc,_addStudioToOpening:e.target.checked}),style:{marginTop:3}}),"ยอดตั้งต้นด้านบนยังไม่รวมเงินห้องซ้อมนี้ · เพิ่มเข้าเงินต้นบัญชีครั้งเดียว"),
+                        React.createElement("p",{className:"text-xs leading-relaxed",style:{color:T.muted}},`ยอดบัญชีหลังบันทึก ${moneyIn(nativeAccountBalance(editAcc,transactions,payments)+(editAcc._addStudioToOpening?Number(editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio)||0:0))} · ห้องซ้อม ${moneyIn(Number(editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio)||0)} · ส่วนตัว ${moneyIn(nativeAccountBalance(editAcc,transactions,payments)+(editAcc._addStudioToOpening?Number(editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio)||0:0)-accountPocketBalances(editAcc,transactions,payments,incomeSources).held-(Number(editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio)||0))}`))),
                 React.createElement(SaveBtn, { disabled: !editAcc.name.trim() || !Number.isFinite(Number(editAcc.startBalance)), onClick: () => {
                         let val = { ...editAcc, id: editAcc.id || uid(), name: editAcc.name.trim(), startBalance: Number(editAcc.startBalance) || 0, accountType: editAcc.accountType || "bank", currency: accountCurrency(editAcc), platform: (editAcc.platform || "").trim(), spendable: isSpendableAccount(editAcc) };
                         if (val.pocketEnabled && (Object.hasOwn(editAcc,"_studioPocketTarget") || !accounts.find(a=>a.id===editAcc.id)?.pocketEnabled)) {
                             const target=editAcc._studioPocketTarget??accountPocketBalances(editAcc,transactions,payments,incomeSources).studio;
-                            const configured=setupAccountPockets(val,target,transactions,payments,incomeSources);
+                            const configured=setupAccountPockets(val,target,transactions,payments,incomeSources,editAcc._addStudioToOpening?Number(target):0);
                             if(!configured){fireToast("ยอดเงินห้องซ้อมต้องไม่ติดลบหรือเกินยอดบัญชีหลังหักเงินรอส่งผู้อื่น · รองรับบัญชี THB ทั่วไป");return;}
                             val=configured;
                         }
                         delete val._studioPocketTarget;
+                        delete val._addStudioToOpening;
                         const parentError = accountParentError(val, accounts);
                         if (parentError) { fireToast(parentError); return; }
                         if (editAcc.id && accountUsageCount(editAcc.id) > 0 && accountCurrency(accounts.find(a => a.id === editAcc.id)) !== val.currency) { fireToast("บัญชีมีรายการแล้ว กรุณาสร้างบัญชีใหม่เมื่อเปลี่ยนสกุลเงิน"); return; }
@@ -17094,6 +17099,10 @@ function allocationDateAfter(day, months) {
         const sharedBill={id:"electricity",kind:"out",accountId:"shared-bank",date:TK,amount:2400,studioExpense:true,pocketSplit:{studio:600,personal:1800}};
         check("กระเป๋า: ตั้งยอดห้องซ้อมไม่เพิ่มยอดธนาคาร",accountPocketBalances(pocketBank,[],[],[]).total,12000);
         check("กระเป๋า: ส่วนตัวตั้งต้นเท่ากับยอดที่เหลือ",accountPocketBalances(pocketBank,[],[],[]).personal,8000);
+        const studioMissing=setupAccountPockets(sharedBank,4000,[],[],[],4000);
+        check("กระเป๋า: เงินห้องซ้อมที่ยังไม่อยู่ในยอดต้นเพิ่มเข้าบัญชี",accountPocketBalances(studioMissing,[],[],[]).total,16000);
+        check("กระเป๋า: ส่วนตัวคงเดิมเมื่อเพิ่มเงินห้องซ้อมที่ตกหล่น",accountPocketBalances(studioMissing,[],[],[]).personal,12000);
+        check("กระเป๋า: ยอดที่รวมแล้วไม่บวกซ้ำเมื่อแก้ไข",accountPocketBalances(setupAccountPockets(studioMissing,4000,[],[],[]),[],[],[]).total,16000);
         check("ภาพรวมบัญชี: เงินห้องซ้อมรวมในยอดบัญชีหลัก",spendableAccountTotals([{...pocketBank,spendable:true}],[],[]).THB,12000);
         check("ภาพรวมบัญชี: บัญชีทั่วไปบวกครั้งเดียว",spendableAccountTotals([{...pocketBank,spendable:true},{id:"cash-other",currency:"THB",startBalance:500,spendable:true}],[],[]).THB,12500);
         check("กระเป๋า: บิลรวมถูกหักจากธนาคารครั้งเดียว",accountPocketBalances(pocketBank,[sharedBill],[],[]).total,9600);
