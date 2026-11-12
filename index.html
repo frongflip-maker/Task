@@ -726,25 +726,41 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 .pa-root>details.pa-card{padding:4px 12px;gap:0}
 .pa-root>details.pa-card>summary{min-height:42px;padding:8px 0;font-size:13px}
 @media(max-width:360px){.pa-target-card .pa-target-row{grid-template-columns:minmax(0,1fr) 68px 67px;gap:5px}.pa-target-row>strong{font-size:12px}.pa-target-row>span:first-child{font-size:12px}}
-.dime-import,.dime-card{display:grid;gap:10px;min-width:0}
+.dime-import,.dime-card{display:grid;gap:12px;min-width:0}
 .dime-import{overflow-wrap:anywhere}
 .dime-card{padding:12px;border:1px solid var(--dime-border);border-radius:14px;background:var(--dime-input-bg)}
-.dime-field{display:grid;gap:4px;min-width:0;font-size:12px;font-weight:700}
-.dime-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.dime-field{display:grid;gap:5px;min-width:0;font-size:14px;font-weight:700}
+.dime-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
 .dime-input,.dime-button{min-height:44px;border:1px solid var(--dime-border);border-radius:9px}
 .dime-input{display:block;width:100%;min-width:0;max-width:100%;padding:6px 8px;font-size:16px;background:var(--dime-input-bg);color:var(--dime-text)}
-.dime-input[type=date]{appearance:none;-webkit-appearance:none}
+.dime-date{position:relative;display:grid;place-items:center;min-height:44px;padding:5px 4px;border:1px solid var(--dime-border);border-radius:9px;background:var(--dime-input-bg);font-size:16px;font-variant-numeric:tabular-nums;text-align:center}
+.dime-date:focus-within{outline:2px solid currentColor;outline-offset:2px}
+.dime-date input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.dime-date input[type=date]::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
 .dime-input[type=file]{white-space:nowrap;overflow:hidden}
 .dime-input::file-selector-button{max-width:100%;margin-inline-end:6px}
-.dime-button{padding:8px 12px;font-size:13px;font-weight:750}
+.dime-button{padding:8px 12px;font-size:15px;font-weight:750}
 .dime-button:disabled,.dime-input:disabled{opacity:.5}
-.dime-note{margin:0;font-size:12px;line-height:1.5}
+.dime-note{margin:0;font-size:14px;line-height:1.5}
 .dime-actions,.dime-file,.dime-check{display:flex;align-items:center;gap:8px}
 .dime-actions{flex-wrap:wrap}
-.dime-file-name{min-width:0;flex:1;font-size:12px}
-.dime-check,.dime-card summary{min-height:44px;font-size:13px;cursor:pointer}
+.dime-file-name{min-width:0;flex:1;font-size:14px}
+.dime-check,.dime-card summary{min-height:44px;font-size:15px;cursor:pointer}
 .dime-check input{width:20px;height:20px;flex:none}
 .dime-card summary{padding-block:11px}
+.dime-trade-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;border:1px solid var(--dime-border);border-radius:10px;overflow:hidden;font-variant-numeric:tabular-nums}
+.dime-trade-table th,.dime-trade-table td{padding:8px 9px;vertical-align:middle}
+.dime-trade-table th{text-align:left}
+.dime-trade-table thead th{font-size:13px;border-bottom:1px solid var(--dime-border)}
+.dime-trade-table tbody th{font-size:14px;font-weight:550}
+.dime-trade-table td,.dime-trade-table thead th:last-child{text-align:right}
+.dime-trade-table td{font-size:16px;font-weight:700}
+.dime-trade-table tbody tr+tr>*{border-top:1px solid var(--dime-border)}
+.dime-trade-table tbody tr:last-child>*{font-size:16px;font-weight:800}
+.dime-receipt{justify-items:center;gap:16px;padding:12px 0;text-align:center}
+.dime-receipt-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:50%}
+.dime-receipt-title{display:block;font-size:20px;margin-bottom:4px}
+.dime-receipt .dime-button{width:100%}
 @media(max-width:360px){.dime-fields{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
@@ -753,7 +769,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #22645c;outline-off
 <div id="err" role="alert"><div class="boot-card"><div class="boot-mark">!</div><strong id="err-title" class="boot-title">เปิดแอปไม่สำเร็จ</strong><div id="err-detail" tabindex="0"></div><div class="error-actions"><button class="boot-copy" type="button" onclick="copyTaskRoutineError()">คัดลอก Error</button><button class="boot-retry" type="button" onclick="location.replace(location.pathname+'?reload='+Date.now()+location.hash)">ลองโหลดใหม่</button></div></div></div>
 <div id="root"></div>
 <script>
-window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-hierarchy-v18-dime-pdf";
+window.__TASKROUTINE_BUILD__="investment-v3-phase5-account-hierarchy-v19-dime-preview";
 window.__TASKROUTINE_BOOT_PHASE__="init";
 window.__TASKROUTINE_LAST_ERROR__="";
 function setBootStatus(t){var e=document.getElementById("boot-status");if(e)e.textContent=t;}
@@ -4078,12 +4094,23 @@ function allocationDateAfter(day, months) {
         return {ready,entries,trades};
     }
 
+    const dimeDateDisplay=new Intl.DateTimeFormat("th-TH-u-ca-gregory",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});
+    function formatDimeQuantity(value) {
+        const amount=dimeDecimal(value);
+        return amount==null?value:dimeAmount(amount);
+    }
+    function formatDimePreviewMoney(amount) {
+        if(amount==null)return "—";
+        const [whole,fraction=""]=dimeAmount(amount).split(".");
+        return whole.replace(/\B(?=(\d{3})+(?!\d))/g,",")+"."+fraction.padEnd(2,"0");
+    }
     function DimePdfImport({accounts,transactions,payments,commitDimeImport,localSaveError,initialAccountId,onClose}) {
         const h=React.createElement;
         const [accountId,setAccountId]=useState(initialAccountId||"");
         const [rows,setRows]=useState([]),[files,setFiles]=useState([]);
         const [progress,setProgress]=useState(""),[challenge,setChallenge]=useState(null),[password,setPassword]=useState("");
         const [submission,setSubmission]=useState(null),[report,setReport]=useState(null);
+        const doneButton=React.useRef(null);
         const session=React.useRef({closed:false,reading:false,password:null});
         const submitting=React.useRef(false);
         useEffect(()=>{
@@ -4109,12 +4136,14 @@ function allocationDateAfter(day, months) {
         const review=useMemo(()=>dimeReview(rows,account,accounts,today),[rows,account,accounts,today]);
         const batch=useMemo(()=>dimeImportBatch(review,account,transactions,payments,today),[review,account,transactions,payments,today]);
         const busy=!!progress||!!submission;
+        const complete=!!report?.saved.length&&!report.skipped.length;
+        useEffect(()=>{if(complete)doneButton.current?.focus();},[complete]);
         const patch=(id,changes)=>{
             setReport(null);
             setRows(current=>current.map(row=>row.id===id?{...row,acknowledged:false,...changes}:row));
         };
         function close(){
-            if(!submitting.current)onClose();
+            if(!submitting.current)onClose(complete);
         }
         async function read(event){
             const selected=Array.from(event.target.files||[]);
@@ -4135,7 +4164,8 @@ function allocationDateAfter(day, months) {
                         setChallenge({name:file.name,incorrect});
                     });
                     if(state.closed)break;
-                    const drafts=extracted.map(row=>({...row,sourceFingerprint:dimePdfFingerprint(row),sourceCurrency:row.currency,
+                    const drafts=extracted.map(row=>({...row,units:formatDimeQuantity(row.units),
+                        sourceFingerprint:dimePdfFingerprint(row),sourceCurrency:row.currency,
                         id:uid(),fileId,selected:true,acknowledged:false}));
                     setRows(current=>[...current,...drafts]);
                     setFiles(current=>[...current,{id:fileId,name:file.name,count:drafts.length}]);
@@ -4168,20 +4198,40 @@ function allocationDateAfter(day, months) {
             setSubmission({accountId:account.id,trades:batch.trades});
             commitDimeImport(accounts,transactions,account,batch.entries);
         }
-        const button=(label,action,{disabled=false,primary=false}={})=>h("button",{
-            type:"button",className:"dime-button",disabled,onClick:action,
+        const button=(label,action,{disabled=false,primary=false,ref}={})=>h("button",{
+            type:"button",className:"dime-button",disabled,onClick:action,ref,
             style:{background:primary?T.green:T.surf2,color:primary?"#101b15":T.text,borderColor:T.border}
         },label);
         const labelField=(label,element)=>h("label",{className:"dime-field"},h("span",null,label),element);
-        const input=(row,key,label,type="text",decimal=false)=>labelField(label,h("input",{
-            type,value:row[key]??"",onChange:e=>patch(row.id,{[key]:e.target.value}),disabled:busy,
-            inputMode:decimal?"decimal":undefined,autoCorrect:"off",autoComplete:"off",spellCheck:false,
-            autoCapitalize:key==="symbol"?"characters":"none",className:"dime-input"
-        }));
+        const input=(row,key,label,type="text",decimal=false)=>{
+            const field=h("input",{
+                type,value:row[key]??"",onChange:e=>patch(row.id,{[key]:e.target.value}),disabled:busy,
+                onBlur:key==="units"?e=>{
+                    const formatted=formatDimeQuantity(e.target.value);
+                    if(formatted!==e.target.value)
+                        setRows(current=>current.map(item=>item.id===row.id?{...item,units:formatted}:item));
+                }:undefined,
+                inputMode:decimal?"decimal":undefined,autoCorrect:"off",autoComplete:"off",spellCheck:false,
+                autoCapitalize:key==="symbol"?"characters":"none",className:"dime-input"
+            });
+            if(type!=="date")return labelField(label,field);
+            return labelField(label,h("span",{className:"dime-date"},
+                h("span",{"aria-hidden":true},allocationDay(row[key])?dimeDateDisplay.format(new Date(row[key]+"T00:00:00Z")):"เลือกวันที่"),
+                field));
+        };
         const select=(label,value,change,options,disabled=busy)=>labelField(label,h("select",{
             value,onChange:e=>change(e.target.value),className:"dime-input",disabled
         },...options.map(([key,text])=>h("option",{key,value:key},text))));
         const note=(message,role="status",color=T.sub)=>h("p",{className:"dime-note",role,style:{color}},message);
+        const importerStyle={"--dime-input-bg":T.surf2,"--dime-border":T.border,"--dime-text":T.text};
+        const saveError=localSaveError?.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ")?localSaveError:"";
+        if(complete)return h(Sheet,{title:"นำเข้า PDF · Dime!",onClose:close},
+            h("div",{className:"dime-import dime-receipt",style:importerStyle},
+                h("div",{className:"dime-receipt-icon","aria-hidden":true,style:{color:T.green,background:T.surf2}},h(Check,{size:25})),
+                h("div",{role:"status"},h("strong",{className:"dime-receipt-title"},saveError?"เพิ่มรายการเข้าบัญชีแล้ว":"บันทึกข้อมูลสำเร็จแล้ว"),
+                    note("เพิ่มเข้าบัญชีแล้ว "+report.saved.length+" รายการ"+(account?" · "+accountLabel(account,accounts):""))),
+                saveError&&note(saveError,"alert",T.red),
+                button("ปิดและกลับหน้า Portfolio",close,{primary:true,ref:doneButton})));
         const totals=new globalThis.Map();
         for(const item of review.filter(item=>item.row.selected&&item.trade&&!item.duplicate&&!item.accountIssue)){
             const {row,net}=item;
@@ -4198,7 +4248,7 @@ function allocationDateAfter(day, months) {
         const money=(value,currency)=>new Intl.NumberFormat("en-US",{minimumFractionDigits:2,maximumFractionDigits:16}).format(Number(dimeAmount(value)))+" "+currency;
         const describe=trade=>trade.date+" · "+trade.type.toUpperCase()+" "+trade.symbol;
         return h(Sheet,{title:"นำเข้า PDF · Dime!",onClose:close},
-            h("div",{className:"dime-import",style:{"--dime-input-bg":T.surf2,"--dime-border":T.border,"--dime-text":T.text}},
+            h("div",{className:"dime-import",style:importerStyle},
                 note("เลือก Trade Confirmation / Confirmation Note จากแอปไฟล์ ระบบอ่านเอกสารบนอุปกรณ์นี้และให้ตรวจยอดก่อนบันทึก"),
                 labelField("เลือก PDF ของ Dime! ได้หลายไฟล์",h("input",{type:"file",multiple:true,accept:".pdf,application/pdf",onChange:read,disabled:busy,className:"dime-input"})),
                 progress&&note(progress),
@@ -4225,8 +4275,15 @@ function allocationDateAfter(day, months) {
                         h("label",{className:"dime-check"},
                             h("input",{type:"checkbox",checked:row.selected,disabled:busy,onChange:e=>patch(row.id,{selected:e.target.checked})}),
                             h("strong",null,(row.symbol||"ไม่พบชื่อหุ้น")+" · "+(row.type||"").toUpperCase()+" · "+(row.date||"ยังไม่ทราบวันที่"))),
-                        h("p",{className:"dime-note"},(row.units||"—")+" หุ้น × "+(row.unitPrice||"—")+" · "+(row.currency||"—")),
-                        h("p",{className:"dime-note"},"ค่าธรรมเนียมสุทธิ "+(fee==null?"—":dimeAmount(fee))+" · ยอดสุทธิ "+(row.net||"—")),
+                        h("table",{className:"dime-trade-table","aria-label":"ข้อมูลซื้อขาย "+(row.symbol||"")},
+                            h("thead",null,h("tr",null,h("th",{scope:"col"},"รายการ"),
+                                h("th",{scope:"col"},row.currency?"ข้อมูล · "+row.currency:"ข้อมูล"))),
+                            h("tbody",null,...[
+                                ["จำนวนหุ้น",formatDimeQuantity(row.units)||"—"],
+                                ["ราคาต่อหุ้น",formatDimePreviewMoney(dimeDecimal(row.unitPrice))],
+                                ["ค่าธรรมเนียมสุทธิ",formatDimePreviewMoney(fee)],
+                                ["ยอดสุทธิ",formatDimePreviewMoney(dimeDecimal(row.net))]
+                            ].map(([label,value])=>h("tr",{key:label},h("th",{scope:"row"},label),h("td",null,value))))),
                         account&&h("p",{className:"dime-note"},accountLabel(account,accounts)),
                         ...[...errors,duplicate,accountIssue,ledgerIssue].filter(Boolean).map(message=>h("p",{key:message,className:"dime-note",role:"alert",style:{color:T.red}},message)),
                         ...warnings.map(message=>h("p",{key:message,className:"dime-note",role:"alert",style:{color:T.orange}},message)),
@@ -4257,7 +4314,7 @@ function allocationDateAfter(day, months) {
                     button(submission?"กำลังบันทึก…":"ยืนยันนำเข้า "+batch.ready.length+" รายการ",confirm,{disabled:busy||!batch.entries,primary:true})),
                 report&&h("section",{className:"dime-card","aria-live":"polite"},
                     report.saved.length>0&&note("เพิ่มเข้าบัญชีแล้ว "+report.saved.length+" รายการ","status",T.green),
-                    report.saved.length>0&&localSaveError?.startsWith("บันทึกข้อมูลในเครื่องไม่สำเร็จ")&&note(localSaveError,"alert",T.red),
+                    report.saved.length>0&&saveError&&note(saveError,"alert",T.red),
                     ...report.saved.map(trade=>h("p",{key:trade.id,className:"dime-note"},describe(trade))),
                     report.skipped.length>0&&note("ข้อมูลบัญชีมีการเปลี่ยนแปลง รายการต่อไปนี้ยังไม่ได้บันทึก กรุณาตรวจแล้วกดยืนยันอีกครั้ง","alert",T.red),
                     ...report.skipped.map(trade=>h("p",{key:trade.id,className:"dime-note"},describe(trade))))));
@@ -13793,12 +13850,20 @@ function allocationDateAfter(day, months) {
         },[rootMode,budgetView]);
         const [taxOpen, setTaxOpen] = useState(false);
         const selectedPortfolio = accounts.find(a => a.id === portfolioId);
-        useEffect(()=>{
-            if(rootMode!=="portfolio"||!props.portfolioHomeSignal)return;
-            setSub("summary");setBudgetView("investment");setPortfolioContextAccountId("");setPortfolioAssetSymbol("");
+        function openPortfolioOverview(){
+            setSub("summary");setBudgetView("investment");setPortfolioContextAccountId("");setPortfolioAsset(null);
             setPortfolioId(null);setPortfolioOrder(null);setPortfolioInitialTab(null);
+            setDimeImportAccount(null);setPortfolioMenuAccountId("");
             requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"auto"}));
+        }
+        useEffect(()=>{
+            if(rootMode==="portfolio"&&props.portfolioHomeSignal)openPortfolioOverview();
         },[props.portfolioHomeSignal]);
+        function closeDimeImport(completed){
+            if(!completed){setDimeImportAccount(null);return;}
+            openPortfolioOverview();
+            if(rootMode!=="portfolio")props.goTab?.("portfolio");
+        }
         const [budgetNow, setBudgetNow] = useState(Date.now());
         useEffect(() => { const id = setInterval(() => setBudgetNow(Date.now()), 60000); return () => clearInterval(id); }, []);
         const [mk, setMk] = useState(monthKey(TK));
@@ -14995,7 +15060,7 @@ function allocationDateAfter(day, months) {
             selectedPortfolio && React.createElement(PortfolioPanel, { key: selectedPortfolio.id+"/"+(portfolioOrder?.id||""), account:selectedPortfolio, accounts, transactions, payments,
                 setAccounts, commitLinkedGold, foreignTax, setForeignTax, initialOrder:portfolioOrder, initialTab:portfolioInitialTab, onDimeImport:()=>setDimeImportAccount(selectedPortfolio.id), onClose:()=>{setPortfolioId(null);setPortfolioOrder(null);setPortfolioInitialTab(null);} }),
             dimeImportAccount!==null&&React.createElement(DimePdfImport,{accounts,transactions,payments,commitDimeImport,localSaveError:props.localSaveError,
-                initialAccountId:dimeImportAccount,onClose:()=>setDimeImportAccount(null)}),
+                initialAccountId:dimeImportAccount,onClose:closeDimeImport}),
             taxOpen && React.createElement(Sheet,{title:"ภาษีเงินลงทุน",onClose:()=>setTaxOpen(false)},React.createElement(ForeignTaxPanel,{accounts,transactions,payments,setAccounts,foreignTax,setForeignTax})),
             editAcc && (React.createElement(Sheet, { onClose: () => setEditAcc(null), title: editAcc.id ? "แก้ไขบัญชี" : "เพิ่มบัญชี" },
                 React.createElement(Input, { label: "\u0E0A\u0E37\u0E48\u0E2D\u0E1A\u0E31\u0E0D\u0E0A\u0E35", value: editAcc.name, onChange: v => setEditAcc({ ...editAcc, name: v }), placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E01\u0E2A\u0E34\u0E01\u0E23\u0E44\u0E17\u0E22, \u0E40\u0E07\u0E34\u0E19\u0E2A\u0E14" }),
