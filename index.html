@@ -9794,7 +9794,7 @@ function allocationDateAfter(day, months) {
         const [activeSuggestion, setActiveSuggestion] = useState(-1);
         const picker = React.useRef(null);
         const listId = React.useId();
-        const inputRef=useNativeTextCommit(value,next=>onPick(next,true));
+        const inputRef=useNativeTextCommit(value,next=>{onPick(next,true);setFocused(true);setActiveSuggestion(-1);});
         useEffect(() => {
             const outside = e => { if (picker.current && !picker.current.contains(e.target)) { setFocused(false); setActiveSuggestion(-1); } };
             document.addEventListener("pointerdown", outside, true);
@@ -9804,17 +9804,17 @@ function allocationDateAfter(day, months) {
         const names = [...new Set([...presets, ...recentTitles].map(name => String(name || "").trim()).filter(Boolean))];
         const matches = names.filter(name => !query || (name.toLocaleLowerCase("th").includes(query) && name.toLocaleLowerCase("th") !== query));
         const suggestions = [...matches.filter(name => name.toLocaleLowerCase("th").startsWith(query)), ...matches.filter(name => !name.toLocaleLowerCase("th").startsWith(query))].slice(0,6);
-        const choose = name => { onPick(name); setFocused(false); setActiveSuggestion(-1); };
+        const choose = name => { if(inputRef.current)inputRef.current.value=name; onPick(name); setFocused(false); setActiveSuggestion(-1); };
         return React.createElement("div", { ref: picker, onBlur: e => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) { setFocused(false); setActiveSuggestion(-1); } }, style: { marginBottom: 14 } },
             React.createElement(Label, null, "ชื่อรายการ"),
             React.createElement("input", { ref:inputRef, "aria-label": "ชื่อรายการ", role: "combobox", "aria-autocomplete": "list", "aria-expanded": focused && suggestions.length > 0, "aria-controls": listId, "aria-activedescendant": focused && activeSuggestion >= 0 && suggestions[activeSuggestion] ? `${listId}-${activeSuggestion}` : undefined,
-                value, onFocus: () => setFocused(true), onChange: e => { onPick(e.target.value, true); setFocused(true); setActiveSuggestion(-1); },
+                defaultValue:value, onFocus: () => setFocused(true),
                 onKeyDown: e => {
                     if (e.key === "Escape") { setFocused(false); setActiveSuggestion(-1); }
                     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && suggestions.length) { e.preventDefault(); setFocused(true); setActiveSuggestion(i => i < 0 ? (e.key === "ArrowDown" ? 0 : suggestions.length - 1) : (i + (e.key === "ArrowDown" ? 1 : -1) + suggestions.length) % suggestions.length); }
                     if (e.key === "Enter" && focused && activeSuggestion >= 0 && suggestions[activeSuggestion]) { e.preventDefault(); choose(suggestions[activeSuggestion]); }
                 }, placeholder: "เช่น ค่าอาหาร / ดอกเบี้ย", style: { width: "100%", padding: "11px 12px", borderRadius: 12, background: T.surf2, color: T.text, border: `1px solid ${T.border}`, fontSize: 16, outline: "none" } }),
-            focused && suggestions.length > 0 && React.createElement("div", { id: listId, role: "listbox", "aria-label": "ชื่อรายการที่แนะนำ", style: { marginTop: 6, maxHeight: 228, overflowY: "auto", border: `1px solid ${T.border}`, borderRadius: 12, background: T.surf, boxShadow: "0 5px 14px rgba(60,50,35,.08)" } }, suggestions.map((name,index) => React.createElement("button", { key: name, id: `${listId}-${index}`, role: "option", "aria-selected": activeSuggestion === index, type: "button", onClick: () => choose(name), style: { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "11px 12px", textAlign: "left", border: "none", borderTop: index ? `1px solid ${T.border}` : "none", background: activeSuggestion === index ? hex(T.blue,.1) : T.surf, color: T.text, fontSize: 14, touchAction: "manipulation" } }, React.createElement(History, { size: 14, style: { flexShrink: 0, color: T.muted } }), React.createElement("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name)))),
+            focused && suggestions.length > 0 && React.createElement("div", { id: listId, role: "listbox", "aria-label": "ชื่อรายการที่แนะนำ", style: { marginTop: 6, maxHeight: 228, overflowY: "auto", border: `1px solid ${T.border}`, borderRadius: 12, background: T.surf, boxShadow: "0 5px 14px rgba(60,50,35,.08)" } }, suggestions.map((name,index) => React.createElement("button", { key: name, id: `${listId}-${index}`, role: "option", "aria-selected": activeSuggestion === index, type: "button", onPointerDown: e => { e.preventDefault(); choose(name); }, onClick: e => { if(e.detail===0)choose(name); }, style: { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "11px 12px", textAlign: "left", border: "none", borderTop: index ? `1px solid ${T.border}` : "none", background: activeSuggestion === index ? hex(T.blue,.1) : T.surf, color: T.text, fontSize: 14, touchAction: "manipulation" } }, React.createElement(History, { size: 14, style: { flexShrink: 0, color: T.muted } }), React.createElement("span", { style: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name)))),
             (onAddPreset || onReorder) && React.createElement("details", { style: { marginTop: 7, fontSize: 11, color: T.muted } },
                 React.createElement("summary", { style: { cursor: "pointer", padding: "4px 0" } }, "รายการที่ใช้บ่อย"),
                 React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 } }, presets.map(name => React.createElement("button", { key: name, type: "button", onClick: () => onPick(name), style: { padding: "7px 9px", borderRadius: 8, background: T.surf2, border: `1px solid ${T.border}`, color: T.sub, fontSize: 12 } }, name))),
@@ -16711,56 +16711,64 @@ function allocationDateAfter(day, months) {
     const Empty = ({ text }) => (React.createElement(Glass, { className: "py-8 flex items-center justify-center" },
         React.createElement("span", { className: "text-xs", style: { color: T.muted } }, text)));
     const Label = ({ children }) => React.createElement("div", { className: "text-[11px] font-semibold mb-1", style: { color: T.sub } }, children);
-    // iOS keyboard replacements can change the DOM value without React's
-    // synthetic onChange firing. Listen on the input itself as well, and read
-    // its final value when composition/autocorrect commits.
+    // Let the browser own the live text while the iOS IME is composing or
+    // replacing a word. A controlled value can overwrite that replacement.
     function useNativeTextCommit(value, commit) {
         const ref=React.useRef(null);
         const latest=React.useRef({value,commit});
         latest.current={value,commit};
+        React.useLayoutEffect(()=>{
+            const input=ref.current;
+            if(input && document.activeElement!==input && input.value!==String(value??""))input.value=String(value??"");
+        },[value]);
         React.useEffect(()=>{
             const input=ref.current;
             if(!input)return;
-            const sync=()=>{
+            let composing=false;
+            const sync=event=>{
+                if(composing || event?.isComposing)return;
                 const next=input.value;
                 if(next!==String(latest.current.value??""))latest.current.commit(next);
             };
+            const start=()=>{composing=true;};
+            const end=event=>{composing=false;sync(event);};
             input.addEventListener("input",sync);
             input.addEventListener("change",sync);
-            input.addEventListener("compositionend",sync);
-            input.addEventListener("blur",sync);
+            input.addEventListener("compositionstart",start);
+            input.addEventListener("compositionend",end);
             return()=>{
                 input.removeEventListener("input",sync);
                 input.removeEventListener("change",sync);
-                input.removeEventListener("compositionend",sync);
-                input.removeEventListener("blur",sync);
+                input.removeEventListener("compositionstart",start);
+                input.removeEventListener("compositionend",end);
             };
         },[]);
         return ref;
     }
     function Input({ label, value, onChange, placeholder, type = "text" }) {
         const inputRef=useNativeTextCommit(value,onChange);
+        const nativeText=type==="text";
         return React.createElement("div", { className: "mb-3 ui-input-field" },
             React.createElement(Label, null, label),
-            React.createElement("input", { ref:inputRef,type: type, "aria-label": label, value: value, onChange: e => onChange(e.target.value), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }));
+            React.createElement("input", { ref:nativeText?inputRef:undefined,type: type, "aria-label": label, ...(nativeText?{defaultValue:value}:{value:value,onChange:e=>onChange(e.target.value)}), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }));
     }
     /* Same look as Input, plus suggestions from whatever the user typed before.
        The list button shows every past entry; typing narrows it down. */
     function SuggestInput({ label, value, onChange, placeholder, options = [], listLabel = "เลือกจากรายการเดิม" }) {
-        const inputRef=useNativeTextCommit(value,onChange);
         const [open, setOpen] = useState(false);
         const [showAll, setShowAll] = useState(false);
+        const inputRef=useNativeTextCommit(value,next=>{onChange(next);setShowAll(false);setOpen(true);});
         const pool = useMemo(() => [...new Set((options || []).map(o => String(o || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")), [options]);
         const query = String(value || "").trim().toLocaleLowerCase("th");
         const matches = showAll ? pool : (query ? pool.filter(o => o.toLocaleLowerCase("th").includes(query) && o.toLocaleLowerCase("th") !== query) : []);
-        const pick = (option) => { onChange(option); setOpen(false); setShowAll(false); };
+        const pick = (option) => { if(inputRef.current)inputRef.current.value=option; onChange(option); setOpen(false); setShowAll(false); };
         return React.createElement("div", { className: "mb-3", style: { position: "relative" } },
             React.createElement("div", { className: "flex items-center justify-between" },
                 React.createElement(Label, null, label),
                 pool.length > 0 && React.createElement("button", { type: "button", onClick: () => { setShowAll(current => !(current && open)); setOpen(current => !(current && showAll)); }, className: "text-[10px] font-bold", style: { color: T.blue, marginBottom: 4 } }, `${listLabel} (${pool.length})`)),
-            React.createElement("input", { ref:inputRef,value: value, onChange: e => { onChange(e.target.value); setShowAll(false); setOpen(true); }, onFocus: () => setOpen(true), onBlur: () => setTimeout(() => { setOpen(false); setShowAll(false); }, 150), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+            React.createElement("input", { ref:inputRef,defaultValue: value, onFocus: () => setOpen(true), onBlur: () => setTimeout(() => { setOpen(false); setShowAll(false); }, 150), placeholder: placeholder, className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
             open && matches.length > 0 && React.createElement("div", { className: "rounded-xl overflow-hidden", style: { position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 30, background: T.surf, border: `1px solid ${T.border}`, boxShadow: "0 12px 30px rgba(83,67,43,.16)", maxHeight: 216, overflowY: "auto" } },
-                matches.slice(0, 40).map((option, index) => React.createElement("button", { key: option, type: "button", onMouseDown: e => e.preventDefault(), onClick: () => pick(option), className: "w-full px-3 py-2.5 text-left text-sm active:scale-[.99]", style: { borderTop: index ? `1px solid ${T.border}` : "none" } }, option))));
+                matches.slice(0, 40).map((option, index) => React.createElement("button", { key: option, type: "button", onPointerDown: e => {e.preventDefault();pick(option);}, onClick: e => {if(e.detail===0)pick(option);}, className: "w-full px-3 py-2.5 text-left text-sm active:scale-[.99]", style: { borderTop: index ? `1px solid ${T.border}` : "none" } }, option))));
     }
     function TimeInput({ value, onChange }) {
         return React.createElement("input", { type: "time", value: value, onChange: e => onChange(e.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } });
