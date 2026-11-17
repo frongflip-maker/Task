@@ -399,6 +399,9 @@ input:focus,select:focus,textarea:focus{border-color:#4F766C!important;box-shado
 .st-flow{font-size:11px;font-weight:600;white-space:nowrap;flex:0 0 auto;color:#386e79}
 .st-badge{display:flex;max-width:54%;min-width:0;flex:0 1 auto;overflow:hidden}.st-route{display:flex;align-items:center;gap:3px;max-width:46%;min-width:0;flex:0 1 auto}.st-route .st-badge{flex:0 1 auto;max-width:calc(50% - 7px)}
 .st-category{font-size:11px;line-height:1.5;color:#61716b;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;min-width:0;flex:0 1 auto}
+.st-row.has-income-shares{height:auto;min-height:76px}
+.st-row.has-income-shares .st-income-line{flex:0 0 auto;align-items:flex-start}
+.st-row.has-income-shares .st-category{white-space:normal;overflow-wrap:anywhere}
 .st-status{font-size:11px;color:#386e79;margin-bottom:5px}
 @media(max-width:360px){.st-day{grid-template-columns:32px minmax(0,1fr);gap:6px}.st-row{padding-inline:8px}.st-line,.st-heading{gap:4px}}
 .pf-stack details{padding:10px 0;border-block:1px solid #b8aa9333}.pf-stack summary{cursor:pointer;font-size:13px;font-weight:650;padding:4px 0}
@@ -9162,6 +9165,8 @@ function allocationDateAfter(day, months) {
                 head.allocationTotals=head.allocationTotals||{};
                 Object.entries(row.allocationTotals).forEach(([key,value])=>{head.allocationTotals[key]=(Number(head.allocationTotals[key])||0)+(Number(value)||0);});
             }
+            if (row.incomeParts)
+                head.incomeParts = [...(head.incomeParts || []), ...row.incomeParts];
             head.bankLineParts.push(titleOf(row));
             head.bankLineDetails.push(labelOf ? labelOf(row) : titleOf(row));
         });
@@ -13406,10 +13411,43 @@ function allocationDateAfter(day, months) {
         return React.createElement("div", { ref: box, style: { width: inline ? "auto" : "100%", flex: inline ? "1 1 0" : undefined, maxWidth: "100%", minWidth: 0, textAlign, whiteSpace: "nowrap", marginTop: inline ? 0 : 5, overflow: "hidden", fontVariantNumeric: "tabular-nums" } },
             React.createElement("span", { ref: content, style: { display: "inline-flex", width: "max-content", alignItems: "baseline", gap: 5, fontSize, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.4 } }, children));
     }
+    function statementIncomeParts(row) {
+        if (row.dir !== "in")
+            return undefined;
+        if (row.paymentRaw) {
+            return paymentAllocationRows(row.paymentRaw, normalizeIncomeCategory(row.raw?.category || "Work"))
+                .map(allocation => allocation.role === "pass_through"
+                    ? { label: allocation.recipientName, amount: allocation.amount, recipient: true, settled: allocation.settled }
+                    : { label: allocation.role === "tip" ? "Tips" : allocation.category, amount: allocation.amount });
+        }
+        const shares = (row.raw?.recipientSplits || [])
+            .filter(split => Number(split.amount) > 0)
+            .map(split => ({ label: String(split.name || "").trim(), amount: Number(split.amount), recipient: true, settled: split.settled }));
+        return [{ label: row.tag, amount: Math.max(0, row.amount - passThroughTotal(row.raw)) }, ...shares];
+    }
+    const compactStatementMoney = (amount, currency) =>
+        (currency === "THB" ? "฿" : currency === "USD" ? "$" : currency + " ") + round2(amount).toLocaleString("en-US", { maximumFractionDigits: 2 });
+    function statementSharedIncomeText(parts, currency) {
+        if (!parts?.some(part => part.recipient))
+            return "";
+        const ownTotals = new globalThis.Map();
+        const shares = [];
+        for (const part of parts) {
+            if (part.recipient) {
+                const label = part.settled ? "ส่วนของ" : "รอส่งให้";
+                shares.push(`${label} ${part.label || "ไม่ระบุชื่อ"} ${compactStatementMoney(part.amount, currency)}`);
+            } else {
+                ownTotals.set(part.label, (ownTotals.get(part.label) || 0) + part.amount);
+            }
+        }
+        const own = [...ownTotals].filter(([, amount]) => round2(amount) > 0)
+            .map(([label, amount]) => `${label} ${compactStatementMoney(amount, currency)}`);
+        return [...(own.length ? own : [`ส่วนของเรา ${compactStatementMoney(0, currency)}`]), ...shares].join(" · ");
+    }
     function statementCategoryText(row,currency) {
+        if (row.sharedIncomeText) return row.sharedIncomeText;
         const parts=Object.entries(row.allocationTotals||{}).filter(([,amount])=>Number(amount)>0);
-        const compact=n=>(currency==="THB"?"฿":currency==="USD"?"$":currency+" ")+Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
-        if(parts.length>1)return parts.map(([label,amount])=>label+" "+compact(amount)).join(" · ");
+        if(parts.length>1)return parts.map(([label,amount])=>label+" "+compactStatementMoney(amount,currency)).join(" · ");
         return row.tag!==row.title ? row.tag||"อื่นๆ" : "";
     }
     function StatementDayRows({ date, rows, accounts, onOpen, onReorder }) {
@@ -13436,7 +13474,7 @@ function allocationDateAfter(day, months) {
                         const category=statementCategoryText(row,currency);
                         const active=dnd.activeIndex===index,armed=dnd.armedIndex===index;
                         const twoAmounts=transfer && (fc!==tc || Math.abs(Number(t.amount)-transferReceived(t))>.005);
-                        return h("button",{key:row.id,type:"button",className:"st-row",...dnd.itemProps(index),
+                        return h("button",{key:row.id,type:"button",className:row.sharedIncomeText?"st-row has-income-shares":"st-row",...dnd.itemProps(index),
                             "aria-label":`ดูรายการ ${row.title}${category?" · "+category:""}`,title:fullHeading,
                             onContextMenu:e=>e.preventDefault(),
                             onClick:e=>{if(dnd.suppressClick()){e.preventDefault();return;}onOpen(row);},
@@ -13449,7 +13487,7 @@ function allocationDateAfter(day, months) {
                                     h("span",{className:"st-label"},heading),
                                     flow!=="none" && h("span",{className:"st-flow","data-investment-flow":flow},INVESTMENT_FLOWS[flow])),
                                 transfer?h("span",{className:"st-route","data-transfer-route":true},badge(from),h("span",{"aria-hidden":true,style:{flexShrink:0,color:T.muted,fontSize:12}},"→"),badge(to)):badge(account)),
-                            h("div",{className:"st-line"},
+                            h("div",{className:"st-line st-income-line"},
                                 !twoAmounts && h("span",{className:"st-category",title:category},transfer?"โอนย้าย":category),
                                 h("div",{style:{flex:twoAmounts?"1 1 0":"0 1 auto",minWidth:0,maxWidth:twoAmounts?"100%":"65%",marginLeft:"auto"}},
                                     h(StatementMoney,{inline:true,fontSize:14},
@@ -14748,14 +14786,23 @@ function allocationDateAfter(day, months) {
                             /* Payments taken together in one transfer share a batchId.
                                The bank shows one line, so show one line here too — the
                                underlying payments stay separate per job. */
-                            ledger = mergeBankLines(ledger.map(row => { const batchId = row.raw?.kind === "transfer" || row.raw?.investmentFeeFor ? null : row.paymentRaw?.batchId || row.raw?.batchId; return batchId ? { ...row, batchId } : row; }), { amountFields: ["amount"], labelOf: row => `${row.title} ${fmtBaht(row.amount)}` })
-                                .map(row => row.bankLineDetails?.length > 1 ? { ...row, detailSummary: row.bankLineDetails.join(" · ") } : row);
+                            ledger = mergeBankLines(ledger.map(row => {
+                                const batchId = row.kind === "passThrough" || row.raw?.kind === "transfer" || row.raw?.investmentFeeFor
+                                    ? null : row.paymentRaw?.batchId || row.raw?.batchId;
+                                return { ...row, batchId, incomeParts: statementIncomeParts(row) };
+                            }), { amountFields: ["amount"], labelOf: row => `${row.title} ${fmtBaht(row.amount)}` })
+                                .map(row => {
+                                    const currency = accountCurrency(accounts.find(account => account.id === row.accountId));
+                                    const sharedIncomeText = statementSharedIncomeText(row.incomeParts, currency);
+                                    const detailSummary = row.bankLineDetails?.length > 1 ? row.bankLineDetails.join(" · ") : row.detailSummary;
+                                    return { ...row, sharedIncomeText, detailSummary };
+                                });
                             const filtered = ledger.filter(l => txPeriod === "all" || String(l.date).startsWith(txMonth))
                                 .filter(l => ledgerAccountMatches(l,txFilter,txIncludeChildren,accounts))
                                 .filter(l => txKind === "all" || (l.raw?.kind === "transfer" ? "transfer" : l.dir) === txKind)
                                 .filter(l => txDirection === "all" || (txDirection === "transfer" ? l.raw?.kind === "transfer" : l.dir === txDirection && l.raw?.kind !== "transfer"))
                                 .filter(l => txCategory === "all" || (l.allocationCategories?.length ? l.allocationCategories.includes(txCategory) : l.tag === txCategory))
-                                .filter(l => !query || [l.title, l.tag, l.allocationSummary, accName(l.accountId), l.raw?.kind === "transfer" ? accName(l.raw.toAccountId) : "", l.raw?.fromCurrency, l.raw?.toCurrency, l.raw?.note, l.paymentRaw?.note].some(v => String(v || "").toLocaleLowerCase("th").includes(query)));
+                                .filter(l => !query || [l.title, l.tag, l.allocationSummary, l.sharedIncomeText, accName(l.accountId), l.raw?.kind === "transfer" ? accName(l.raw.toAccountId) : "", l.raw?.fromCurrency, l.raw?.toCurrency, l.raw?.note, l.paymentRaw?.note].some(v => String(v || "").toLocaleLowerCase("th").includes(query)));
                             // Keep the established newest-first order. A saved Statement order only
                             // replaces the relative slots of rows manually moved within the same day.
                             const defaultSorted = collapseLedgerFees(filtered).map((item, index) => ({ item, index }))
@@ -15134,7 +15181,8 @@ function allocationDateAfter(day, months) {
                 txnActionItem.raw?.investmentFeeFor && React.createElement("p", { className: "text-xs mb-3", style: { color: T.sub } }, `มูลค่ารายจ่าย ณ วันโอน ${moneyIn(txnActionItem.raw.amount)}`),
                 txnActionItem.raw?.kind === "transfer" && React.createElement(TransferDetail, { transaction: txnActionItem.raw, accounts, transactions, payments }),
                 (txnActionItem.paymentRaw?.note || txnActionItem.raw?.note) && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub, whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, txnActionItem.paymentRaw?.note || txnActionItem.raw?.note),
-                txnActionItem.detailSummary && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub } }, txnActionItem.detailSummary),
+                (txnActionItem.sharedIncomeText || txnActionItem.detailSummary) && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub, overflowWrap: "anywhere" } }, txnActionItem.sharedIncomeText || txnActionItem.detailSummary),
+                txnActionItem.sharedIncomeText && txnActionItem.bankLineDetails?.length > 1 && React.createElement("p", { className: "text-xs mb-4 leading-relaxed", style: { color: T.sub } }, txnActionItem.detailSummary),
                 txnActionItem.kind === "passThrough" ? React.createElement("div", { className: "space-y-2" },
                     React.createElement("button", { onClick: () => {
                         const initial = getPassThroughData(txnActionItem);
