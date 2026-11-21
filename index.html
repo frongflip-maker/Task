@@ -7891,6 +7891,8 @@ function allocationDateAfter(day, months) {
             fireToast("รายรับ–รายจ่ายทั่วไปใช้บัญชี THB ที่เปิดใช้งาน · บัญชี USD ใช้เมนูโอนย้ายในเวอร์ชันนี้"); return false;
         };
         const addIncomeSourcePayment = (incomeSourceId, payment) => {
+            const replacing = payment.replacesTransactionId ? transactions.find(row => row.id === payment.replacesTransactionId && row.kind === "in") : null;
+            if (payment.replacesTransactionId && (!replacing || payments.some(row => row.replacesTransactionId === payment.replacesTransactionId))) return false;
             if (!guardTHB(payment)) return false;
             const source = incomeSources.find(item => item.id === incomeSourceId);
             if (!source)
@@ -7902,6 +7904,7 @@ function allocationDateAfter(day, months) {
                 return {
                     id: allocation.id || uid(), role,
                     category: role === "pass_through" ? "เงินส่วนของผู้อื่น" : normalizeIncomeCategory(allocation.category || (role === "tip" ? "Tips" : fallbackCategory)),
+                    stage: role === "principal" ? allocation.stage : undefined,
                     amount: Math.max(0, Number(allocation.amount) || 0),
                     recipientName: role === "pass_through" ? String(allocation.recipientName || allocation.name || "").trim() : "",
                     settled: role === "pass_through" ? !!allocation.settled : false,
@@ -7922,8 +7925,12 @@ function allocationDateAfter(day, months) {
             if (amount <= 0 || !passThroughValid)
                 return false;
             rememberPayer(payment.payer);
-            const nextPayment = { id: uid(), incomeSourceId, sourceType: source.sourceType, sourceId: source.sourceId, paymentType, amount, principalAmount, tipAmount, passThroughAmount, allocations, ...(payment.batchId ? { batchId: payment.batchId } : {}), date: payment.date || TK, accountId: payment.accountId || null, payer: String(payment.payer || "").trim(), note: String(payment.note || "").trim(), reconcileStatus: payment.reconcileStatus || "unchecked", moneyType: "work_income", createdAt: new Date().toISOString() };
+            const nextPayment = { ...(replacing ? { replacesTransactionId: replacing.id } : {}), id: uid(), incomeSourceId, sourceType: source.sourceType, sourceId: source.sourceId, paymentType, amount, principalAmount, tipAmount, passThroughAmount, allocations, ...(payment.batchId ? { batchId: payment.batchId } : {}), date: payment.date || TK, accountId: payment.accountId || null, payer: String(payment.payer || "").trim(), note: String(payment.note || "").trim(), reconcileStatus: payment.reconcileStatus || "unchecked", moneyType: "work_income", createdAt: new Date().toISOString() };
             setPayments(list => [...list, nextPayment]);
+            if (replacing) {
+                setTransactions(list => list.filter(row => row.id !== replacing.id));
+                clearStatementMatches("t" + replacing.id);
+            }
             if (principalAmount >= remaining && remaining > 0)
                 setIncomeSources(list => list.map(item => item.id === incomeSourceId ? { ...item, status: "paid", updatedAt: new Date().toISOString() } : item));
             return true;
@@ -10690,6 +10697,8 @@ function allocationDateAfter(day, months) {
       const initialRemaining = sourceByInitialId ? incomeSourceRemainingAmount(sourceByInitialId, paymentEditMode ? payments.filter(payment => payment.id !== initialIncomeSourcePayment?.id) : payments) : 0;
       const [linkedPaymentType, setLinkedPaymentType] = useState(paymentEditMode ? (initialIncomeSourcePayment?.paymentType || "full") : effectiveInitialIncomeSourceId ? (initialRemaining > 0 ? "full" : "tip") : "full");
       const [splitAccounts, setSplitAccounts] = useState(false);
+      const savingReceipt = React.useRef(false);
+      const [receiptError, setReceiptError] = useState("");
       const [linkedAllocations, setLinkedAllocations] = useState(() => paymentEditMode
         ? paymentAllocationRows(initialIncomeSourcePayment, sourceByInitialId?.category || "Work").map(allocation => ({ ...allocation, id: allocation.id || uid(), role: allocation.role === "tip" ? "principal" : allocation.role, category: allocation.role === "tip" ? "Tips" : allocation.category, stage: allocation.role === "principal" ? (allocation.stage || (initialIncomeSourcePayment.paymentType === "tip" ? "full" : initialIncomeSourcePayment.paymentType) || "full") : undefined, amount: String(allocation.amount), recipientName: allocation.recipientName || "", settled: !!allocation.settled, settledDate: allocation.settledDate || initialIncomeSourcePayment?.date || TK, settledAccountId: allocation.settledAccountId || initialIncomeSourcePayment?.accountId || accounts[0]?.id || null }))
         : effectiveInitialIncomeSourceId ? (initialRemaining > 0 ? [{ id: uid(), role: "principal", category: normalizeIncomeCategory(sourceByInitialId?.category || "Work"), amount: String(initialRemaining), recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }] : [{ id: uid(), role: "principal", category: normalizeIncomeCategory(sourceByInitialId?.category || "Work"), stage: "full", amount: "", recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }])  : [{ id: uid(), role: "principal", category: normalizeIncomeCategory(initial?.category || "Work"), stage: "full", amount: initial?.amount ? String(initial.amount) : "", recipientName: "", settled: false, settledDate: TK, settledAccountId: accounts[0]?.id || null }]);
@@ -10727,21 +10736,30 @@ function allocationDateAfter(day, months) {
           setF(current => ({ ...current, amount: "" }));
         }
       };
-      const selectLinkedIncomeSource = sourceId => {
+      const selectLinkedIncomeSource = (sourceId, preserveAmount = false) => {
         const source = incomeSources.find(item => item.id === sourceId) || null;
-        setStudioBookingLink(false);
         setLinkedIncomeSourceId(sourceId || "");
         if (!source) {
           setLinkedAllocations([]);
           setLinkedPaymentType("full");
-          setF(current => ({ ...current, title: "", amount: "", category: "Work", payer: "", paymentStage: "", moneyType: "work_income" }));
+          if (!editMode) setF(current => ({ ...current, title: "", amount: "", category: "Work", payer: "", paymentStage: "", moneyType: "work_income" }));
           return;
         }
-        const remaining = incomeSourceRemainingAmount(source, payments);
+        const remaining = preserveAmount || editMode ? Number(f.amount) || 0 : incomeSourceRemainingAmount(source, payments);
         const defaultType = remaining > 0 ? "full" : "tip";
         setLinkedPaymentType(defaultType);
         setLinkedAllocations(remaining > 0 ? [{ id: uid(), role: "principal", category: normalizeIncomeCategory(source.category || "Work"), amount: String(remaining), recipientName: "", settled: false, settledDate: f.date || TK, settledAccountId: f.accountId || accounts[0]?.id || null }] : [{ id: uid(), role: "principal", category: normalizeIncomeCategory(source.category || "Work"), stage: "full", amount: "", recipientName: "", settled: false, settledDate: f.date || TK, settledAccountId: f.accountId || accounts[0]?.id || null }]);
-        setF(current => ({ ...current, kind: "in", title: source.title || "รับเงินจากงาน", amount: remaining > 0 ? String(remaining) : "", category: normalizeIncomeCategory(source.category || "Work"), payer: source.customerName || linkedSourcePayments.at(-1)?.payer || "", paymentStage: "", moneyType: "work_income", taxable: true }));
+        if (editMode && initial?.recipientSplits?.length) {
+          const shares = initial.recipientSplits.map(split => ({
+            id: split.id || uid(), role: "pass_through", category: "เงินส่วนของผู้อื่น",
+            amount: String(Number(split.amount) || 0), recipientName: split.name || "",
+            settled: !!split.settled, settledDate: split.settledDate || f.date,
+            settledAccountId: split.settledAccountId || f.accountId
+          }));
+          const held = shares.reduce((sum, split) => sum + Number(split.amount), 0);
+          setLinkedAllocations([makeLinkedAllocation("principal", source.category, Math.max(0, remaining - held)), ...shares]);
+        }
+        setF(current => ({ ...current, kind: "in", title: source.title || "รับเงินจากงาน", amount: remaining > 0 ? String(remaining) : "", category: normalizeIncomeCategory(source.category || "Work"), payer: editMode ? current.payer : source.customerName || current.payer || linkedSourcePayments.at(-1)?.payer || "", paymentStage: "", moneyType: "work_income", taxable: editMode ? current.taxable : true }));
         setAdvancedOpen(false);
       };
       useEffect(() => {
@@ -10764,11 +10782,10 @@ function allocationDateAfter(day, months) {
           return source.id === linkedIncomeSourceId;
         return incomeSourceRemainingAmount(source, payments) > 0 || source.id === linkedIncomeSourceId;
       }).sort((a, b) => String(a.dueDate || "").localeCompare(String(b.dueDate || "")) || String(a.title || "").localeCompare(String(b.title || ""), "th"));
-      const [studioBookingLink, setStudioBookingLink] = useState(false);
       const [studioBookingForm, setStudioBookingForm] = useState(() => ({
-        bandName: "", bookingDate: f.date || TK, startTime: "18:00", endTime: "20:00", tipAmount: "",
+        bandName: initial?.payer || "", bookingDate: f.date || TK, startTime: "18:00", endTime: "20:00", tipAmount: "",
       }));
-      const studioBookingLinkActive = !studioMode && !editMode && !duplicateMode && !paymentEditMode && !linkedIncomeSource && f.kind === "in" && normalizeIncomeCategory(f.category) === "Studio" && studioBookingLink;
+      const studioBookingLinkActive = !studioMode && !editMode && !duplicateMode && !paymentEditMode && !linkedIncomeSource && f.kind === "in" && normalizeIncomeCategory(f.category) === "Studio";
       const studioBookingHours = studioBookingLinkActive ? hoursBetween(studioBookingForm.startTime, studioBookingForm.endTime) : 0;
       const studioBookingPassThroughPreview = f.sharedIncome ? (f.recipientSplits || []).reduce((sum, split) => sum + (Number(split.amount) || 0), 0) : 0;
       const studioBookingTipPreview = Math.max(0, Number(studioBookingForm.tipAmount) || 0);
@@ -10785,20 +10802,17 @@ function allocationDateAfter(day, months) {
         });
       })() : false;
       const customerProfileOptions = Object.values(customerProfiles || {}).filter(profile => profile?.id && normalizeCustomerName(profile.bandName)).sort((a, b) => String(a.bandName).localeCompare(String(b.bandName), "th"));
-      const toggleStudioBookingLink = () => {
-        const next = !studioBookingLink;
-        setStudioBookingLink(next);
-        if (next) {
-          setLinkedIncomeSourceId("");
-          setLinkedAllocations([]);
-          setStudioBookingForm(current => ({ ...current, bandName: current.bandName || f.payer || f.title || "", bookingDate: current.bookingDate || f.date || TK }));
-          setF(current => ({ ...current, kind: "in", category: "Studio", moneyType: "work_income", taxable: true }));
-        }
-      };
+      const studioNameKey = value => customerNameKey(String(value || "").replace(/^(ห้องซ้อม|เรียนกลอง|สอนกลอง|ค่าสอน|Studio)\s*[:：]\s*/i, ""));
       useEffect(() => {
-        if (f.kind !== "in" || normalizeIncomeCategory(f.category) !== "Studio" || linkedIncomeSource || editMode || duplicateMode || paymentEditMode)
-          setStudioBookingLink(false);
-      }, [f.kind, f.category, linkedIncomeSourceId, editMode, duplicateMode, paymentEditMode]);
+        if (!studioBookingLinkActive && !(editMode && initial?.kind === "in" && f.kind === "in" && normalizeIncomeCategory(f.category) === "Studio" && !linkedIncomeSource)) return;
+        const name = studioNameKey((editMode ? f.title : studioBookingForm.bandName) || f.title || f.payer);
+        const day = editMode ? initial.date : studioBookingForm.bookingDate || f.date;
+        const matches = incomeSources.filter(source => source.sourceType === "studio" &&
+          !["archived", "cancelled"].includes(source.status) && source.dueDate === day &&
+          (source.subtype || "room") === (f.studioService || "room") &&
+          name && [source.customerName, source.title].some(value => studioNameKey(value) === name));
+        if (matches.length === 1) selectLinkedIncomeSource(matches[0].id, true);
+      }, [studioBookingLinkActive, linkedIncomeSourceId, studioBookingForm.bandName, studioBookingForm.bookingDate, f.title, f.payer, f.studioService, incomeSources]);
       const [transferOnward, setTransferOnward] = useState(false);
       const [onwardAccountId, setOnwardAccountId] = useState(
         accounts[1]?.id || null,
@@ -11015,7 +11029,7 @@ function allocationDateAfter(day, months) {
         : accountCurrency(accounts.find(a => a.id === f.accountId)) !== "THB" ? false : linkedIncomeSource
           ? Number(f.amount) > 0 && !!f.accountId && linkedAllocationValid
           : studioBookingLinkActive
-            ? normalizeCustomerName(studioBookingForm.bandName) &&
+            ? normalizeCustomerName((studioBookingForm.bandName || f.title || f.payer)) &&
               studioBookingForm.bookingDate && studioBookingForm.startTime && studioBookingForm.endTime && studioBookingHours > 0 &&
               !studioBookingInFuture && !studioBookingConflict &&
               Number(f.amount) > 0 && studioBookingPrincipalPreview > 0 &&
@@ -11473,8 +11487,7 @@ function allocationDateAfter(day, months) {
                       if (k !== "in") {
                         setLinkedIncomeSourceId("");
                         setLinkedAllocations([]);
-                        setStudioBookingLink(false);
-                      }
+                                      }
                       setF({
                         ...f,
                         kind: k,
@@ -11495,7 +11508,7 @@ function allocationDateAfter(day, months) {
                 );
               }),
             ),
-          !studioMode && f.kind === "in" && !editMode && !duplicateMode && !paymentEditMode && activeIncomeSources.length > 0 && React.createElement("details", { open: linkedIncomeSource ? true : undefined, style: { marginBottom: 8, fontSize: 12 } },
+          !studioMode && f.kind === "in" && !duplicateMode && !paymentEditMode && activeIncomeSources.length > 0 && React.createElement("details", { open: linkedIncomeSource ? true : undefined, style: { marginBottom: 8, fontSize: 12 } },
             React.createElement("summary", { style: { color: T.blue, padding: "8px 0", cursor: "pointer" } }, linkedIncomeSource ? "งานค้างรับที่เลือก" : "+ รับเงินจากงานค้างรับ"),
             React.createElement(Label, null, "เลือกงานค้างรับ (ถ้ามี)"),
             React.createElement("select", { value: linkedIncomeSourceId, onChange: event => selectLinkedIncomeSource(event.target.value), className: "w-full px-3 py-2.5 rounded-xl text-sm outline-none", style: { background: linkedIncomeSource ? hex(T.green, .14) : T.surf2, color: linkedIncomeSource ? T.green : T.text, fontWeight: linkedIncomeSource ? 800 : 400, border: `${linkedIncomeSource ? 2 : 1}px solid ${linkedIncomeSource ? T.green : T.border}` } },
@@ -11512,6 +11525,11 @@ function allocationDateAfter(day, months) {
             : null,
         ),
         linkedIncomeSource && renderLinkedIncomePaymentFields(),
+        linkedIncomeSource?.sourceType === "studio" && (() => {
+          const booking = bookings.find(row => row.id === linkedIncomeSource.sourceId);
+          return booking && React.createElement("p", { className: "text-xs mb-3 leading-relaxed", style: { color: T.purple } },
+            `เชื่อมการจองเดิม · ${booking.bandName} · ${booking.date} ${booking.startTime}–${booking.endTime} · ${hoursBetween(booking.startTime, booking.endTime)} ชม. · ชั่วโมงสะสมอัปเดตเมื่อใช้บริการเสร็จและรับครบ`);
+        })(),
         duplicateMode && initial?.moneyType === "reimbursement" &&
           React.createElement(
             "div",
@@ -11903,15 +11921,10 @@ function allocationDateAfter(day, months) {
                       ),
                     ),
                     !editMode && !duplicateMode && React.createElement(React.Fragment, null,
-                      React.createElement("button", { type: "button", onClick: toggleStudioBookingLink, className: "w-full flex items-center gap-3 p-3 rounded-xl mt-3 text-left active:scale-[.99]", style: { background: studioBookingLinkActive ? hex(T.purple, .12) : T.surf2, border: `1px solid ${studioBookingLinkActive ? hex(T.purple, .48) : T.border}` } },
-                        React.createElement("span", { className: "w-11 h-6 rounded-full relative shrink-0 transition-colors", style: { background: studioBookingLinkActive ? T.purple : T.muted, border: `1px solid ${studioBookingLinkActive ? T.purple : T.sub}` } },
-                          React.createElement("span", { className: "absolute w-5 h-5 rounded-full transition-all", style: { top: "1px", left: studioBookingLinkActive ? "22px" : "1px", background: T.surf, boxShadow: `0 1px 4px ${hex(T.text, .28)}` } })),
-                        React.createElement("div", { className: "flex-1 min-w-0" },
-                          React.createElement("div", { className: "text-xs font-bold" }, "เชื่อมกับการจองห้องซ้อม"),
-                          React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: T.muted } }, "สร้างลูกค้า Booking ย้อนหลัง และรับเงินครบในครั้งเดียว"))),
+                      React.createElement("p", { className: "text-xs mt-3", style: { color: T.purple } }, "เชื่อมข้อมูลห้องซ้อมอัตโนมัติ · การจองเดิมใช้รายการเดิม การจองใหม่กรอกชื่อวงและเวลาใช้บริการ"),
                       studioBookingLinkActive && React.createElement("div", { className: "mt-3 p-3 rounded-xl", style: { background: hex(T.purple, .07), border: `1px solid ${hex(T.purple, .32)}` } },
                         React.createElement(Label, null, f.studioService === "teaching" ? "ชื่อนักเรียน / ลูกค้า" : "ชื่อวง / ลูกค้า"),
-                        React.createElement("input", { list: "studio-customer-options", value: studioBookingForm.bandName, onChange: event => setStudioBookingForm(current => ({ ...current, bandName: event.target.value })), placeholder: f.studioService === "teaching" ? "เลือกชื่อเดิมหรือพิมพ์ชื่อใหม่" : "เลือกวงเดิมหรือพิมพ์ชื่อใหม่", className: "w-full px-3 py-2.5 rounded-xl text-sm font-bold outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
+                        React.createElement("input", { list: "studio-customer-options", value: studioBookingForm.bandName || f.title || f.payer, onChange: event => setStudioBookingForm(current => ({ ...current, bandName: event.target.value })), placeholder: f.studioService === "teaching" ? "เลือกชื่อเดิมหรือพิมพ์ชื่อใหม่" : "เลือกวงเดิมหรือพิมพ์ชื่อใหม่", className: "w-full px-3 py-2.5 rounded-xl text-sm font-bold outline-none", style: { background: T.surf, color: T.text, border: `1px solid ${T.border}` } }),
                         React.createElement("datalist", { id: "studio-customer-options" }, customerProfileOptions.map(profile => React.createElement("option", { key: profile.id, value: profile.bandName }))),
                         React.createElement("div", { className: "mt-3" }, React.createElement(Label, null, "วันที่ใช้บริการ"), React.createElement(DateInput, { value: studioBookingForm.bookingDate, onChange: value => setStudioBookingForm(current => ({ ...current, bookingDate: value })) })),
                         React.createElement("div", { className: "grid grid-cols-2 gap-2 mt-3" },
@@ -12541,6 +12554,7 @@ function allocationDateAfter(day, months) {
           React.createElement(
             React.Fragment,
             null,
+            receiptError && React.createElement("p", { role: "alert", style: { color: T.red, marginBottom: 8 } }, receiptError),
             dupConfirm && duplicateExisting && React.createElement("div", { className: "mb-2 px-3 py-2 rounded-xl text-[11px] font-bold", style: { background: hex(T.orange, .14), border: `1px solid ${hex(T.orange, .5)}`, color: T.orange } }, "⚠ มีรายการชื่อ/ยอด/วันเดียวกันอยู่แล้ว — กดบันทึกอีกครั้งถ้าต้องการบันทึกซ้ำจริง"),
             isTransfer && !valid && React.createElement("p", { role: "status", style: { fontSize: 12, lineHeight: 1.7, color: T.red, marginBottom: 8 } },
                 !fromAcc || !toAcc ? "เลือกบัญชีต้นทางและปลายทาง" : f.fromAccountId === f.toAccountId ? "เลือกบัญชีต้นทางและปลายทางคนละบัญชี" : !(Number(f.amount) > 0) ? "กรอกยอดโอนมากกว่า 0" : !(receivedAmount > 0) ? "กรอกยอดรับจริงปลายทางมากกว่า 0" : needsTHBRate && !(rates.sourceRate > 0) ? "กรอกเรทเงินบาทมากกว่า 0 เพื่อคิดค่าธรรมเนียมหรือยอดลงทุน" : !purposeValid ? "บัญชีสกุลเดียวกันให้เลือกโอนย้ายบัญชี" : "ตรวจค่าธรรมเนียมและบัญชีที่เลือกก่อนบันทึก"),
@@ -12608,11 +12622,18 @@ function allocationDateAfter(day, months) {
                     allocations: paidRows.map(buildAllocationPayload),
                     date: f.date, accountId: f.accountId, payer: f.payer.trim(), note: f.note.trim(), reconcileStatus: f.reconcileStatus,
                   };
-                  const saved = paymentEditMode
-                    ? onUpdateIncomeSourcePayment?.(initialIncomeSourcePayment.id, paymentPayload)
-                    : onSaveIncomeSourcePayment?.(linkedIncomeSource.id, paymentPayload);
-                  if (saved !== false)
-                    onClose();
+                  if (savingReceipt.current) return;
+                  const savePayment = paymentEditMode ? onUpdateIncomeSourcePayment : onSaveIncomeSourcePayment;
+                  if (typeof savePayment !== "function") {
+                    setReceiptError("บันทึกรับเงินไม่ได้ กรุณาปิดแล้วเปิดรายการนี้ใหม่");
+                    return;
+                  }
+                  savingReceipt.current = true;
+                  try {
+                    const saved = savePayment(paymentEditMode ? initialIncomeSourcePayment.id : linkedIncomeSource.id, paymentPayload);
+                    if (saved === true) onClose();
+                    else setReceiptError("บันทึกรับเงินไม่สำเร็จ กรุณาตรวจบัญชีและยอดจัดสรร");
+                  } finally { savingReceipt.current = false; }
                   return;
                 }
                 if (!studioMode && !isTransfer && f.kind === "in" && !linkedIncomeSource && !studioBookingLinkActive && onSaveManualIncome && (linkedAllocations.length > 1 || linkedAllocations.some(allocation => allocation.role === "pass_through"))) {
@@ -12656,7 +12677,7 @@ function allocationDateAfter(day, months) {
                   const ownAmount = Math.max(0, totalAmount - passThroughAllocations.reduce((sum, allocation) => sum + allocation.amount, 0) - tipAmount);
                   const allocations = [{ id: uid(), role: "principal", category: "Studio", amount: ownAmount }, ...(tipAmount > 0 ? [{ id: uid(), role: "tip", category: "Tips", amount: tipAmount }] : []), ...passThroughAllocations];
                   const saved = onSavePaidStudioBookingIncome?.({
-                    bandName: studioBookingForm.bandName, studioService: f.studioService || "room",
+                    bandName: studioBookingForm.bandName || f.title || f.payer, studioService: f.studioService || "room",
                     bookingDate: studioBookingForm.bookingDate, startTime: studioBookingForm.startTime, endTime: studioBookingForm.endTime,
                     amount: totalAmount, principalAmount: ownAmount, tipAmount, allocations, date: f.date, accountId: f.accountId,
                     payer: f.payer.trim() || normalizeCustomerName(studioBookingForm.bandName), note: f.note.trim(),
@@ -15256,10 +15277,14 @@ function allocationDateAfter(day, months) {
                 if (saved) fireToast("บันทึกการแก้ไขแล้ว");
                 return saved;
             }, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, onClose: () => setEditIncomePayment(null), onSave: () => {} }),
-            txnOpen && React.createElement(TxnModal, { initialKind: txnKind, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, bookings, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onSaveManualIncome: addManualIncomeWithAllocations, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
+            txnOpen && React.createElement(TxnModal, { key: txnIncomeSourceId || txnKind, initialKind: txnKind, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, incomeSources, payments, initialIncomeSourceId: txnIncomeSourceId, onSaveIncomeSourcePayment: addIncomeSourcePayment, onUpdateIncomeSourcePayment: updateIncomeSourcePayment, onDeleteIncomeSourcePayment: deleteIncomeSourcePayment, customerProfiles, bookings, onSavePaidStudioBookingIncome: addPaidStudioBookingIncome, onSaveManualIncome: addManualIncomeWithAllocations, onClose: () => { setTxnOpen(false); setTxnIncomeSourceId(""); }, onSave: (list) => { list.forEach(addTxn); setTxnOpen(false); setTxnIncomeSourceId(""); } }),
             refundExpense && React.createElement(TxnModal, { payments, initial: { title: refundExpense.title, amount: refundExpense.amount, kind: "in", date: TK, accountId: accounts.find(a => !a.archived && accountCurrency(a) === "THB")?.id || null, category: txnCategories.income?.[0] || "อื่นๆ", taxable: false, payer: refundExpense.payer || "", moneyType: "reimbursement", linkedExpenseId: refundExpense.id, note: `รับคืนจากรายการ ${refundExpense.raw?.title || "สำรองจ่าย"}` }, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setRefundExpense(null), onSave: (list) => { list.forEach(addTxn); setRefundExpense(null); } }),
             duplicateTxn && React.createElement(TxnModal, { payments, initial: duplicateTxn, duplicateMode: true, studioMode: !!duplicateTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setDuplicateTxn(null), onSave: (list) => { list.forEach(addTxn); setDuplicateTxn(null); } }),
-            editTxn && React.createElement(TxnModal, { payments, initial: editTxn, studioMode: !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
+            editTxn && React.createElement(TxnModal, { incomeSources, bookings, onSaveIncomeSourcePayment: (sourceId, data) => {
+                const saved = addIncomeSourcePayment(sourceId, { ...data, replacesTransactionId: editTxn.id });
+                if (saved) fireToast("เชื่อมกับงานเดิมและปรับยอดค้างรับแล้ว");
+                return saved;
+            }, payments, initial: editTxn, studioMode: !!editTxn.studioExpense, accounts: accounts, transactions: transactions, txnCategories: txnCategories, setTxnCategories: setTxnCategories, onRenameCategory: renameTxnCategory, onDeleteCategory: deleteTxnCategory, expensePresets: expensePresets, setExpensePresets: setExpensePresets, incomePresets: incomePresets, setIncomePresets: setIncomePresets, payerNames: payerNames, setPayerNames: setPayerNames, txnTemplateDefaults: txnTemplateDefaults, setTxnTemplateDefaults: setTxnTemplateDefaults, onClose: () => setEditTxn(null), onSave: (list) => { if (applyEditedTransactionList(editTxn.id, list, updateTxn, addTxn)) setEditTxn(null); } }),
             ));
     }
     let _actx = null;
