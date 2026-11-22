@@ -10600,7 +10600,7 @@ function allocationDateAfter(day, months) {
               kind: initial.kind || (studioMode ? "out" : "out"),
               date: initial.date || TK,
               accountId: initial.accountId || accounts.find(a => !a.archived && accountCurrency(a) === "THB")?.id || null,
-              category: initial.category || (studioMode ? "ห้องซ้อม" : ""),
+              category: initial.category || (initial.kind === "in" ? "Work" : studioMode ? "ห้องซ้อม" : ""),
               taxable: duplicateMode && initial.moneyType === "reimbursement" ? false : initial.taxable !== false,
               payer: initial.payer || "",
               moneyType: duplicateMode && initial.moneyType === "reimbursement" ? "personal" : initial.moneyType || "work_income",
@@ -10659,7 +10659,7 @@ function allocationDateAfter(day, months) {
               kind: initialIncomeSourceId ? "in" : initialKind,
               date: TK,
               accountId: accounts.find(a => !a.archived && accountCurrency(a) === "THB")?.id || null,
-              category: initialIncomeSourceId ? normalizeIncomeCategory(incomeSources.find(source => source.id === initialIncomeSourceId)?.category || "Work") : studioMode ? "ห้องซ้อม" : "",
+              category: initialIncomeSourceId ? normalizeIncomeCategory(incomeSources.find(source => source.id === initialIncomeSourceId)?.category || "Work") : studioMode ? "ห้องซ้อม" : initialKind === "in" ? "Work" : "",
               taxable: true,
               payer: initialIncomeSourceId ? (incomeSources.find(source => source.id === initialIncomeSourceId)?.customerName || "") : "",
               moneyType: "work_income",
@@ -11731,7 +11731,7 @@ function allocationDateAfter(day, months) {
                         ? normalizeIncomeCategories(txnCategories.income || [])
                         : txnCategories.expense || [],
                     value:
-                      f.kind === "in"
+                      f.kind === "in" && f.category
                         ? normalizeIncomeCategory(f.category)
                         : f.category,
                     onChange: (v) => setF({ ...f, category: v }),
